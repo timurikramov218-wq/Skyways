@@ -260,7 +260,16 @@ body { font-family: var(--font-body); padding-block: 18px 48px; background-image
 .seg-btn[aria-pressed="true"], .bbtn[aria-pressed="true"] { color: var(--champ); background: rgba(214,191,150,0.1); border-color: rgba(214,191,150,0.45); }
 .bbtn:disabled { opacity: 0.25; cursor: default; }
 .conds { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 30px; }
-.livs { margin-top: 4px; padding-top: 14px; border-top: 1px solid var(--hair); }
+.livs { margin-top: 4px; padding-top: 14px; border-top: 1px solid var(--hair); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.livs > span { flex-basis: 100%; margin-bottom: 2px; }
+/* livery choices look and feel like buttons: a soft pill with a hairline edge */
+.livs .seg-btn { background: var(--g2); border: 1px solid var(--hair); padding: 8px 14px; font-size: 13px; }
+.livs .seg-btn:hover { border-color: var(--hair-2); }
+.livs .seg-btn[aria-pressed="true"] { border-color: rgba(214,191,150,0.6); }
+/* while the briefing is open the flight buttons step aside: only the ⋯ menu stays, on a solid header bar */
+.stage:has(#brief:not([hidden])) #camCycle, .stage:has(#brief:not([hidden])) #apToggle, .stage:has(#brief:not([hidden])) #menuBtn { display: none; }
+.stage:has(#brief:not([hidden])) .topbar { left: auto; right: 0; width: auto; background: none; padding-bottom: 0; }
+.stage:has(#brief:not([hidden])) .dialog { padding-top: 16px; }
 .seg > span { flex-basis: 100%; font: 500 11px var(--font-body); letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-3); margin: 0 0 4px 14px; }
 
 .planes { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
@@ -407,12 +416,12 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .btn.play::after { content: "▶"; font-size: 11px; }
 .btn.alt.next::after { content: "→"; }
 /* featured routes */
-.featured { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.featured { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .feat { display: grid; gap: 3px; text-align: left; font: inherit; color: var(--fg); background: var(--g2); border: 1px solid var(--hair); border-radius: 12px; padding: 11px 14px; cursor: pointer; min-width: 0; }
 .feat:hover { border-color: var(--hair-2); }
 .feat[aria-pressed="true"] { border-color: var(--champ); }
 .feat b { font: 400 17px var(--font-display); }
-.feat span { font: 400 11px var(--font-mono); color: var(--fg-3); overflow-wrap: anywhere; }
+.feat span { font: 400 11px var(--font-mono); color: var(--fg-3); overflow-wrap: normal; line-height: 1.55; }
 .sub-h { margin: 0; font: 500 11px var(--font-body); letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-3); }
 /* replay */
 .replay { position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(760px, calc(100% - 20px)); box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; background: rgba(23,23,26,0.86); border: 1px solid var(--hair-2); border-radius: 16px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 6; }
@@ -1851,14 +1860,14 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   const randomLiv = (kind) => { const l = LIVERIES[kind]; return l && Math.random() < 0.85 ? l[Math.floor(Math.random() * l.length)] : "house"; };
   let chosenLiv = {}; try { chosenLiv = JSON.parse(load("sw-liv") || "{}") || {}; } catch { chosenLiv = {}; }
   const PLANES = {
-    b737: { name: "Airbus A320", type: "Narrow-body airliner · detailed 3D model", packed: true, build: build737model, thrust: 3.1, vmax: 128, stall: 56, roll: 0.42, pitch: 0.32, yaw: 0.18, turn: 0.75, gearH: 3.2, retract: true, cam: [64, 13], cock: [1.0, -17.4], wingX: 17.9, brake: 4.5, shadow: 18, big: true, stats: [0.8, 0.3, 0.35] },
+    b737: { name: "Airbus A320", type: "Narrow-body airliner · CFM56 twin", packed: true, build: build737model, thrust: 3.1, vmax: 128, stall: 56, roll: 0.42, pitch: 0.32, yaw: 0.18, turn: 0.75, gearH: 3.2, retract: true, cam: [64, 13], cock: [1.0, -17.4], wingX: 17.9, brake: 4.5, shadow: 18, big: true, stats: [0.8, 0.3, 0.35] },
     b77w: { name: "Boeing 777-300ER", type: "Long-haul wide-body · twin GE90", packed: true, build: build77Wmodel, thrust: 2.8, vmax: 146, stall: 62, roll: 0.32, pitch: 0.26, yaw: 0.15, turn: 0.62, gearH: 5.3, retract: true, cam: [128, 24], cock: [2.6, -31.6], wingX: 32.4, brake: 3.9, shadow: 37, big: true, stats: [0.97, 0.2, 0.26] },
     a330: { name: "Airbus A330-300", type: "Wide-body airliner · twin · raked winglets", packed: true, build: buildA330model, thrust: 2.9, vmax: 140, stall: 60, roll: 0.34, pitch: 0.27, yaw: 0.15, turn: 0.66, gearH: 4.7, retract: true, cam: [118, 22], cock: [1.35, -28.0], wingX: 29.4, brake: 4.0, shadow: 33, big: true, stats: [0.93, 0.22, 0.28] },
     b744: { name: "Boeing 747-400", type: "Jumbo jet · upper deck · four engines", packed: true, build: build744model, thrust: 2.7, vmax: 148, stall: 64, roll: 0.3, pitch: 0.25, yaw: 0.14, turn: 0.6, gearH: 5.2, retract: true, cam: [132, 27], cock: [3.5, -28.4], wingX: 31.2, brake: 3.8, shadow: 38, big: true, stats: [0.96, 0.18, 0.24] },
     b747: { name: "Boeing 747-400F", type: "Jumbo freighter · four engines", packed: true, freighter: true, cargo: 113, build: build747model, thrust: 2.7, vmax: 148, stall: 64, roll: 0.3, pitch: 0.25, yaw: 0.14, turn: 0.6, gearH: 5.2, retract: true, cam: [132, 27], cock: [3.5, -28.4], wingX: 31.2, brake: 3.8, shadow: 38, big: true, stats: [0.96, 0.18, 0.24] },
     b763: { name: "Boeing 767-300ER", type: "Wide-body airliner · stretched 767", packed: true, build: build763model, thrust: 3.0, vmax: 140, stall: 58, roll: 0.36, pitch: 0.28, yaw: 0.16, turn: 0.68, gearH: 4.2, retract: true, cam: [98, 19], cock: [1.2, -24.3], wingX: 23.6, brake: 4.1, shadow: 28, big: true, stats: [0.92, 0.24, 0.29] },
     a321: { name: "Airbus A321", type: "Narrow-body airliner · stretched A320", packed: true, build: buildA321model, thrust: 2.9, vmax: 128, stall: 58, roll: 0.4, pitch: 0.3, yaw: 0.17, turn: 0.72, gearH: 3.2, retract: true, cam: [72, 14], cock: [1.0, -20.8], wingX: 17.9, brake: 4.4, shadow: 19, big: true, stats: [0.84, 0.28, 0.33] },
-    mh: { name: "Boeing 737", type: "Narrow-body airliner · low-poly 3D model", packed: true, build: buildMHmodel, thrust: 3.2, vmax: 130, stall: 55, roll: 0.44, pitch: 0.33, yaw: 0.18, turn: 0.75, gearH: 3.0, retract: true, cam: [60, 13], cock: [1.0, -15.6], wingX: 18.9, brake: 4.5, shadow: 18, big: true, stats: [0.8, 0.32, 0.38] },
+    mh: { name: "Boeing 737", type: "Narrow-body airliner · best-selling jet", packed: true, build: buildMHmodel, thrust: 3.2, vmax: 130, stall: 55, roll: 0.44, pitch: 0.33, yaw: 0.18, turn: 0.75, gearH: 3.0, retract: true, cam: [60, 13], cock: [1.0, -15.6], wingX: 18.9, brake: 4.5, shadow: 18, big: true, stats: [0.8, 0.32, 0.38] },
   };
   for (const k of Object.keys(PLANES)) PLANES[k].kind = k;
   (function realScale() {
@@ -4995,7 +5004,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       const b = document.createElement("button"); b.type = "button"; b.className = "feat";
       b.setAttribute("aria-pressed", String(fromSel.value === String(AIRPORTS.indexOf(f)) && toSel.value === String(AIRPORTS.indexOf(t)) && chosen === r.plane));
       const tt = document.createElement("b"); tt.textContent = r.t;
-      const s1 = document.createElement("span"); s1.textContent = `${f.code} → ${t.code} · ${routeKm(f, t)} km · RWY ${t.label} ${t.len} m`;
+      const s1 = document.createElement("span"); s1.textContent = `${f.code}\u00a0→\u00a0${t.code} · ${routeKm(f, t)}\u00a0km · RWY\u00a0${t.label} ${t.len}\u00a0m`;   // units never wrap away from their numbers
       const s2 = document.createElement("span"); s2.textContent = `${PLANES[r.plane].name} · ${TIME_LBL[r.time]} · ${WX_LBL[r.wx]}`;
       b.append(tt, s1, s2);
       b.addEventListener("click", () => applyFeatured(r));
