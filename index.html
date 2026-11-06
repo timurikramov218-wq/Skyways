@@ -2789,6 +2789,29 @@ vec3 liveryAt(vec3 p, out float fus) {
     for (const sx of [-1, 1]) { const h = hit(sx * R * 3, cy + R * 0.05, pz, -sx, 0, 0, R * 3)[0]; if (h) out.pitots.push(new THREE.Vector3(h.point.x + sx * 0.02, h.point.y, pz)); }
     return (PACK_CACHE[ck] = out);
   }
+  // find a nacelle's intake on the model: its true centre, the inner radius of the lip and how far in the fan face can sit.
+  // Rays go outward from the guessed centre in the plane just behind the lip; the hits trace the inside of the cowl.
+  function fitIntake(key, root, x0, y0, r0, zFront) {
+    const ck = `intake:${key}:${x0.toFixed(2)}`; if (PACK_CACHE[ck]) return PACK_CACHE[ck];
+    const solids = root.children.filter((c) => c.isMesh), ray = new THREE.Raycaster(), O = new THREE.Vector3(), D = new THREE.Vector3();
+    // the lip's front: rays parallel to the axis at 0.85 r, from far ahead
+    let zLip = null;
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; ray.set(O.set(x0 + Math.cos(a) * r0 * 0.85, y0 + Math.sin(a) * r0 * 0.85, zFront - 12), D.set(0, 0, 1)); ray.far = 24; const h = ray.intersectObjects(solids, false)[0]; if (h && (zLip === null || h.point.z < zLip)) zLip = h.point.z; }
+    if (zLip === null) zLip = zFront;
+    let cx = x0, cy = y0, rIn = r0 * 0.85;
+    for (let pass = 0; pass < 2; pass++) {
+      const z = zLip + r0 * 0.3, hits = [];
+      for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; ray.set(O.set(cx, cy, z), D.set(Math.cos(a), Math.sin(a), 0)); ray.far = r0 * 2; const h = ray.intersectObjects(solids, false)[0]; if (h && h.distance > r0 * 0.25) hits.push(h.point); }
+      if (hits.length < 12) break;
+      cx = hits.reduce((s2, p) => s2 + p.x, 0) / hits.length; cy = hits.reduce((s2, p) => s2 + p.y, 0) / hits.length;
+      const ds = hits.map((p) => Math.hypot(p.x - cx, p.y - cy)).sort((a2, b2) => a2 - b2); rIn = ds[Math.floor(ds.length * 0.25)];
+    }
+    // the fan face: just inside the lip, but in front of anything the model itself has at the centre (some models paint their own)
+    let zFan = zLip + rIn * 0.35;
+    ray.set(O.set(cx, cy, zLip - 2), D.set(0, 0, 1)); ray.far = rIn * 3 + 2; const hc = ray.intersectObjects(solids, false)[0];
+    if (hc && hc.point.z < zLip + rIn * 0.9) zFan = zLip + rIn * 0.02;   // the model has its own fan face: ours goes right behind the lip, in front of it
+    return (PACK_CACHE[ck] = { x: cx, y: cy, z: zFan, r: rIn });
+  }
   // shared pieces for the engine fronts and the aircraft lights
   const FAN_GEO = new THREE.CircleGeometry(1, 36); FAN_GEO.rotateY(Math.PI);
   const FAN_MAT = new THREE.MeshStandardMaterial({ map: canvasTex(256, 256, (g, W) => {
@@ -2854,10 +2877,12 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     // engine fronts: a bladed fan and a spinner that turn with the engines
     const fans = [];
+    root.updateMatrixWorld(true);
     for (const e of [o.eng, o.eng2]) if (e) for (const sx of [-1, 1]) {
-      const fan = new THREE.Group(); fan.position.set(sx * e[0], e[1], e[3] + e[2] * 0.3);
-      const disc = new THREE.Mesh(FAN_GEO, FAN_MAT); disc.scale.setScalar(e[2] * 0.76); fan.add(disc);
-      const cone = new THREE.Mesh(SPIN_GEO, SPIN_MAT); cone.scale.setScalar(e[2]); fan.add(cone);
+      const fit = fitIntake(key, root, sx * e[0], e[1], e[2], e[3]);
+      const fan = new THREE.Group(); fan.position.set(fit.x, fit.y, fit.z);
+      const disc = new THREE.Mesh(FAN_GEO, FAN_MAT); disc.scale.setScalar(fit.r * 0.97); fan.add(disc);
+      const cone = new THREE.Mesh(SPIN_GEO, SPIN_MAT); cone.scale.setScalar(fit.r * 1.15); fan.add(cone);
       root.add(fan); fans.push(fan);
     }
     // lights: red (left) and green (right) at the wingtips, white strobes there, a white tail light, red beacons top and bottom
