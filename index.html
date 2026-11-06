@@ -2639,6 +2639,47 @@ vec3 liveryAt(vec3 p, out float fus) {
       }
     }
   }
+  // ---------- airframe details, measured on each model once by casting rays at it ----------
+  const DETAIL_M = { paint: new THREE.MeshStandardMaterial({ color: 0xe9ebee, roughness: 0.4, metalness: 0.15 }), dark: new THREE.MeshStandardMaterial({ color: 0x3a3e44, roughness: 0.5, metalness: 0.4 }), metal: new THREE.MeshStandardMaterial({ color: 0xc8ccd1, roughness: 0.25, metalness: 0.9 }) };
+  const DETAIL_G = {
+    pod: (() => { const g = new THREE.SphereGeometry(0.5, 14, 10); return g; })(),                       // canoe: a stretched sphere
+    blade: (() => { const g = new THREE.BoxGeometry(0.05, 0.42, 0.34); g.translate(0, 0.21, 0); const p = g.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) > 0.2) p.setZ(i, p.getZ(i) * 0.5 + 0.12); return g; })(),
+    apu: (() => { const g = new THREE.CylinderGeometry(0.2, 0.26, 0.5, 14, 1, true); g.rotateX(Math.PI / 2); return g; })(),
+    pitot: (() => { const g = new THREE.CylinderGeometry(0.025, 0.035, 0.42, 6); g.rotateX(Math.PI / 2); g.translate(0, 0, -0.1); return g; })(),
+  };
+  function detailGeometry(key, root, o, tip) {
+    const ck = `detail:${key}`; if (PACK_CACHE[ck]) return PACK_CACHE[ck];
+    const solids = root.children.filter((c) => c.isMesh), ray = new THREE.Raycaster(), V0 = new THREE.Vector3(), D = new THREE.Vector3();
+    const hit = (ox, oy, oz, dx, dy, dz, far) => { ray.set(V0.set(ox, oy, oz), D.set(dx, dy, dz)); ray.far = far; return ray.intersectObjects(solids, false); };
+    const out = { fairings: [], antennas: [], apu: null, pitots: [] }, R = o.R, cy = o.cy, len = o.zTail - o.zNose;
+    // flap-track fairings: at three stations along each wing, between the engines, under the trailing edge
+    const xr = R * 1.25, xt = Math.abs(tip[0]) * 0.78, eng = [o.eng, o.eng2].filter(Boolean);
+    for (const t of [0.12, 0.42, 0.68]) {
+      let x = xr + (xt - xr) * t;
+      for (const e of eng) if (Math.abs(x - e[0]) < e[2] * 1.4) x = e[0] + Math.sign(x - e[0] || 1) * e[2] * 1.5;
+      let zLE = null, zTE = null, yLow = 0;
+      for (let z = o.zNose + len * 0.2; z < o.zNose + len * 0.75; z += 0.3) {
+        const h = hit(x, cy - R * 3, z, 0, 1, 0, R * 4).filter((q) => q.point.y > cy - R * 1.6 && q.point.y < cy + R * 0.6)[0];
+        if (h) { if (zLE === null) zLE = z; zTE = z; yLow = h.point.y; }
+      }
+      if (zLE === null || zTE - zLE < 1.2) continue;
+      const chord = zTE - zLE, l = chord * 0.75, sc = R / 2.7;
+      out.fairings.push({ x, y: yLow - 0.18 * sc, z: zTE - chord * 0.08, w: 0.42 * sc, h: 0.5 * sc, l });
+    }
+    // antennas: two on the crown, one under the belly
+    for (const [fz, up] of [[0.3, true], [0.52, true], [0.38, false]]) {
+      const z = o.zNose + len * fz, h = hit(0, up ? cy + R * 3 : cy - R * 3, z, 0, up ? -1 : 1, 0, R * 4)[0];
+      if (h) out.antennas.push([0, h.point.y + (up ? -0.02 : 0.02), z, up]);
+    }
+    // APU exhaust at the very end of the tail cone
+    let best = null;
+    for (let y = cy - R * 0.4; y <= cy + R * 1.0; y += R * 0.08) { const h = hit(0, y, o.zTail + 20, 0, 0, -1, 30)[0]; if (h && (!best || h.point.z > best.z)) best = h.point.clone(); }
+    if (best) { best.z -= 0.1; out.apu = best; }
+    // pitot probes on both sides of the nose, below the cockpit windows
+    const pz = o.zNose + len * 0.035;
+    for (const sx of [-1, 1]) { const h = hit(sx * R * 3, cy + R * 0.05, pz, -sx, 0, 0, R * 3)[0]; if (h) out.pitots.push(new THREE.Vector3(h.point.x + sx * 0.02, h.point.y, pz)); }
+    return (PACK_CACHE[ck] = out);
+  }
   // shared pieces for the engine fronts and the aircraft lights
   const FAN_GEO = new THREE.CircleGeometry(1, 36); FAN_GEO.rotateY(Math.PI);
   const FAN_MAT = new THREE.MeshStandardMaterial({ map: canvasTex(256, 256, (g, W) => {
@@ -2686,6 +2727,20 @@ vec3 liveryAt(vec3 p, out float fus) {
       gearG.userData.legs = gearLegs;
     }
     if (!gearG.userData.legs) mergeStatic(gearG);   // the model's own gear: one mesh per material
+    // small airframe details the source models lack: flap-track fairings under the wings, antennas, APU exhaust, pitot probes
+    if (o.cy !== undefined && o.zTail !== undefined) {
+      root.updateMatrixWorld(true);
+      const det = new THREE.Group(); root.add(det);
+      const geo = detailGeometry(key, root, o, pk.tip);
+      const fairM = DETAIL_M.paint, darkM = DETAIL_M.dark;
+      for (const f of geo.fairings) for (const sx of [-1, 1]) {
+        const m = new THREE.Mesh(DETAIL_G.pod, fairM); m.scale.set(f.w, f.h, f.l); m.position.set(sx * f.x, f.y, f.z); m.rotation.x = -0.04; det.add(m);
+      }
+      for (const [x, y, z, up] of geo.antennas) { const m = new THREE.Mesh(DETAIL_G.blade, darkM); m.position.set(x, y, z); if (!up) m.rotation.z = Math.PI; det.add(m); }
+      if (geo.apu) { const m = new THREE.Mesh(DETAIL_G.apu, darkM); m.position.copy(geo.apu); m.scale.setScalar(o.R / 2.7); det.add(m); }
+      for (const pp of geo.pitots) { const m = new THREE.Mesh(DETAIL_G.pitot, DETAIL_M.metal); m.position.copy(pp); det.add(m); }
+      mergeStatic(det);
+    }
     // engine fronts: a bladed fan and a spinner that turn with the engines
     const fans = [];
     for (const e of [o.eng, o.eng2]) if (e) for (const sx of [-1, 1]) {
