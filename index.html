@@ -2170,8 +2170,8 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
 uniform vec4 uGeo; uniform vec4 uZ; uniform vec4 uLn; uniform vec4 uLn2; uniform vec4 uTb; uniform vec4 uFl;
 uniform vec3 uBody; uniform vec3 uBelly; uniform vec3 uTop; uniform vec3 uStr; uniform vec3 uStr2; uniform vec3 uFin1; uniform vec3 uFin2; uniform vec3 uFin3; uniform vec3 uWing; uniform vec3 uNose; uniform vec3 uLead;
 uniform sampler2D uTitle; uniform float uCabin;
-uniform vec4 uFg0; uniform vec4 uFg1; uniform vec4 uEng; uniform vec4 uEz; uniform vec3 uEngC; uniform vec3 uLip; uniform vec4 uMask; uniform vec4 uEng2; uniform vec4 uEz2; uniform float uPaintWin; uniform vec4 uUp; uniform float uHump; uniform vec4 uDoor; uniform vec2 uDoorB; uniform vec2 uWinR; uniform vec4 uEmb; uniform vec3 uEmbC; uniform vec3 uEmbC2; uniform sampler2D uFinTex; uniform sampler2D uRegTex; uniform float uHasReg;
-float gMask = 0.0, gGlass = 0.0;   // set when a pixel lies in the A350 mask: then even the model's own dark glass is repainted
+uniform vec4 uFg0; uniform vec4 uFg1; uniform vec4 uEng; uniform vec4 uEz; uniform vec3 uEngC; uniform vec3 uLip; uniform vec4 uMask; uniform vec4 uEng2; uniform vec4 uEz2; uniform float uPaintWin; uniform vec4 uUp; uniform float uHump; uniform vec4 uDoor; uniform vec2 uDoorB; uniform vec2 uWinR; uniform float uHideWin; uniform float uPitch; uniform vec4 uEmb; uniform vec3 uEmbC; uniform vec3 uEmbC2; uniform sampler2D uFinTex; uniform sampler2D uRegTex; uniform float uHasReg;
+float gMask = 0.0, gGlass = 0.0, gHide = 0.0;   // set when a pixel lies in the A350 mask: then even the model's own dark glass is repainted
 vec3 liveryAt(vec3 p, out float fus) {
   fus = 0.0;
   float cy = uGeo.x, R = uGeo.y, finY = uGeo.z, finTop = uGeo.w;
@@ -2234,17 +2234,18 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (uPaintWin > 0.5 && abs(p.x) > R * 0.5) {
       // real proportions: 0.508 m window pitch (20 in), 0.25 x 0.37 m panes with round corners, 1.07 x 1.93 m doors
       float len = uZ.y - uZ.x, wz = p.z - uZ.x, wy = p.y - (cy + uZ.z * R);
+      if (uHideWin > 0.5 && f > uWinR.x - 0.075 && f < uWinR.y + 0.05 && wy > -2.0 && wy < 0.9) gHide = 1.0;   // paint over the model's own windows and doors
       float dmin = 1e3, dz0 = 0.0;
       for (int k = 0; k < 5; k++) { float dz = len * (k == 0 ? uDoor.x : k == 1 ? uDoor.y : k == 2 ? uDoor.z : k == 3 ? uDoor.w : uDoorB.x); float dd = abs(wz - dz); if (dd < dmin) { dmin = dd; dz0 = wz - dz; } }
       if (f > uWinR.x && f < uWinR.y && dmin > 0.9) {
-        vec2 q = abs(vec2((fract(wz / 0.508) - 0.5) * 0.508, wy)) - vec2(0.04, 0.1); float rr = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.085;
+        vec2 q = abs(vec2((fract(wz / uPitch) - 0.5) * uPitch, wy)) - vec2(0.04, 0.1); float rr = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.085;
         if (rr < 0.0) c = mix(vec3(0.03, 0.04, 0.05), vec3(0.08, 0.1, 0.12), smoothstep(-0.18, 0.18, wy)); else if (rr < 0.016) c *= 0.84;
       }
       { vec2 q = abs(vec2(dz0, wy + 0.6)) - vec2(0.39, 0.82); float rr = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.15;
         if (abs(rr) < 0.02) c *= 0.6;                                                          // door outline
         if (dmin < 0.2 && abs(wy - 0.05) < 0.11 && abs(dz0) < 0.12) c = vec3(0.04, 0.05, 0.06); } // small door window
       float bot = 0.05 + (0.06 - f) * 2.2;
-      if (uUp.w < 0.5 && f > 0.018 && f < 0.062 && v > bot && v < bot + 0.15 && abs(fract(f / 0.011) - 0.5) < 0.4) c = vec3(0.02, 0.024, 0.03);
+      if (uUp.w < 0.5 && uHideWin < 0.5 && f > 0.018 && f < 0.062 && v > bot && v < bot + 0.15 && abs(fract(f / 0.011) - 0.5) < 0.4) c = vec3(0.02, 0.024, 0.03);
     }
     if (uUp.w > 0.5 && abs(p.x) > 0.8) {   // 747 upper deck: 20 windows a frame pair apart, and the upper-deck door
       float uz = p.z - uUp.x, uy = p.y - uUp.z;
@@ -2277,7 +2278,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     shader.fragmentShader = LIV_FRAG + shader.fragmentShader.replace("#include <color_fragment>", `#include <color_fragment>
   { float fus; vec3 lc = liveryAt(vLp, fus);
     if (uCabin > 0.5 && fus > 0.5) discard;
-    float pnt = max(smoothstep(0.3, 0.42, max(max(vColor.r, vColor.g), vColor.b)), gMask);
+    float pnt = max(smoothstep(0.3, 0.42, max(max(vColor.r, vColor.g), vColor.b)), max(gMask, gHide));
     diffuseColor.rgb = mix(diffuseColor.rgb, lc, pnt); }`).replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
   if (gMask > 0.5) roughnessFactor = gGlass > 0.5 ? 0.12 : 0.85;`).replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
   if (gMask > 0.5) metalnessFactor = 0.0;`);
@@ -2303,7 +2304,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       uEng: { value: new THREE.Vector4(o.eng[0], o.eng[1], o.eng[2], 1) }, uEz: { value: new THREE.Vector4(o.eng[3], o.eng[4], 0, 0) },
       uEng2: { value: o.eng2 ? new THREE.Vector4(o.eng2[0], o.eng2[1], o.eng2[2], 1) : new THREE.Vector4(0, 0, 0, 0) }, uEz2: { value: new THREE.Vector4(o.eng2 ? o.eng2[3] : 0, o.eng2 ? o.eng2[4] : 0, 0, 0) },
       uEngC: V3(L.engine || "#eef0f2"), uLip: V3("#c3c7cc"), uPaintWin: { value: o.paintWindows ? 1 : 0 }, uUp: { value: new THREE.Vector4(...(o.upper || [0, 0, 0, 0])) }, uHump: { value: o.hump || 0 },
-      uDoor: { value: new THREE.Vector4(...(o.doors || [0.13, 0.27, 0.47, 0.69, 0.855]).slice(0, 4)) }, uDoorB: { value: new THREE.Vector2((o.doors || [0, 0, 0, 0, 0.855])[4], o.upDoor ?? -9) }, uWinR: { value: new THREE.Vector2(...(o.winRange || [0.115, 0.9])) }, uMask: { value: o.mask ? new THREE.Vector4(o.mask[0], o.mask[1], o.mask[2], o.mask[3]) : new THREE.Vector4(0, 0, 0, 0) },
+      uDoor: { value: new THREE.Vector4(...(o.doors || [0.13, 0.27, 0.47, 0.69, 0.855]).slice(0, 4)) }, uDoorB: { value: new THREE.Vector2((o.doors || [0, 0, 0, 0, 0.855])[4], o.upDoor ?? -9) }, uWinR: { value: new THREE.Vector2(...(o.winRange || [0.115, 0.9])) }, uHideWin: { value: o.hideWin ? 1 : 0 }, uPitch: { value: o.pitch || 0.508 }, uMask: { value: o.mask ? new THREE.Vector4(o.mask[0], o.mask[1], o.mask[2], o.mask[3]) : new THREE.Vector4(0, 0, 0, 0) },
     };
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, metalness: Math.min(pt.m, 0.3), roughness: clamp(pt.r, 0.24, 0.42), side: THREE.DoubleSide, envMapIntensity: 1.1 });   // glossy paint that picks up the sky
     mat.userData.u = u; mat.onBeforeCompile = liveryCompile;
@@ -2556,6 +2557,51 @@ vec3 liveryAt(vec3 p, out float fus) {
     [["SPD", AP.spd], ["HDG", String(Math.round(AP.hdg) % 360).padStart(3, "0")], ["ALT", AP.alt], ["V/S", AP.vs]].forEach(([l, v], i) => { m.g.fillStyle = "#9aa3ab"; m.g.font = "12px monospace"; m.g.fillText(l, 64 + i * 128, 14); m.g.fillStyle = "#ffb43d"; m.g.font = "bold 22px monospace"; m.g.fillText(String(v), 64 + i * 128, 40); });
     m.t.needsUpdate = true;
   }
+  // ---------- landing gear: oleo strut with chrome piston, torque link, side brace, door, axles, rimmed tyres ----------
+  const GEAR_M = {
+    paint: new THREE.MeshStandardMaterial({ color: 0xd9dcdf, roughness: 0.45, metalness: 0.2 }),
+    chrome: new THREE.MeshStandardMaterial({ color: 0xe6eaee, roughness: 0.12, metalness: 1 }),
+    dark: new THREE.MeshStandardMaterial({ color: 0x4a4f56, roughness: 0.5, metalness: 0.6 }),
+    tyre: new THREE.MeshStandardMaterial({ color: 0x18191b, roughness: 0.92, metalness: 0 }),
+    rim: new THREE.MeshStandardMaterial({ color: 0xbfc4ca, roughness: 0.3, metalness: 0.8 }),
+    door: new THREE.MeshStandardMaterial({ color: 0xeef0f2, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide }),
+  };
+  const GEAR_G = {
+    tyre: (() => { const g = new THREE.TorusGeometry(0.7, 0.3, 12, 28); g.rotateY(Math.PI / 2); return g; })(),
+    rim: (() => { const g = new THREE.CylinderGeometry(0.46, 0.46, 0.5, 24); g.rotateZ(Math.PI / 2); return g; })(),
+    hub: (() => { const g = new THREE.CylinderGeometry(0.16, 0.2, 0.62, 12); g.rotateZ(Math.PI / 2); return g; })(),
+    cyl: new THREE.CylinderGeometry(1, 1, 1, 12),
+    box: new THREE.BoxGeometry(1, 1, 1),
+  };
+  // one leg, built downward from its attachment point (local y = 0) to the axle at y = -len
+  function buildGearLeg(leg, { len, r, nose, wheelsAcross, bogie, side }) {
+    const add = (geo, mat, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, ry, rz); leg.add(m); return m; };
+    const so = nose ? 0.11 : 0.19, piston = len * 0.38, axleY = -len, tw = r * 0.62;   // strut radius, chrome stroke, tyre width
+    add(GEAR_G.cyl, GEAR_M.paint, 0, -(len - piston) / 2, 0, so, len - piston, so);                     // oleo cylinder
+    add(GEAR_G.cyl, GEAR_M.chrome, 0, -(len - piston) - piston / 2 + 0.05, 0, so * 0.72, piston, so * 0.72); // chrome piston
+    // torque link: two short arms in a V in front of the strut
+    add(GEAR_G.box, GEAR_M.dark, 0, -(len - piston) - 0.05, -so * 1.6, 0.06, piston * 0.55, 0.05, 0.6, 0, 0);
+    add(GEAR_G.box, GEAR_M.dark, 0, -(len - piston) - piston * 0.45, -so * 1.6, 0.06, piston * 0.55, 0.05, -0.6, 0, 0);
+    // side brace (main) or drag brace (nose)
+    if (nose) add(GEAR_G.cyl, GEAR_M.dark, 0, -len * 0.22, -len * 0.25, 0.05, len * 0.62, 0.05, -0.9, 0, 0);
+    else add(GEAR_G.cyl, GEAR_M.dark, side * len * 0.24, -len * 0.25, 0, 0.06, len * 0.62, 0.06, 0, 0, side * 0.75);
+    // strut-mounted gear door on the outboard side
+    if (!nose) add(GEAR_G.box, GEAR_M.door, side * (so + 0.08), -len * 0.42, 0, 0.04, len * 0.62, 1.1);
+    else add(GEAR_G.cyl, GEAR_M.dark, 0, -len + piston * 0.9, 0, so * 1.5, 0.12, so * 1.5);           // steering collar
+    // wheels: one axle (pairs) or a bogie truck with 2 or 3 axles
+    const axles = bogie === 1 ? [0] : bogie === 2 ? [-0.68, 0.68] : [-1.4, 0, 1.4];
+    if (bogie > 1) add(GEAR_G.box, GEAR_M.dark, 0, axleY, 0, 0.22, 0.24, axles[axles.length - 1] * r * 4 + 0.6);
+    const gap = tw * 1.15;
+    for (const az of axles) {
+      add(GEAR_G.cyl, GEAR_M.dark, 0, axleY, az * r * 2, 0.07, gap * 2 + tw, 0.07, 0, 0, Math.PI / 2);      // axle
+      for (const sx of wheelsAcross === 2 ? [-1, 1] : [0]) {
+        const wx = sx * gap, wz = az * r * 2;
+        add(GEAR_G.tyre, GEAR_M.tyre, wx, axleY, wz, tw / 0.6 * 0.95, r, r);
+        add(GEAR_G.rim, GEAR_M.rim, wx, axleY, wz, tw / 0.5 * 0.8, r, r);
+        add(GEAR_G.hub, GEAR_M.dark, wx + sx * 0.02, axleY, wz, tw / 0.62, r, r);
+      }
+    }
+  }
   // shared pieces for the engine fronts and the aircraft lights
   const FAN_GEO = new THREE.CircleGeometry(1, 36); FAN_GEO.rotateY(Math.PI);
   const FAN_MAT = new THREE.MeshStandardMaterial({ map: canvasTex(256, 256, (g, W) => {
@@ -2588,18 +2634,21 @@ vec3 liveryAt(vec3 p, out float fus) {
         const hit = ray.intersectObjects(solids, false)[0];
         return (PACK_CACHE[ck] = hit ? hit.point.y + 0.05 : -0.8);
       };
-      const legs = [[o.mainX, o.mainZ, 2], [-o.mainX, o.mainZ, 2], [0, o.noseZ, 2]];
-      if (o.bodyGear) legs.push([o.bodyGear[0], o.bodyGear[1], 2], [-o.bodyGear[0], o.bodyGear[1], 2]);   // 747: body gear inboard of the wing gear
-      for (const [x, z, n] of legs) {
-        const nose = z === o.noseZ, rr = nose ? r * 0.8 : r;
-        gearG.add(strut(x, underside(x, z), z, x, -gh + rr, z, nose ? 0.1 : 0.16));
-        for (const dz of (o.bogie && !nose ? (o.six ? [-1.35, 0, 1.35] : [-0.65, 0.65]) : [0])) for (let k = 0; k < n; k++) {
-          const w = wheel(rr, 0.32); w.position.set(x + (k - 0.5) * 0.7, -gh + rr, z + dz); gearG.add(w);
-        }
-        if (o.bogie && !nose) { const beam = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, o.six ? 3.2 : 1.6), M.metal); beam.position.set(x, -gh + rr, z); gearG.add(beam); }
+      const legs = [[o.mainX, o.mainZ, false], [-o.mainX, o.mainZ, false], [0, o.noseZ, true]];
+      if (o.bodyGear) legs.push([o.bodyGear[0], o.bodyGear[1], false], [-o.bodyGear[0], o.bodyGear[1], false]);   // 747: body gear inboard of the wing gear
+      const gearLegs = [];
+      for (const [x, z, nose] of legs) {
+        const top = underside(x, z), rr = nose ? r * 0.78 : r;
+        const leg = new THREE.Group(); leg.position.set(x, top, z); gearG.add(leg);
+        buildGearLeg(leg, { len: top - (-gh + rr), r: rr, nose, wheelsAcross: 2, bogie: o.bogie && !nose ? (o.six ? 3 : 2) : 1, side: Math.sign(x) || 1 });
+        mergeStatic(leg);
+        // retraction: main legs fold sideways in towards the fuselage, the nose leg folds forwards
+        leg.userData.fold = nose ? { axis: "x", sign: 1 } : { axis: "z", sign: -(Math.sign(x) || 1) };
+        gearLegs.push(leg);
       }
+      gearG.userData.legs = gearLegs;
     }
-    mergeStatic(gearG);   // struts and tyres: one mesh per material
+    if (!gearG.userData.legs) mergeStatic(gearG);   // the model's own gear: one mesh per material
     // engine fronts: a bladed fan and a spinner that turn with the engines
     const fans = [];
     for (const e of [o.eng, o.eng2]) if (e) for (const sx of [-1, 1]) {
@@ -2612,7 +2661,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const tip = new THREE.Vector3(...pk.tip), glow = (col, size, x, y, z) => { const sp = new THREE.Sprite(LIGHT_MAT[col]); sp.scale.setScalar(size); sp.position.set(x, y, z); root.add(sp); return sp; };
     glow("red", 1.1, -tip.x - 0.15, tip.y, tip.z); glow("green", 1.1, tip.x + 0.15, tip.y, tip.z);
     if (o.zTail !== undefined) glow("white", 0.9, 0, o.cy, o.zTail + 0.2);
-    const strobes = [glow("strobe", 2.4, tip.x + 0.2, tip.y, tip.z + 0.4), glow("strobe", 2.4, -tip.x - 0.2, tip.y, tip.z + 0.4)];
+    const strobes = [glow("strobe", 1.6, tip.x + 0.2, tip.y, tip.z + 0.4), glow("strobe", 1.6, -tip.x - 0.2, tip.y, tip.z + 0.4)];
     const beacon = new THREE.Group(); root.add(beacon);
     if (o.cy !== undefined) { const b1 = new THREE.Sprite(LIGHT_MAT.beacon); b1.scale.setScalar(1.3); b1.position.set(0, o.cy + o.R * 1.02 + (o.hump ? o.hump * 0.5 : 0), o.zNose * 0.15); beacon.add(b1); const b2 = new THREE.Sprite(LIGHT_MAT.beacon); b2.scale.setScalar(1.3); b2.position.set(0, o.cy - o.R * 1.02, o.zNose * 0.05); beacon.add(b2); }
     const dummy = () => new THREE.Object3D();
@@ -2620,8 +2669,8 @@ vec3 liveryAt(vec3 p, out float fus) {
   }
   // measured on the source models: fuselage axis/radius, window line, nose/tail, fin [root y, tip y, root LE, root TE, tip LE, tip TE], engine [x, y, r, z front, z back]
   var PACK_OPTS = {
-    b737: { cy: 1.08, R: 2.16, win: 0.19, zNose: -19.9, zTail: 19.5, finTop: 9.2, fin: [3.1, 9.2, 12.0, 19.5, 17.57, 19.53], eng: [5.16, -0.9, 1.05, -6.6, -2.9], tailZ: 19.6, beaconY: 2.2 },
-    mh: { cy: 1.1, R: 2.1, win: 0.1, zNose: -17.7, zTail: 16.6, finTop: 10.7, fin: [3.0, 10.7, 10.53, 15.42, 15.42, 16.61], eng: [5.04, -1.23, 1.25, -4.9, -1.6], bodyOnly: true, addGear: true, gearH: 3.0, mainX: 2.7, mainZ: 1.6, noseZ: -13.6, tailZ: 17.6, beaconY: 2.0 },
+    b737: { paintWindows: true, hideWin: true, pitch: 0.533, doors: [0.16, 0.43, 0.46, 0.89, -5], winRange: [0.19, 0.86], cy: 1.08, R: 2.16, win: 0.19, zNose: -19.9, zTail: 19.5, finTop: 9.2, fin: [3.1, 9.2, 12.0, 19.5, 17.57, 19.53], eng: [5.16, -0.9, 1.05, -6.6, -2.9], tailZ: 19.6, beaconY: 2.2 },
+    mh: { paintWindows: true, hideWin: true, pitch: 0.508, doors: [0.14, 0.46, 0.88, -5, -5], winRange: [0.17, 0.85], cy: 1.1, R: 2.1, win: 0.1, zNose: -17.7, zTail: 16.6, finTop: 10.7, fin: [3.0, 10.7, 10.53, 15.42, 15.42, 16.61], eng: [5.04, -1.23, 1.25, -4.9, -1.6], bodyOnly: true, addGear: true, gearH: 3.0, mainX: 2.7, mainZ: 1.6, noseZ: -13.6, tailZ: 17.6, beaconY: 2.0 },
     b767: { cy: 0.2, R: 2.7, win: 0.21, zNose: -24.3, zTail: 24.3, finTop: 11.41, fin: [3.43, 11.41, 13.73, 21.3, 21.57, 24.25], eng: [7.97, -2.22, 1.42, -8.8, -4.6], bodyOnly: true, addGear: true, gearH: 4.2, mainX: 4.65, mainZ: 2.4, noseZ: -18.3, bogie: true, tailZ: 24.0, beaconY: 2.8 },
   };
   PACK_OPTS.b747 = { cy: 0.2, R: 3.35, win: 0.15, zNose: -35.3, zTail: 35.3, finTop: 14.1, fin: [4.2, 14.1, 22.0, 34.0, 30.4, 35.3],
@@ -2646,14 +2695,14 @@ vec3 liveryAt(vec3 p, out float fus) {
     eng: [9.3, -2.53, 1.95, -11.9, -4.8], bodyOnly: true, addGear: true, gearH: 5.3, wheelR: 0.68, six: true, bogie: true,
     mainX: 5.5, mainZ: 1.7, noseZ: -29.5, tailZ: 36.5, beaconY: 4.0, paintWindows: true };
   function build77Wmodel(liv) { return buildPacked("b77w", packOpts("b77w"), liv); }
-  function build763model(liv) { return buildPacked("b763", packOpts("b763"), liv); }
-  function buildA321model(liv) { return buildPacked("a321", packOpts("a321"), liv); }
+  function build763model(liv) { return buildPacked("b763", packOpts("b763", { paintWindows: true, hideWin: true, doors: [0.12, 0.3, 0.5, 0.88, -5], winRange: [0.14, 0.86] }), liv); }
+  function buildA321model(liv) { return buildPacked("a321", packOpts("a321", { doors: [0.13, 0.33, 0.62, 0.9, -5], winRange: [0.15, 0.88] }), liv); }
   function build739model(liv) { return buildPacked("mh", packOpts("mh"), liv); }
   function build747model(liv) { return buildPacked("b747", packOpts("b747"), liv); }
   function build744model(liv) { return buildPacked("b744", packOpts("b744", { win: 0.24, paintWindows: true, upper: [-26.6, 21.3, 3.85, 1], upDoor: 16, hump: 1.4, doors: [0.14, 0.283, 0.453, 0.642, 0.793], winRange: [0.115, 0.84] }), liv); }
   function buildA330model(liv) {
     const d = DERIVED.a330;
-    return buildPacked("a330", packOpts("a330", { gearH: 4.7, wheelR: 0.6, zNose: derivePoint(d, 0, 0.2, -24.3)[2], noseZ: derivePoint(d, 0, -1, -18.3)[2] }), liv);
+    return buildPacked("a330", packOpts("a330", { paintWindows: true, hideWin: true, pitch: 0.533, doors: [0.12, 0.32, 0.6, 0.88, -5], winRange: [0.14, 0.86], gearH: 4.7, wheelR: 0.6, zNose: derivePoint(d, 0, 0.2, -24.3)[2], noseZ: derivePoint(d, 0, -1, -18.3)[2] }), liv);
   }
   function buildA350model(liv) {
     const d = DERIVED.a350, a = derivePoint(d, ...d.mask[0]), b = derivePoint(d, ...d.mask[1]);
@@ -3978,7 +4027,11 @@ vec3 liveryAt(vec3 p, out float fus) {
     u.elev.forEach((e) => (e.rotation.x = -S.inputs.pitch * 0.35));
     u.rud.rotation.x = S.inputs.yaw * 0.4;
     if (u.flaps) u.flaps.forEach((f) => (f.rotation.x = S.flapPos * 0.45));
-    if (spec.retract) { u.gear.scale.y = Math.max(0.02, S.gearPos); u.gear.visible = S.gearPos > 0.03; }
+    if (spec.retract) {
+      const legs = u.gear.userData && u.gear.userData.legs;
+      if (legs) { const f = (1 - S.gearPos) * Math.PI / 2; legs.forEach((l) => { l.rotation[l.userData.fold.axis] = l.userData.fold.sign * f; }); u.gear.visible = S.gearPos > 0.04; }
+      else { u.gear.scale.y = Math.max(0.02, S.gearPos); u.gear.visible = S.gearPos > 0.03; }
+    }
     const blink = (now % 1200) < 80; u.strobes.forEach((s) => (s.visible = blink));
     if (u.beacon) u.beacon.visible = (now % 1000) < 500;
     const gy = Math.max(groundY(S.pos.x, S.pos.z), 0);
