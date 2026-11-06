@@ -430,6 +430,25 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .replay .chip { padding: 9px 12px; }
 .replay .seg { flex-wrap: nowrap; }
 .stage.replaying .touch, .stage.replaying .ap, .stage.replaying #pushBtn, .stage.replaying #apToggle { display: none !important; }
+
+/* ---------- touch controls on tablets: a tidy cockpit layout ----------
+   stick bottom-left with trim/rudder in a small block beside it; throttle bottom-right with the
+   six system switches stacked above it in one column, clear of the runway view and of the screen's home bar */
+@media (pointer: coarse) and (min-width: 481px) {
+  .stick, .throttle, .tbtns2 { bottom: calc(22px + var(--dock, 0px) + env(safe-area-inset-bottom, 0px)); }
+  .stick { width: 120px; height: 120px; }
+  .throttle { height: 150px; width: 48px; }
+  .tbtns { right: 14px; bottom: calc(206px + var(--dock, 0px) + env(safe-area-inset-bottom, 0px)); grid-template-columns: 1fr; gap: 6px; width: 92px; }
+  .tbtns .tbtn, .tbtns2 .tbtn {
+    height: 36px; padding: 0 8px; border-radius: 10px; font: 600 10px var(--font-body); letter-spacing: 0.08em; text-transform: uppercase;
+    background: rgba(18,19,22,0.5); border: 1px solid rgba(255,255,255,0.14); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .tbtns .tbtn::before { display: inline-block !important; content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.25); flex: none; }
+  .tbtns .tbtn[aria-pressed="true"]::before { background: var(--champ); box-shadow: 0 0 6px var(--champ); }
+  .tbtns2 { left: 148px; grid-template-columns: repeat(2, 70px); gap: 6px; }
+  .tbtns2 .tbtn { width: 70px; white-space: nowrap; }
+}
 </style>
 
 <div class="wrap">
