@@ -2237,6 +2237,21 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     for (const g of parts) { const gi = g.toNonIndexed(); P.push(...gi.attributes.position.array); N.push(...gi.attributes.normal.array); for (let k = 0; k < gi.attributes.position.count; k++) I.push(o + k); o += gi.attributes.position.count; }
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(N, 3)); return g;
   }
+  // the A320 model has its windows as real recesses: seen at an angle their side walls showed through the painted
+  // windows. Vertices in the window band are pushed out to the skin radius of their fuselage slice, so the skin is flush.
+  function flattenWindowRecesses(parts, o) {
+    const R = o.R, cy = o.cy, yw = cy + o.win * R, len = o.zTail - o.zNose, z0 = o.zNose + len * 0.12, z1 = o.zNose + len * 0.9, bin = 0.25, nb = Math.ceil((z1 - z0) / bin) + 2;
+    const inBand = (x, y, z) => Math.abs(x) > R * 0.35 && Math.abs(y - yw) < 0.55 && z > z0 && z < z1;
+    const maxR = new Float32Array(nb);
+    for (const pt of parts) { if (pt.gear) continue; const P = pt.g.attributes.position.array;
+      for (let i = 0; i < P.length; i += 3) if (inBand(P[i], P[i + 1], P[i + 2])) { const b = Math.floor((P[i + 2] - z0) / bin), r = Math.hypot(P[i], P[i + 1] - cy); if (r > maxR[b] && r < R * 1.15) maxR[b] = r; } }
+    for (const pt of parts) { if (pt.gear) continue; const P = pt.g.attributes.position.array; let moved = false;
+      for (let i = 0; i < P.length; i += 3) if (inBand(P[i], P[i + 1], P[i + 2])) {
+        const b = Math.floor((P[i + 2] - z0) / bin), m = Math.max(maxR[Math.max(0, b - 1)], maxR[b], maxR[Math.min(nb - 1, b + 1)]), dx = P[i], dy = P[i + 1] - cy, r = Math.hypot(dx, dy);
+        if (m > 0 && r > m * 0.72 && r < m) { P[i] = dx / r * m; P[i + 1] = cy + dy / r * m; moved = true; }
+      }
+      if (moved) { pt.g.attributes.position.needsUpdate = true; pt.g.computeBoundingSphere(); } }
+  }
   function decodePack(key) {
     if (PACK_CACHE[key]) return PACK_CACHE[key];
     if (DERIVED[key]) {
@@ -2259,6 +2274,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       const mat = new THREE.MeshStandardMaterial({ color: vc ? 0xffffff : new THREE.Color(gr.c[0], gr.c[1], gr.c[2]), vertexColors: !!vc, metalness: Math.min(gr.m, 0.5), roughness: Math.max(gr.r, 0.32), side: THREE.DoubleSide, envMapIntensity: 0.9 });
       return { gear: !!gr.g, g, mat, base: gr.c, vc: vc ? g.getAttribute("color").array : null, m: gr.m, r: gr.r };
     });
+    if (key === "b737") flattenWindowRecesses(parts, PACK_OPTS.b737);
     parts.forEach((pt) => smoothNormals(pt.g, 42));   // low-poly models: smooth curved surfaces, keep the hard edges
     return (PACK_CACHE[key] = { tip: D.tip, parts });
   }
@@ -2305,7 +2321,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
 uniform vec4 uGeo; uniform vec4 uZ; uniform vec4 uLn; uniform vec4 uLn2; uniform vec4 uTb; uniform vec4 uFl;
 uniform vec3 uBody; uniform vec3 uBelly; uniform vec3 uTop; uniform vec3 uStr; uniform vec3 uStr2; uniform vec3 uFin1; uniform vec3 uFin2; uniform vec3 uFin3; uniform vec3 uWing; uniform vec3 uNose; uniform vec3 uLead;
 uniform sampler2D uTitle; uniform float uCabin;
-uniform vec4 uFg0; uniform vec4 uFg1; uniform vec4 uEng; uniform vec4 uEz; uniform vec3 uEngC; uniform vec3 uLip; uniform vec4 uMask; uniform vec4 uEng2; uniform vec4 uEz2; uniform float uPaintWin; uniform vec4 uTip; uniform vec3 uTipC; uniform vec4 uAft; uniform vec3 uAftC; uniform vec4 uUp; uniform float uHump; uniform vec4 uDoor; uniform vec2 uDoorB; uniform vec2 uWinR; uniform float uHideWin; uniform float uPitch; uniform vec4 uEmb; uniform vec3 uEmbC; uniform vec3 uEmbC2; uniform sampler2D uFinTex; uniform sampler2D uRegTex; uniform float uHasReg;
+uniform vec4 uFg0; uniform vec4 uFg1; uniform vec4 uEng; uniform vec4 uEz; uniform vec3 uEngC; uniform vec3 uLip; uniform vec4 uMask; uniform vec4 uEng2; uniform vec4 uEz2; uniform float uPaintWin; uniform float uCkpt; uniform vec4 uTip; uniform vec3 uTipC; uniform vec4 uAft; uniform vec3 uAftC; uniform vec4 uUp; uniform float uHump; uniform vec4 uDoor; uniform vec2 uDoorB; uniform vec2 uWinR; uniform float uHideWin; uniform float uPitch; uniform vec4 uEmb; uniform vec3 uEmbC; uniform vec3 uEmbC2; uniform sampler2D uFinTex; uniform sampler2D uRegTex; uniform float uHasReg;
 float gMask = 0.0, gGlass = 0.0, gHide = 0.0;   // set when a pixel lies in the A350 mask: then even the model's own dark glass is repainted
 vec3 liveryAt(vec3 p, out float fus) {
   fus = 0.0;
@@ -2394,6 +2410,12 @@ vec3 liveryAt(vec3 p, out float fus) {
       float bot = 0.05 + (0.06 - f) * 2.2;
       if (uUp.w < 0.5 && uHideWin < 0.5 && f > 0.018 && f < 0.062 && v > bot && v < bot + 0.15 && abs(fract(f / 0.011) - 0.5) < 0.4) c = vec3(0.02, 0.024, 0.03);
     }
+    if (uCkpt > 0.5) {   // flight-deck glazing on models that have none: windscreen and side windows round the upper nose
+      float a = atan(abs(p.x), p.y - cy), fs = 0.031 + a * 0.006, fe = 0.044 + a * 0.008 - max(0.0, 0.5 - a) * 0.004;
+      float fr = abs(a - 0.52) - 0.0 + 0.0, fr2 = abs(a - 0.9), aw = max(fwidth(a), 1e-4), fw = max(fwidth(f), 1e-5); fr = min(fr, fr2);
+      float cov = smoothstep(0.07 - aw, 0.07 + aw, a) * (1.0 - smoothstep(1.2 - aw, 1.2 + aw, a)) * smoothstep(fs - fw, fs + fw, f) * (1.0 - smoothstep(fe - fw, fe + fw, f)) * smoothstep(0.03 - aw, 0.03 + aw, fr);
+      c = mix(c, mix(vec3(0.02, 0.03, 0.04), vec3(0.09, 0.11, 0.14), smoothstep(0.3, 1.3, a)), cov);
+    }
     if (uUp.w > 0.5 && abs(p.x) > 0.8) {   // 747 upper deck: 20 windows a frame pair apart, and the upper-deck door
       float uz = p.z - uUp.x, uy = p.y - uUp.z;
       if (uz > 0.0 && uz < uUp.y) {
@@ -2453,7 +2475,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       uFg0: { value: new THREE.Vector4(o.fin[0], o.fin[1], o.fin[2], o.fin[3]) }, uFg1: { value: new THREE.Vector4(o.fin[4], o.fin[5], 0.35 * o.R, L.spine ? 1 : 0) },
       uEng: { value: new THREE.Vector4(o.eng[0], o.eng[1], o.eng[2], 1) }, uEz: { value: new THREE.Vector4(o.eng[3], o.eng[4], 0, 0) },
       uEng2: { value: o.eng2 ? new THREE.Vector4(o.eng2[0], o.eng2[1], o.eng2[2], 1) : new THREE.Vector4(0, 0, 0, 0) }, uEz2: { value: new THREE.Vector4(o.eng2 ? o.eng2[3] : 0, o.eng2 ? o.eng2[4] : 0, 0, 0) },
-      uEngC: V3(L.engine || "#eef0f2"), uLip: V3("#c3c7cc"), uPaintWin: { value: o.paintWindows ? 1 : 0 }, uTip: { value: new THREE.Vector4(o.tipX ? o.tipX * 0.955 : 999, 0, 0, L.tip && o.tipX ? 1 : 0) }, uTipC: V3(L.tip || white), uAft: { value: new THREE.Vector4(L.aft ? L.aft[1] : 0, 0, 0, L.aft ? 1 : 0) }, uAftC: V3(L.aft ? L.aft[0] : white), uUp: { value: new THREE.Vector4(...(o.upper || [0, 0, 0, 0])) }, uHump: { value: o.hump || 0 },
+      uEngC: V3(L.engine || "#eef0f2"), uLip: V3("#c3c7cc"), uPaintWin: { value: o.paintWindows ? 1 : 0 }, uCkpt: { value: o.cockpitGlass ? 1 : 0 }, uTip: { value: new THREE.Vector4(o.tipX ? o.tipX * 0.955 : 999, 0, 0, L.tip && o.tipX ? 1 : 0) }, uTipC: V3(L.tip || white), uAft: { value: new THREE.Vector4(L.aft ? L.aft[1] : 0, 0, 0, L.aft ? 1 : 0) }, uAftC: V3(L.aft ? L.aft[0] : white), uUp: { value: new THREE.Vector4(...(o.upper || [0, 0, 0, 0])) }, uHump: { value: o.hump || 0 },
       uDoor: { value: new THREE.Vector4(...(o.doors || [0.13, 0.27, 0.47, 0.69, 0.855]).slice(0, 4)) }, uDoorB: { value: new THREE.Vector2((o.doors || [0, 0, 0, 0, 0.855])[4], o.upDoor ?? -9) }, uWinR: { value: new THREE.Vector2(...(o.winRange || [0.115, 0.9])) }, uHideWin: { value: o.hideWin ? 1 : 0 }, uPitch: { value: o.pitch || 0.508 }, uMask: { value: o.mask ? new THREE.Vector4(o.mask[0], o.mask[1], o.mask[2], o.mask[3]) : new THREE.Vector4(0, 0, 0, 0) },
     };
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, metalness: Math.min(pt.m, 0.3), roughness: clamp(pt.r, 0.24, 0.42), side: THREE.DoubleSide, envMapIntensity: 1.1 });   // glossy paint that picks up the sky
@@ -2926,7 +2948,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   // 777-300ER: a simple mesh without windows, so the shader paints the window rows, doors and flight-deck glass
   PACK_OPTS.b77w = { cy: 0.62, R: 3.2, win: 0.24, zNose: -36.95, zTail: 36.95, finTop: 13.1, fin: [3.9, 13.1, 24.0, 35.8, 33.5, 36.2],
     eng: [9.3, -2.53, 1.95, -11.9, -4.8], bodyOnly: true, addGear: true, gearH: 5.3, wheelR: 0.68, six: true, bogie: true,
-    mainX: 5.5, mainZ: 1.7, noseZ: -29.5, tailZ: 36.5, beaconY: 4.0, paintWindows: true };
+    mainX: 5.5, mainZ: 1.7, noseZ: -29.5, tailZ: 36.5, beaconY: 4.0, paintWindows: true, cockpitGlass: true };
   function build77Wmodel(liv) { return buildPacked("b77w", packOpts("b77w"), liv); }
   function build763model(liv) { return buildPacked("b763", packOpts("b763", { paintWindows: true, hideWin: true, doors: [0.12, 0.3, 0.5, 0.88, -5], winRange: [0.14, 0.86] }), liv); }
   function buildA321model(liv) { return buildPacked("a321", packOpts("a321", { doors: [0.13, 0.33, 0.62, 0.9, -5], winRange: [0.15, 0.88] }), liv); }
