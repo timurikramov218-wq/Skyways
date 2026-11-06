@@ -2267,10 +2267,17 @@ vec3 liveryAt(vec3 p, out float fus) {
       for (int k = 0; k < 5; k++) { float dz = len * (k == 0 ? uDoor.x : k == 1 ? uDoor.y : k == 2 ? uDoor.z : k == 3 ? uDoor.w : uDoorB.x); float dd = abs(wz - dz); if (dd < dmin) { dmin = dd; dz0 = wz - dz; } }
       if (f > uWinR.x && f < uWinR.y && dmin > 0.9) {
         vec2 q = abs(vec2((fract(wz / uPitch) - 0.5) * uPitch, wy)) - vec2(0.04, 0.1); float rr = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.085;
-        if (rr < 0.0) c = mix(vec3(0.03, 0.04, 0.05), vec3(0.08, 0.1, 0.12), smoothstep(-0.18, 0.18, wy)); else if (rr < 0.016) c *= 0.84;
+        // anti-aliased edges (one pixel wide, from the screen-space rate of change); when the row is so far away that a
+        // window is under ~3 pixels, it fades to its average: a soft dark band, never jagged dots or shimmer
+        float aa = max(length(vec2(dFdx(rr), dFdy(rr))), 1e-4), cov = 1.0 - smoothstep(-aa, aa, rr), ring = (1.0 - smoothstep(0.016 - aa, 0.016 + aa, rr)) - cov;
+        float far = smoothstep(0.08, 0.2, length(vec2(dFdx(wz), dFdy(wz))) / uPitch), wya = max(length(vec2(dFdx(wy), dFdy(wy))), 1e-4);
+        float band = 1.0 - smoothstep(0.185 - wya, 0.185 + wya, abs(wy));
+        cov = mix(cov, min(1.0, band * 0.5 / uPitch), far); ring = mix(ring, 0.0, far);
+        vec3 glass = mix(vec3(0.03, 0.04, 0.05), vec3(0.08, 0.1, 0.12), smoothstep(-0.18, 0.18, wy));
+        c = mix(c * (1.0 - 0.16 * ring), glass, cov);
       }
       { vec2 q = abs(vec2(dz0, wy + 0.6)) - vec2(0.39, 0.82); float rr = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.15;
-        if (abs(rr) < 0.02) c *= 0.6;                                                          // door outline
+        { float aa = max(length(vec2(dFdx(rr), dFdy(rr))), 1e-4); c *= 1.0 - 0.4 * (1.0 - smoothstep(0.02 - aa, 0.02 + aa, abs(rr))); }   // door outline, anti-aliased
         if (dmin < 0.2 && abs(wy - 0.05) < 0.11 && abs(dz0) < 0.12) c = vec3(0.04, 0.05, 0.06); } // small door window
       float bot = 0.05 + (0.06 - f) * 2.2;
       if (uUp.w < 0.5 && uHideWin < 0.5 && f > 0.018 && f < 0.062 && v > bot && v < bot + 0.15 && abs(fract(f / 0.011) - 0.5) < 0.4) c = vec3(0.02, 0.024, 0.03);
@@ -2279,7 +2286,9 @@ vec3 liveryAt(vec3 p, out float fus) {
       float uz = p.z - uUp.x, uy = p.y - uUp.z;
       if (uz > 0.0 && uz < uUp.y) {
         float cellI = floor(uz / 1.016), lx = (fract(uz / 1.016) - 0.5) * 1.016;
-        if (abs(cellI - uDoorB.y) > 0.5) { vec2 q = abs(vec2(lx, uy)) - vec2(0.04, 0.1); float rr = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.085; if (rr < 0.0) c = vec3(0.04, 0.05, 0.06); else if (rr < 0.016) c *= 0.84; }
+        if (abs(cellI - uDoorB.y) > 0.5) { vec2 q = abs(vec2(lx, uy)) - vec2(0.04, 0.1); float rr = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.085;
+          float aa = max(length(vec2(dFdx(rr), dFdy(rr))), 1e-4), cov = 1.0 - smoothstep(-aa, aa, rr), far = smoothstep(0.08, 0.2, length(vec2(dFdx(uz), dFdy(uz))) / 1.016);
+          float uya = max(length(vec2(dFdx(uy), dFdy(uy))), 1e-4); cov = mix(cov, (1.0 - smoothstep(0.185 - uya, 0.185 + uya, abs(uy))) * 0.16, far); c = mix(c, vec3(0.04, 0.05, 0.06), cov); }
         else { vec2 q = abs(vec2(lx, uy + 0.55)) - vec2(0.3, 0.72); float rr = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.12; if (abs(rr) < 0.02) c *= 0.6; }
       }
     }
@@ -2335,7 +2344,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       uDoor: { value: new THREE.Vector4(...(o.doors || [0.13, 0.27, 0.47, 0.69, 0.855]).slice(0, 4)) }, uDoorB: { value: new THREE.Vector2((o.doors || [0, 0, 0, 0, 0.855])[4], o.upDoor ?? -9) }, uWinR: { value: new THREE.Vector2(...(o.winRange || [0.115, 0.9])) }, uHideWin: { value: o.hideWin ? 1 : 0 }, uPitch: { value: o.pitch || 0.508 }, uMask: { value: o.mask ? new THREE.Vector4(o.mask[0], o.mask[1], o.mask[2], o.mask[3]) : new THREE.Vector4(0, 0, 0, 0) },
     };
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, metalness: Math.min(pt.m, 0.3), roughness: clamp(pt.r, 0.24, 0.42), side: THREE.DoubleSide, envMapIntensity: 1.1 });   // glossy paint that picks up the sky
-    mat.userData.u = u; mat.onBeforeCompile = liveryCompile;
+    mat.userData.u = u; mat.onBeforeCompile = liveryCompile; mat.extensions = { derivatives: true };   // dFdx/dFdy smooth the painted window edges
     return mat;
   }
   function paintPack(key, o, liv) {
