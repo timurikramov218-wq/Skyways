@@ -863,7 +863,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   // graphics quality: render resolution, how far detailed terrain and forests reach, cloud count, real-time shadow of your aircraft
   const QUALITY = {
     low: { label: "Low", pr: 1, hi: 5500, vis: 10000, trees: 3500, clouds: 0.5, shadows: false },
-    medium: { label: "Medium", pr: 1.5, hi: 9500, vis: 15000, trees: 7500, clouds: 1, shadows: false },
+    medium: { label: "Medium", pr: 2, hi: 9500, vis: 15000, trees: 7500, clouds: 1, shadows: true },   // full Retina sharpness and your aircraft's shadow by default
     high: { label: "High", pr: 2, hi: 12500, vis: 16000, trees: 10000, clouds: 1, shadows: true },
   };
   let qualName = load("sw-quality"); if (!QUALITY[qualName]) qualName = "medium";
@@ -2187,6 +2187,52 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     g.setIndex(new THREE.BufferAttribute(I, 1)); g.computeBoundingSphere();
     return Object.assign({}, pt, { g, vc: VC });
   }
+  // Smooth shading with a crease angle: each vertex takes the area-weighted average of the face normals at its position
+  // that are within `deg` of its own face, so fuselages and nacelles look round while wing edges and fins stay crisp.
+  function smoothNormals(g, deg) {
+    const P = g.attributes.position.array, N = g.attributes.normal.array, I = g.index ? g.index.array : null, nv = P.length / 3;
+    const tri = I ? I.length / 3 : nv / 3, cosT = Math.cos(deg * Math.PI / 180), fN = new Float32Array(tri * 3);
+    const at = (t, k) => (I ? I[t * 3 + k] : t * 3 + k);
+    const key = (v) => `${Math.round(P[v * 3] * 500)},${Math.round(P[v * 3 + 1] * 500)},${Math.round(P[v * 3 + 2] * 500)}`;
+    const byPos = new Map(), vFaces = Array.from({ length: nv }, () => []);
+    for (let t = 0; t < tri; t++) {
+      const a = at(t, 0), b = at(t, 1), c = at(t, 2);
+      const ux = P[b * 3] - P[a * 3], uy = P[b * 3 + 1] - P[a * 3 + 1], uz = P[b * 3 + 2] - P[a * 3 + 2], vx = P[c * 3] - P[a * 3], vy = P[c * 3 + 1] - P[a * 3 + 1], vz = P[c * 3 + 2] - P[a * 3 + 2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const l = Math.hypot(nx, ny, nz); if (l < 1e-12) continue;
+      fN[t * 3] = nx; fN[t * 3 + 1] = ny; fN[t * 3 + 2] = nz;   // area-weighted (length = 2 × area)
+      for (const v of [a, b, c]) { const k = key(v); let arr = byPos.get(k); if (!arr) byPos.set(k, (arr = [])); arr.push(t); vFaces[v].push(t); }
+    }
+    const out = new Float32Array(N.length);
+    for (let v = 0; v < nv; v++) {
+      const own = vFaces[v]; if (!own.length) { out[v * 3] = N[v * 3]; out[v * 3 + 1] = N[v * 3 + 1]; out[v * 3 + 2] = N[v * 3 + 2]; continue; }
+      // reference: this vertex's own faces (averaged) — the side of the crease it belongs to
+      let rx = 0, ry = 0, rz = 0; for (const t of own) { rx += fN[t * 3]; ry += fN[t * 3 + 1]; rz += fN[t * 3 + 2]; }
+      const rl = Math.hypot(rx, ry, rz) || 1; rx /= rl; ry /= rl; rz /= rl;
+      let sx = 0, sy = 0, sz = 0;
+      for (const t of byPos.get(key(v))) { const fx = fN[t * 3], fy = fN[t * 3 + 1], fz = fN[t * 3 + 2], fl = Math.hypot(fx, fy, fz); if ((fx * rx + fy * ry + fz * rz) / fl >= cosT) { sx += fx; sy += fy; sz += fz; } }
+      const sl = Math.hypot(sx, sy, sz) || 1;
+      // keep the original winding side: if the stored normal points the other way, follow it
+      const flip = (N[v * 3] * sx + N[v * 3 + 1] * sy + N[v * 3 + 2] * sz) < 0 ? -1 : 1;
+      out[v * 3] = flip * sx / sl; out[v * 3 + 1] = flip * sy / sl; out[v * 3 + 2] = flip * sz / sl;
+    }
+    g.setAttribute("normal", new THREE.BufferAttribute(out, 3));
+  }
+  // a box with rounded edges (a superellipsoid-ish squash of a segmented box): cars, tugs and trucks without hard corners
+  function roundedBox(w, h, d, r, seg = 3) {
+    const g = new THREE.BoxGeometry(w, h, d, seg * 2, seg * 2, seg * 2), p = g.attributes.position, v = new THREE.Vector3(), hw = w / 2 - r, hh = h / 2 - r, hd = d / 2 - r;
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i); const c = new THREE.Vector3(clamp(v.x, -hw, hw), clamp(v.y, -hh, hh), clamp(v.z, -hd, hd));
+      const n = v.clone().sub(c); if (n.lengthSq() > 1e-9) v.copy(c).addScaledVector(n.normalize(), r); p.setXYZ(i, v.x, v.y, v.z);
+    }
+    g.computeVertexNormals(); return g;
+  }
+  function carGeometry(len, wid) {
+    const body = roundedBox(wid, 0.85, len, 0.3); body.translate(0, 0.55, 0);
+    const cab = roundedBox(wid * 0.9, 0.7, len * 0.52, 0.28); cab.translate(0, 1.25, -len * 0.04);
+    const parts = [body, cab], P = [], N = [], I = []; let o = 0;
+    for (const g of parts) { const gi = g.toNonIndexed(); P.push(...gi.attributes.position.array); N.push(...gi.attributes.normal.array); for (let k = 0; k < gi.attributes.position.count; k++) I.push(o + k); o += gi.attributes.position.count; }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(N, 3)); return g;
+  }
   function decodePack(key) {
     if (PACK_CACHE[key]) return PACK_CACHE[key];
     if (DERIVED[key]) {
@@ -2209,6 +2255,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       const mat = new THREE.MeshStandardMaterial({ color: vc ? 0xffffff : new THREE.Color(gr.c[0], gr.c[1], gr.c[2]), vertexColors: !!vc, metalness: Math.min(gr.m, 0.5), roughness: Math.max(gr.r, 0.32), side: THREE.DoubleSide, envMapIntensity: 0.9 });
       return { gear: !!gr.g, g, mat, base: gr.c, vc: vc ? g.getAttribute("color").array : null, m: gr.m, r: gr.r };
     });
+    parts.forEach((pt) => smoothNormals(pt.g, 42));   // low-poly models: smooth curved surfaces, keep the hard edges
     return (PACK_CACHE[key] = { tip: D.tip, parts });
   }
   // Paints a packed model: white by default, or an airline's colours. Light surfaces take the paint by region
@@ -3149,7 +3196,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     flat(grp, a.lotX1 - a.lotX0, a.apL * 0.7, MAT.lot, (a.lotX0 + a.lotX1) / 2, 0.04, 0);
     const carCols = [0xd23b2f, 0x2f5fd2, 0xeeeeee, 0x222222, 0x8a8f96, 0x2f8a4f, 0xe0b830].map((c) => new THREE.Color(c));
     const cars = []; for (let x = a.lotX0 + 6; x < a.lotX1 - 4; x += 12) for (let zz = -a.apL * 0.33; zz < a.apL * 0.33; zz += 3.2) if (hash(x, zz) < 0.7) cars.push([x, 0.75, zz]);
-    const carM = new THREE.InstancedMesh(new THREE.BoxGeometry(4.4, 1.5, 1.9), new THREE.MeshLambertMaterial(), cars.length), m4 = new THREE.Matrix4();
+    const carM = new THREE.InstancedMesh(carGeometry(4.4, 1.85).rotateY(Math.PI / 2).translate(0, -0.75, 0), new THREE.MeshLambertMaterial(), cars.length), m4 = new THREE.Matrix4();
     cars.forEach(([x, y, zz], i) => { m4.makeTranslation(x, y, zz); carM.setMatrixAt(i, m4); carM.setColorAt(i, carCols[Math.floor(hash(i, x) * carCols.length)]); }); grp.add(carM);
     // ground service vehicles round the parked aircraft: tug at the nose, baggage carts and a belt loader, a fuel truck at the wing
     { const veh = { tug: [], cart: [], fuel: [], belt: [] };
@@ -3160,9 +3207,9 @@ vec3 liveryAt(vec3 p, out float fus) {
         if (hash(st.z, a.x) > 0.4) veh.fuel.push([x(0.45), st.z + 9]);
       }
       const put = (list, geo, mat, h) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, mat, list.length), m4b = new THREE.Matrix4(); list.forEach(([vx, vz], i) => { m4b.makeTranslation(vx, h, vz); im.setMatrixAt(i, m4b); }); grp.add(im); };
-      put(veh.tug, new THREE.BoxGeometry(4.2, 1.5, 2.3), APT.tug, 0.75);
-      put(veh.cart, new THREE.BoxGeometry(2.8, 1.4, 1.6), APT.cart, 0.9);
-      put(veh.fuel, new THREE.BoxGeometry(9, 2.8, 2.5), APT.fuel, 1.4);
+      put(veh.tug, roundedBox(4.2, 1.5, 2.3, 0.35), APT.tug, 0.75);
+      put(veh.cart, roundedBox(2.8, 1.4, 1.6, 0.2), APT.cart, 0.9);
+      put(veh.fuel, roundedBox(9, 2.8, 2.5, 0.6), APT.fuel, 1.4);
       { const bg = new THREE.BoxGeometry(8, 0.5, 1.2); bg.rotateZ(0.28); put(veh.belt, bg, APT.tug, 1.8); }
     }
     // apron floodlight masts
@@ -4896,7 +4943,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     }).filter((r) => r.len > 150);
     const total = runs.reduce((s, r) => s + r.len, 0), N = Math.min(220, Math.round(total / 120));
     const cols = [0xd23b2f, 0x2f5fd2, 0xeeeeee, 0x222222, 0x8a8f96, 0x2f8a4f, 0xe0b830, 0xf0f0f0].map((c) => new THREE.Color(c).convertSRGBToLinear());
-    const g = new THREE.BoxGeometry(1.9, 1.5, 4.4); g.translate(0, 0.75, 0);
+    const g = carGeometry(4.4, 1.85);   // rounded body and cabin
     const im = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial(), Math.max(1, N));
     for (let i = 0; i < N; i++) {
       let pick = hash(i, 42) * total, r = runs[0]; for (const rr of runs) { if (pick < rr.len) { r = rr; break; } pick -= rr.len; }
