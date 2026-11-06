@@ -1859,15 +1859,15 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     dal: { name: "Delta", reg: "N671US", belly: "#0e1f3f", bellyY: -0.4, rise: 0.25, fin: ["#c8102e", "#7c1630"], finMode: 4, engine: "#0e1f3f", title: ["DELTA", "#0e1f3f", "900", "sans", 0.12] },
     ual: { name: "United", reg: "N2749U", emb: ["globe", "#ffffff", 0.55, 0.5, 0.2], belly: "#0033a0", bellyY: -0.28, rise: 0.3, stripe: ["#8a9bb0", -0.34, -0.28], fin: ["#0b2d6e"], engine: "#0033a0", title: ["UNITED", "#0b2d6e", "800", "sans", 0.18] },
     aal: { name: "American", reg: "N718AN", body: "#c6ccd2", wing: "#b8bec4", fin: ["#c30019", "#ffffff", "#0a3a79"], finMode: 2, engine: "#c6ccd2", title: ["American", "#36495a", "700", "sans"] },
-    uae: { name: "Emirates", reg: "A6-EGO", fin: ["#00843d", "#ffffff", "#111111"], finMode: 3, finLead: "#d71921", title: ["Emirates", "#b5985a", "700", "serif"] },
+    uae: { name: "Emirates", reg: "A6-EGO", fin: ["#00843d", "#ffffff", "#111111"], finMode: 3, finLead: "#d71921", tip: "#d71921", titleScale: 1.3, title: ["Emirates", "#b8975a", "700", "serif"] },
     qtr: { name: "Qatar Airways", reg: "A7-BEB", body: "#eceeef", fin: ["#5c0632"], spine: true, engine: "#d6d9dc", title: ["QATAR AIRWAYS", "#5c0632", "700", "sans", 0.1] },
     dlh: { name: "Lufthansa", reg: "D-ABYA", emb: ["ring", "#ffffff", 0.55, 0.55, 0.2], fin: ["#05164d"], engine: "#f4f6f8", title: ["Lufthansa", "#05164d", "700", "serif"] },
     baw: { name: "British Airways", reg: "G-CIVB", belly: "#13306b", bellyY: -0.45, rise: 0.2, stripe: ["#c8102e", -0.52, -0.45], fin: ["#c8102e", "#ffffff", "#13306b"], finMode: 2, engine: "#a9b1b9", title: ["BRITISH AIRWAYS", "#13306b", "600", "sans", 0.06] },
     klm: { name: "KLM", reg: "PH-BFA", regCol: "#ffffff", emb: ["text", "#ffffff", 0.55, 0.55, 0.12, 0, "KLM"], top: "#00a1de", topY: -0.1, stripe2: ["#003082", -0.18, -0.09], fin: ["#00a1de"], engine: "#00a1de", title: ["KLM", "#ffffff", "900", "sans", 0.15] },
     ryr: { name: "Ryanair", reg: "EI-DCL", belly: "#073590", bellyY: -0.33, rise: 0.3, stripe: ["#f1c933", -0.4, -0.33], fin: ["#073590"], engine: "#073590", title: ["RYANAIR", "#073590", "900", "sans"] },
     ezy: { name: "easyJet", reg: "G-EZWA", emb: ["text", "#ffffff", 0.5, 0.42, 0.15, 0, "easyJet"], fin: ["#ff6600"], nose: "#ff6600", engine: "#ff6600", title: ["easyJet", "#ff6600", "900", "sans"] },
-    thy: { name: "Turkish Airlines", reg: "TC-JJA", emb: ["disc", "#ffffff", 0.55, 0.55, 0.17], fin: ["#c8102e"], stripe2: ["#c8102e", -0.27, -0.19], engine: "#d9dcdf", title: ["TURKISH AIRLINES", "#c8102e", "700", "sans", 0.05] },
-    afl: { name: "Aeroflot", reg: "RA-73181", body: "#eef1f4", stripe2: ["#0b4ea2", -0.29, -0.16], fin: ["#ffffff", "#0039a6", "#d52b1e"], finMode: 1, engine: "#0b4ea2", title: ["AEROFLOT", "#0b4ea2", "800", "sans", 0.12] },
+    thy: { name: "Turkish Airlines", reg: "TC-JJA", emb: ["ring", "#ffffff", 0.55, 0.55, 0.17], fin: ["#c8102e"], belly: "#c9cdd2", bellyY: -0.4, rise: 0.15, engine: "#e3e6e9", tip: "#c8102e", title: ["TURKISH AIRLINES", "#1c2c63", "700", "sans", 0.05] },
+    afl: { name: "Aeroflot", reg: "RA-73181", body: "#c9ced4", wing: "#c3c8ce", belly: "#14306b", bellyY: -0.42, rise: 0.55, stripe: ["#e4572e", -0.47, -0.42], fin: ["#ffffff", "#0039a6", "#d52b1e"], finMode: 2, engine: "#c9ced4", tip: "#e4572e", title: ["AEROFLOT", "#14306b", "800", "sans", 0.14] },
     s7: { name: "S7 Airlines", reg: "VQ-BCM", emb: ["text", "#ffffff", 0.55, 0.5, 0.11, 0, "S7"], body: "#b5d334", wing: "#c9cfd4", fin: ["#8fb31d"], engine: "#8fb31d", title: ["S7 AIRLINES", "#36520f", "900", "sans", 0.08] },
     afr: { name: "Air France", reg: "F-GSQA", fin: ["#ffffff", "#002157", "#e51937"], finMode: 6, title: ["AIRFRANCE", "#002157", "800", "sans", 0.1] },
     vir: { name: "Virgin Atlantic", reg: "G-VXLG", body: "#eceef0", fin: ["#da0530"], engine: "#da0530", title: ["virgin atlantic", "#da0530", "700", "serif"] },
@@ -2224,7 +2224,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
 uniform vec4 uGeo; uniform vec4 uZ; uniform vec4 uLn; uniform vec4 uLn2; uniform vec4 uTb; uniform vec4 uFl;
 uniform vec3 uBody; uniform vec3 uBelly; uniform vec3 uTop; uniform vec3 uStr; uniform vec3 uStr2; uniform vec3 uFin1; uniform vec3 uFin2; uniform vec3 uFin3; uniform vec3 uWing; uniform vec3 uNose; uniform vec3 uLead;
 uniform sampler2D uTitle; uniform float uCabin;
-uniform vec4 uFg0; uniform vec4 uFg1; uniform vec4 uEng; uniform vec4 uEz; uniform vec3 uEngC; uniform vec3 uLip; uniform vec4 uMask; uniform vec4 uEng2; uniform vec4 uEz2; uniform float uPaintWin; uniform vec4 uUp; uniform float uHump; uniform vec4 uDoor; uniform vec2 uDoorB; uniform vec2 uWinR; uniform float uHideWin; uniform float uPitch; uniform vec4 uEmb; uniform vec3 uEmbC; uniform vec3 uEmbC2; uniform sampler2D uFinTex; uniform sampler2D uRegTex; uniform float uHasReg;
+uniform vec4 uFg0; uniform vec4 uFg1; uniform vec4 uEng; uniform vec4 uEz; uniform vec3 uEngC; uniform vec3 uLip; uniform vec4 uMask; uniform vec4 uEng2; uniform vec4 uEz2; uniform float uPaintWin; uniform vec4 uTip; uniform vec3 uTipC; uniform vec4 uUp; uniform float uHump; uniform vec4 uDoor; uniform vec2 uDoorB; uniform vec2 uWinR; uniform float uHideWin; uniform float uPitch; uniform vec4 uEmb; uniform vec3 uEmbC; uniform vec3 uEmbC2; uniform sampler2D uFinTex; uniform sampler2D uRegTex; uniform float uHasReg;
 float gMask = 0.0, gGlass = 0.0, gHide = 0.0;   // set when a pixel lies in the A350 mask: then even the model's own dark glass is repainted
 vec3 liveryAt(vec3 p, out float fus) {
   fus = 0.0;
@@ -2331,6 +2331,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     return c;
   }
+  if (uTip.w > 0.5 && abs(p.x) > uTip.x) return uTipC;   // painted winglets / wingtips
   return uWing;
 }
 `;
@@ -2348,7 +2349,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   }
   function liveryMat(pt, o, liv, cabin) {
     const L = liv || {}, white = "#f4f6f8", V3 = (hex) => ({ value: linC(hex) }), fin = L.fin || [white];
-    const len = o.zTail - o.zNose, tz0 = o.zNose + len * 0.1, tw = 6.7 * o.R;
+    const len = o.zTail - o.zNose, tz0 = o.zNose + len * 0.1, tw = 6.7 * o.R * (L.titleScale || 1);
     const u = {
       uGeo: { value: new THREE.Vector4(o.cy, o.R, o.cy + o.R + 0.35, o.finTop) },
       uZ: { value: new THREE.Vector4(o.zNose, o.zTail, o.win, 0) },
@@ -2366,7 +2367,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       uFg0: { value: new THREE.Vector4(o.fin[0], o.fin[1], o.fin[2], o.fin[3]) }, uFg1: { value: new THREE.Vector4(o.fin[4], o.fin[5], 0.35 * o.R, L.spine ? 1 : 0) },
       uEng: { value: new THREE.Vector4(o.eng[0], o.eng[1], o.eng[2], 1) }, uEz: { value: new THREE.Vector4(o.eng[3], o.eng[4], 0, 0) },
       uEng2: { value: o.eng2 ? new THREE.Vector4(o.eng2[0], o.eng2[1], o.eng2[2], 1) : new THREE.Vector4(0, 0, 0, 0) }, uEz2: { value: new THREE.Vector4(o.eng2 ? o.eng2[3] : 0, o.eng2 ? o.eng2[4] : 0, 0, 0) },
-      uEngC: V3(L.engine || "#eef0f2"), uLip: V3("#c3c7cc"), uPaintWin: { value: o.paintWindows ? 1 : 0 }, uUp: { value: new THREE.Vector4(...(o.upper || [0, 0, 0, 0])) }, uHump: { value: o.hump || 0 },
+      uEngC: V3(L.engine || "#eef0f2"), uLip: V3("#c3c7cc"), uPaintWin: { value: o.paintWindows ? 1 : 0 }, uTip: { value: new THREE.Vector4(o.tipX ? o.tipX * 0.955 : 999, 0, 0, L.tip && o.tipX ? 1 : 0) }, uTipC: V3(L.tip || white), uUp: { value: new THREE.Vector4(...(o.upper || [0, 0, 0, 0])) }, uHump: { value: o.hump || 0 },
       uDoor: { value: new THREE.Vector4(...(o.doors || [0.13, 0.27, 0.47, 0.69, 0.855]).slice(0, 4)) }, uDoorB: { value: new THREE.Vector2((o.doors || [0, 0, 0, 0, 0.855])[4], o.upDoor ?? -9) }, uWinR: { value: new THREE.Vector2(...(o.winRange || [0.115, 0.9])) }, uHideWin: { value: o.hideWin ? 1 : 0 }, uPitch: { value: o.pitch || 0.508 }, uMask: { value: o.mask ? new THREE.Vector4(o.mask[0], o.mask[1], o.mask[2], o.mask[3]) : new THREE.Vector4(0, 0, 0, 0) },
     };
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, metalness: Math.min(pt.m, 0.3), roughness: clamp(pt.r, 0.24, 0.42), side: THREE.DoubleSide, envMapIntensity: 1.1 });   // glossy paint that picks up the sky
@@ -2722,6 +2723,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   })();
   function buildPacked(key, o, liv) {
     const pk = decodePack(key), root = new THREE.Group(), gearG = new THREE.Group(); root.add(gearG);
+    o.tipX = Math.abs(pk.tip[0]);
     for (const pt of paintPack(key, o, liv)) {
       if (pt.gear && o.dropGear) continue;   // the model's own simple gear is replaced by the detailed gear below
       const mesh = new THREE.Mesh(pt.g, pt.mat); ((pt.gear && !o.bodyOnly) ? gearG : root).add(mesh);
