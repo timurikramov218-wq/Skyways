@@ -2237,7 +2237,9 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (m < 0.5) fc = uFin1;
       else if (m < 1.5) fc = vc > 0.6667 ? uFin1 : (vc > 0.3333 ? uFin2 : uFin3);
       else if (m < 2.5) { float t = vc + uf * 0.55; fc = t > 1.0 ? uFin1 : (t > 0.6 ? uFin2 : uFin3); }
-      else if (m < 3.5) fc = uf < 0.26 ? uLead : (vc > 0.6667 ? uFin1 : (vc > 0.3333 ? uFin2 : uFin3));
+      else if (m < 3.5) {   // Emirates: white leading edge, a broad red band along it, then green / white / black, white trailing edge
+        if (uf < 0.07 || uf > 0.86) fc = vec3(0.92); else if (uf < 0.34) fc = uLead;
+        else { float t = vc + (uf - 0.34) * 0.35; fc = t > 0.66 ? uFin1 : (t > 0.38 ? vec3(0.92) : uFin3); } }
       else if (m < 4.5) fc = (uf + (1.0 - vc) * 0.9 > 1.15) ? uFin2 : uFin1;
       else if (m < 5.5) { float cu = abs(uf - 0.55), cv = abs(vc - 0.5); fc = ((cu < 0.07 && cv < 0.2) || (cv < 0.06 && cu < 0.24)) ? uFin2 : uFin1; }   // white cross on red
       else { float t = uf - vc * 0.22; fc = ((t > 0.52 && t < 0.58) || (t > 0.62 && t < 0.67) || (t > 0.71 && t < 0.75)) ? uFin2 : ((t > 0.8 && t < 0.86) ? uFin3 : uFin1); }   // Air France-style streamers on the rear of the fin
@@ -2816,7 +2818,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   function build767model(liv) { return buildPacked("b767", packOpts("b767"), liv); }
   function buildMHmodel(liv) { return buildPacked("mh", packOpts("mh"), liv); }
   // 777-300ER: a simple mesh without windows, so the shader paints the window rows, doors and flight-deck glass
-  PACK_OPTS.b77w = { cy: 0.62, R: 3.2, win: 0.24, zNose: -36.95, zTail: 36.95, finTop: 13.1, fin: [3.9, 13.1, 19.0, 34.5, 33.5, 36.2],
+  PACK_OPTS.b77w = { cy: 0.62, R: 3.2, win: 0.24, zNose: -36.95, zTail: 36.95, finTop: 13.1, fin: [3.9, 13.1, 24.0, 35.8, 33.5, 36.2],
     eng: [9.3, -2.53, 1.95, -11.9, -4.8], bodyOnly: true, addGear: true, gearH: 5.3, wheelR: 0.68, six: true, bogie: true,
     mainX: 5.5, mainZ: 1.7, noseZ: -29.5, tailZ: 36.5, beaconY: 4.0, paintWindows: true };
   function build77Wmodel(liv) { return buildPacked("b77w", packOpts("b77w"), liv); }
