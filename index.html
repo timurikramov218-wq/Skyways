@@ -449,6 +449,14 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
   .tbtns2 { left: 148px; grid-template-columns: repeat(2, 70px); gap: 6px; }
   .tbtns2 .tbtn { width: 70px; white-space: nowrap; }
 }
+
+/* route: two airport pickers instead of the departures board */
+.route-pick { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; margin: 2px 0 18px; }
+.route-pick label { display: grid; gap: 6px; flex: 1 1 220px; }
+.route-pick label > span { font: 500 11px var(--font-body); letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-3); }
+.route-pick select { appearance: none; -webkit-appearance: none; font: 500 15px var(--font-body); color: var(--fg); background: var(--g2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23b9b2a5' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 14px center; border: 1px solid var(--hair); border-radius: 12px; padding: 12px 38px 12px 14px; min-width: 0; width: 100%; }
+.route-pick select:focus-visible { outline: 1px solid var(--champ); outline-offset: 2px; }
+.route-arrow { font: 400 20px var(--font-display); color: var(--champ); padding-bottom: 10px; }
 </style>
 
 <div class="wrap">
@@ -482,6 +490,7 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
           <button class="chip" id="fsBtn" type="button">Full screen</button>
         </div>
       </div>
+      <button class="chip icon" id="fsTop" type="button" aria-label="Full screen" title="Full screen (F11)"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
       <button class="chip icon" id="menuBtn" type="button" aria-label="Pause (P)" title="Pause (P)">❚❚</button>
     </div>
 
@@ -577,7 +586,7 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
           <div class="planes" id="planes" role="radiogroup" aria-label="Aircraft"></div>
           <div class="seg livs" id="livRow" role="group" aria-label="Livery" hidden></div>
         </section>
-        <section class="step free-only" aria-labelledby="stepRoute">
+        <section class="step free-only" aria-labelledby="stepRoute" hidden>
           <h3 id="stepRoute"><span class="num">2</span>Departures</h3>
           <p class="sub-h">Featured routes</p>
           <div class="featured" id="featured"></div>
@@ -585,7 +594,12 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
           <div class="board-wrap"><div class="board" id="routeBoard"></div></div>
         </section>
         <section class="step free-only" aria-labelledby="stepCond">
-          <h3 id="stepCond"><span class="num">3</span>Conditions</h3>
+          <h3 id="stepCond"><span class="num">2</span>Route &amp; conditions</h3>
+          <div class="route-pick">
+            <label><span>From</span><select id="fromSel" aria-label="Depart from"></select></label>
+            <span class="route-arrow" aria-hidden="true">→</span>
+            <label><span>To</span><select id="toSel" aria-label="Fly to"></select></label>
+          </div>
           <div class="conds">
             <div class="seg" data-for="startSel" role="group" aria-label="Start position"><span>Start</span><button type="button" class="seg-btn" data-v="runway">Runway</button><button type="button" class="seg-btn" data-v="gate">Gate</button></div>
             <div class="seg" data-for="timeSel" role="group" aria-label="Time of day"><span>Time</span><button type="button" class="seg-btn" data-v="day">Day</button><button type="button" class="seg-btn" data-v="sunset">Sunset</button><button type="button" class="seg-btn" data-v="night">Night</button></div>
@@ -593,7 +607,6 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
             <div class="seg" data-for="wxSel" role="group" aria-label="Weather"><span>Weather</span><button type="button" class="seg-btn" data-v="clear">Clear</button><button type="button" class="seg-btn" data-v="cloudy">Cloudy</button><button type="button" class="seg-btn" data-v="rain">Rain</button><button type="button" class="seg-btn" data-v="fog">Fog</button></div>
           </div>
           <div hidden>
-            <select id="fromSel" aria-label="Depart from"></select><select id="toSel" aria-label="Fly to"></select>
             <select id="startSel" aria-label="Start at"><option value="runway">Runway</option><option value="gate">Gate</option></select>
             <select id="timeSel" aria-label="Time of day"><option value="day">Day</option><option value="sunset">Sunset</option><option value="night">Night</option></select>
             <select id="modelSel" aria-label="Flight model"><option value="easy">Assisted</option><option value="real">Realistic</option></select>
@@ -708,7 +721,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       rwys: [{ off: 0, len: 1300, w: 35, sfx: "" }], stands: ["mh", "b763", "b737"] },
     { code: "FRC", name: "Far Reach", x: -12250, z: 5250, hdg: 10, elev: 33, kind: "ga",
       rwys: [{ off: 0, len: 1250, w: 35, sfx: "" }], stands: ["b763", "b737", "mh"] },
-    // mountain field 830 m up between the eastern ridges: thin air, short runway, snow on the peaks around it
+    // mountain field 830 m up between the eastern ridges: thin air, mountain runway, snow on the peaks around it
     { code: "GRP", name: "Granite Peak", x: 11250, z: -4000, hdg: 30, elev: 830, kind: "regional",
       rwys: [{ off: 0, len: 1500, w: 40, sfx: "" }], stands: ["b737", "mh"] },
     // a runway on its own little island far out in the western sea
@@ -727,6 +740,12 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   const WORLD = 16000;
   const DIMS = { a330: [60.3, 63.7], b744: [64.4, 70.6], b747: [64.4, 70.6], b773: [60.9, 73.6], a350: [64.8, 66.9], b77w: [64.8, 73.6], b763: [47.6, 55.2], a321: [35.8, 46.5], b739: [37.8, 43.0], b777: [60.9, 63.7], trainer: [11, 8.3], aero: [8, 6.6], islander: [35.8, 39.5], breeze: [27.1, 27.2], swift: [15.5, 17.7], atlas: [42.4, 45.1], arrow: [9.1, 14.4], regio: [28.7, 36.2], skyliner: [60.1, 62.8], jumbo: [64.4, 70.7], commuter: [17.7, 17.6], b772: [64.8, 73.9], b737: [35.8, 39.7], mh: [37.8, 35.5], b767: [47.6, 48.5] };
   const swapLR = (s) => (s === "L" ? "R" : s === "R" ? "L" : "");
+  // runways long enough for the fleet: an A320/737 needs about 2 km, the 767/A330 about 2.5 km, the 777/747 about 3 km
+  const RWY_MIN = { ga: 2100, regional: 2400, intl: 2900 };
+  for (const a of AIRPORTS) {
+    const heavy = a.stands.some((k) => ["b77w", "b744", "b747", "a330"].includes(k)), need = Math.max(RWY_MIN[a.kind] || 2100, heavy ? 3000 : 0);
+    a.rwys[0].len = Math.max(a.rwys[0].len, need); a.rwys[0].w = Math.max(a.rwys[0].w, 45);
+  }
   for (const a of AIRPORTS) {
     const t = a.hdg * Math.PI / 180; a.s = Math.sin(t); a.c = Math.cos(t);
     a.num = Math.round(a.hdg / 10) || 36; a.recip = ((a.num + 17) % 36) + 1;
@@ -907,8 +926,9 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     return t;
   })();
   // k: strength; s: sizes in metres of the fine, medium and coarse layers; tint: dry/lush colour variation (terrain)
+  const APT_CIRCLES = Array.from({ length: 24 }, (_, i) => { const a = AIRPORTS[i]; return a ? new THREE.Vector3(a.x, a.z, Math.max(...a.rwys.map((r) => r.len)) / 2 + 450) : new THREE.Vector3(0, 0, 0); });
   function addDetail(mat, k, s1, s2, s3, tint = 0) {
-    mat.userData.det = { uDetail: { value: DETAIL }, uDk: { value: new THREE.Vector4(k, 1 / s1, 1 / s2, 1 / s3) }, uTint: { value: tint } };
+    mat.userData.det = { uDetail: { value: DETAIL }, uDk: { value: new THREE.Vector4(k, 1 / s1, 1 / s2, 1 / s3) }, uTint: { value: tint }, uApt: { value: APT_CIRCLES } };
     mat.onBeforeCompile = detailCompile;
     return mat;
   }
@@ -944,7 +964,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   function detailCompile(sh) {
     Object.assign(sh.uniforms, this.userData.det);
     sh.vertexShader = "varying vec3 vWp;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\n  vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;");
-    sh.fragmentShader = "uniform sampler2D uDetail; uniform vec4 uDk; uniform float uTint; varying vec3 vWp;\n" + sh.fragmentShader.replace("#include <color_fragment>", `#include <color_fragment>
+    sh.fragmentShader = "uniform sampler2D uDetail; uniform vec4 uDk; uniform float uTint; uniform vec3 uApt[24]; varying vec3 vWp;\n" + sh.fragmentShader.replace("#include <color_fragment>", `#include <color_fragment>
   { vec2 w = vWp.xz; float a = texture2D(uDetail, w * uDk.y).r, b = texture2D(uDetail, w * uDk.z).g, c = texture2D(uDetail, w * uDk.w).b;
     float dist = length(vWp - cameraPosition), nearF = 1.0 - smoothstep(60.0 / uDk.y * 0.12, 60.0 / uDk.y * 0.5, dist), midF = 1.0 - smoothstep(30.0 / uDk.z * 0.5, 30.0 / uDk.z * 2.0, dist);
     float det = (a - 0.5) * 0.55 * nearF + (b - 0.5) * 0.75 * midF + (c - 0.5) * 0.6;   // fine layers fade out with distance, so no shimmer or rings
@@ -956,7 +976,8 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       vec3 nrm = normalize(cross(dFdx(vWp), dFdy(vWp)));
       float flt = smoothstep(0.985, 0.996, abs(nrm.y)), low = smoothstep(4.0, 12.0, vWp.y) * (1.0 - smoothstep(120.0, 190.0, vWp.y));
       float zone = smoothstep(0.42, 0.52, texture2D(uDetail, w / 3100.0).g);
-      float fm = flt * low * zone * clamp(g * 14.0, 0.0, 1.0);
+      float nearApt = 0.0; for (int i = 0; i < 24; i++) { vec3 ap = uApt[i]; if (ap.z > 0.0) nearApt = max(nearApt, 1.0 - smoothstep(ap.z, ap.z + 700.0, length(w - ap.xy))); }
+      float fm = flt * low * zone * clamp(g * 14.0, 0.0, 1.0) * (1.0 - nearApt);   // airports sit in mown grass, not in farmland
       if (fm > 0.01) {
         float ang = texture2D(uDetail, w / 9000.0).r * 6.283; vec2 rw = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * w;
         vec2 cellSz = vec2(210.0, 140.0), id = floor(rw / cellSz), fr = fract(rw / cellSz);
@@ -1065,7 +1086,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       img.data.set([(nx / l * 0.5 + 0.5) * 255, (nz / l * 0.5 + 0.5) * 255, (1 / l * 0.5 + 0.5) * 255, 255], (j * S + i) * 4);
     }
     g.putImageData(img, 0, 0);
-    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(900, 900); return t;
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(900, 900); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t;   // anisotropic: no sparkle and blockiness at low angles
   })();
   (function () {
     const water = new THREE.Mesh(new THREE.PlaneGeometry(90000, 90000), waterMat = new THREE.MeshPhongMaterial({
@@ -1073,7 +1094,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     }));
     water.rotation.x = -Math.PI / 2; scene.add(water);
     // depth map of the whole world (computed once): shallow turquoise water and surf along the coasts, dark blue offshore
-    const N = 256, dep = new Uint8Array(N * N * 4);
+    const N = 512, dep = new Uint8Array(N * N * 4);   // ~60 m per texel: smooth coastlines
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
       const x = (i / (N - 1) * 2 - 1) * WORLD, z = (j / (N - 1) * 2 - 1) * WORLD, d = clamp(-heightAt(x, z), 0, 60);
       dep[(j * N + i) * 4] = Math.round(d / 60 * 255); dep[(j * N + i) * 4 + 3] = 255;
@@ -1103,13 +1124,18 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   // ---------- roads (ribbons that follow the ground) ----------
   const roadPts = [];  // collected quads
   const roadRuns = [];
+  // inside the airport fence on the runway side of the terminal: no public roads and no road traffic there
+  function airside(x, z) {
+    for (const a of AIRPORTS) { const [al, ac] = local(a, x, z); if (Math.abs(al) < a.alongHalf && ac > a.acrossMin && ac < a.lotX0 - 5) return true; }
+    return false;
+  }
   function addRoad(points, width) {
     let run = [];
     const flushRun = () => { if (run.length >= 3 && width >= 9) roadRuns.push(run); run = []; };
     for (let i = 0; i < points.length - 1; i++) {
       const [x0, z0] = points[i], [x1, z1] = points[i + 1];
       const y0 = groundY(x0, z0), y1 = groundY(x1, z1);
-      if (y0 < 1.2 || y1 < 1.2 || Math.abs(y1 - y0) > 18) { flushRun(); continue; }
+      if (y0 < 1.2 || y1 < 1.2 || Math.abs(y1 - y0) > 18 || airside(x0, z0) || airside(x1, z1)) { flushRun(); continue; }
       if (!run.length) run.push([x0, z0]); run.push([x1, z1]);
       const dx = x1 - x0, dz = z1 - z0, l = Math.hypot(dx, dz) || 1, nx = -dz / l * width / 2, nz = dx / l * width / 2;
       roadPts.push([x0 + nx, y0 + 0.45, z0 + nz], [x0 - nx, y0 + 0.45, z0 - nz], [x1 + nx, y1 + 0.45, z1 + nz], [x1 - nx, y1 + 0.45, z1 - nz]);
@@ -2814,7 +2840,8 @@ vec3 liveryAt(vec3 p, out float fus) {
   const MAT = {
     asphalt: addDetail(lam(0x474b52, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), 0.35, 1.3, 9, 70), taxi: addDetail(lam(0x51555c, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -3 }), 0.35, 1.3, 9, 70),
     apron: addDetail(lam(0x9fa2a4, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }), 0.22, 1.1, 7, 60), shoulder: addDetail(lam(0x6e7266, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 0.4, 2, 12, 80), lot: addDetail(lam(0x3c3f44, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }), 0.3, 1.3, 9, 70),
-    yellow: new THREE.MeshBasicMaterial({ color: 0xf2c230 }), white: new THREE.MeshBasicMaterial({ color: 0xf3f3ef }),
+    // paint sits on the asphalt: a stronger depth offset than the surfaces so it is never hidden or flickers
+    yellow: new THREE.MeshBasicMaterial({ color: 0xf2c230, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -12 }), white: new THREE.MeshBasicMaterial({ color: 0xf3f3ef, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -12 }),
     glass: std(0x2a5d8a, { roughness: 0.12, metalness: 0.7 }), wall: lam(0xe9e6df), wall2: lam(0xd4d7da), roof: lam(0x6f7780),
     red: lam(0xb7372c), tank: lam(0xf0f0ec), hangar: lam(0x9aa6b2), door: lam(0x5a636d),
     edge: new THREE.MeshBasicMaterial({ color: 0xfff1b8 }), green: new THREE.MeshBasicMaterial({ color: 0x3dff78 }), redL: new THREE.MeshBasicMaterial({ color: 0xff3b30 }),
@@ -2872,6 +2899,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     return {
       corr: m(corr), roof: m(roofT), facade: new THREE.MeshPhongMaterial({ map: facade, shininess: 90, specular: 0x8899aa }), office: m(office), inside: m(inside, { color: 0xcfd3d8 }),
       lightStrip: new THREE.MeshBasicMaterial({ color: 0xfff6dc }), floodHead: new THREE.MeshBasicMaterial({ color: 0xfff2c8 }), pole: new THREE.MeshLambertMaterial({ color: 0x9aa0a6 }),
+      bridge: m(tx(128, 64, (g, W, H) => { g.fillStyle = "#d9dcdf"; g.fillRect(0, 0, W, H); g.fillStyle = "#3a4654"; g.fillRect(0, H * 0.3, W, H * 0.32); g.fillStyle = "#b9bdc2"; for (let x = 0; x < W; x += 16) g.fillRect(x, 0, 2, H); })),
       tug: new THREE.MeshLambertMaterial({ color: 0xe8b524 }), cart: new THREE.MeshLambertMaterial({ color: 0x8c949c }), fuel: new THREE.MeshLambertMaterial({ color: 0xf4f4f0 }), dark: new THREE.MeshLambertMaterial({ color: 0x2a2d31 }),
     };
   })();
@@ -2940,10 +2968,32 @@ vec3 liveryAt(vec3 p, out float fus) {
     flat(grp, 23, tl, MAT.taxi, a.tx, 0.05, 0); flat(grp, 0.5, tl, MAT.yellow, a.tx, 0.08, 0);
     for (let z = -tl / 2; z <= tl / 2; z += 60) for (const sx of [-1, 1]) blueL.push([a.tx + sx * 13, 0.25, z]);
     const conns = [-tl / 2 + 12, tl / 2 - 12]; for (let z = -tl / 2 + 450; z < tl / 2 - 300; z += 480) conns.push(z);
-    for (const z of conns) {
+    // taxiway edge lines (double yellow is for shoulders; a single 15 cm line marks the paved edge), broken where connectors join
+    { const cuts = conns.slice().sort((p, q) => p - q), segs = []; let z0 = -tl / 2;
+      for (const c of cuts) { if (c - 12.5 > z0) segs.push([z0, c - 12.5]); z0 = c + 12.5; } if (tl / 2 > z0) segs.push([z0, tl / 2]);
+      for (const [za, zb] of segs) flat(grp, 0.18, zb - za, MAT.yellow, a.tx - 11.2, 0.085, (za + zb) / 2);
+      flat(grp, 0.18, tl, MAT.yellow, a.tx + 11.2, 0.085, 0); }
+    for (const [ci, z] of conns.entries()) {
       const x0 = r0.off + r0.w / 2, len = a.tx - x0;
-      flat(grp, len, 23, MAT.taxi, x0 + len / 2, 0.05, z); flat(grp, len, 0.5, MAT.yellow, x0 + len / 2, 0.08, z);
-      for (const dx of [6, 7.2]) flat(grp, 0.35, 23, MAT.yellow, x0 + 30 + dx, 0.09, z);
+      flat(grp, len, 23, MAT.taxi, x0 + len / 2, 0.05, z); flat(grp, len - 30, 0.4, MAT.yellow, x0 + 30 + (len - 30) / 2, 0.08, z);
+      for (const sz of [-1, 1]) flat(grp, len - 23, 0.18, MAT.yellow, x0 + (len - 11.5) / 2, 0.085, z + sz * 11.2);   // connector edges
+      // runway holding position: two solid lines on the taxiway side, two dashed on the runway side
+      for (const dx of [7.6, 8.6]) flat(grp, 0.3, 23, MAT.yellow, x0 + 30 + dx, 0.09, z);
+      for (const dx of [5.4, 6.4]) for (let k = -10.5; k <= 10.5; k += 3) flat(grp, 0.3, 1.8, MAT.yellow, x0 + 30 + dx, 0.09, z + k);
+      // centreline lead-on curving into the runway centreline (toward the runway's middle)
+      { const dir = z > 0 ? -1 : 1, rad = Math.min(60, x0 - r0.off + 30), cx = r0.off + rad, cz = z;
+        for (let k = 0; k < 10; k++) {
+          const a0 = k / 10 * Math.PI / 2, a1 = (k + 1) / 10 * Math.PI / 2;
+          const p0 = [cx - rad * Math.sin(a0), cz + dir * rad * (1 - Math.cos(a0))], p1 = [cx - rad * Math.sin(a1), cz + dir * rad * (1 - Math.cos(a1))];
+          const m = flat(grp, Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) + 0.2, 0.4, MAT.yellow, (p0[0] + p1[0]) / 2, 0.09, (p0[1] + p1[1]) / 2);
+          m.rotation.z = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]) * -1;
+        }
+        if (x0 + 30 > cx) flat(grp, x0 + 30 - cx, 0.4, MAT.yellow, (cx + x0 + 30) / 2, 0.09, z); }
+      // surface painted location sign (yellow letter on black) and the red mandatory runway sign at the hold line
+      const tag = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshBasicMaterial({ map: textTex("A" + (ci + 1), "#14161a", "#f2c230", 128, 128), polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -12 }));
+      tag.rotation.x = -Math.PI / 2; tag.rotation.z = Math.PI / 2; tag.position.set(x0 + 44, 0.1, z - 5.5); grp.add(tag);
+      const msign = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.3, 5), [lam(0x222222), lam(0x222222), lam(0x222222), lam(0x222222), new THREE.MeshBasicMaterial({ map: textTex(`${String(a.num).padStart(2, "0")}-${String(a.recip).padStart(2, "0")}`, "#c8102e", "#ffffff", 256, 64) }), new THREE.MeshBasicMaterial({ map: textTex(`${String(a.recip).padStart(2, "0")}-${String(a.num).padStart(2, "0")}`, "#c8102e", "#ffffff", 256, 64) })]);
+      msign.rotation.y = Math.PI / 2; msign.position.set(x0 + 37, 1.3, z + 16); grp.add(msign);
       const sign = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.4, 4), [lam(0x222222), lam(0x222222), lam(0x222222), lam(0x222222), new THREE.MeshBasicMaterial({ map: textTex("A", "#f2c230", "#111", 128, 96) }), new THREE.MeshBasicMaterial({ map: textTex(a.label, "#c8102e", "#fff", 192, 96) })]);
       sign.rotation.y = Math.PI / 2; sign.position.set(x0 + 30, 1.4, z - 16); grp.add(sign);
     }
@@ -2958,6 +3008,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     // apron with stand markings
     flat(grp, a.apD, a.apL, MAT.apron, a.apX0 + a.apD / 2, 0.04, 0);
     flat(grp, 14, a.apL * 0.9, MAT.taxi, a.apX0 - 4, 0.05, 0);
+    flat(grp, 0.3, a.apL, MAT.yellow, a.apX0 + 3.2, 0.085, 0);                                                     // apron taxilane edge
+    for (let z = -a.apL / 2 + 4; z < a.apL / 2 - 4; z += 8) for (const dx of [-4.5, 4.5]) flat(grp, 0.25, 4, MAT.white, a.termX0 - 15 + dx, 0.085, z);   // service road beside the terminal
     let z = -a.apL / 2 + 50; a.gates = [];
     const stands = [];
     for (const kind of a.stands) {
@@ -2965,6 +3017,8 @@ vec3 liveryAt(vec3 p, out float fus) {
       stands.push({ kind, z, len }); a.gates.push(stands[stands.length - 1]);
       flat(grp, a.apD - 6, 0.45, MAT.yellow, a.apX0 + a.apD / 2 + 3, 0.09, z);
       flat(grp, 0.45, 8, MAT.yellow, a.termX0 - 9, 0.09, z);
+      { const no = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), new THREE.MeshBasicMaterial({ map: textTex(String(stands.length + 1), "#14161a", "#f2c230", 128, 128), polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -12 }));
+        no.rotation.x = -Math.PI / 2; no.rotation.z = Math.PI / 2; no.position.set(a.apX0 + 16, 0.1, z); grp.add(no); }   // stand number painted at the lead-in line
       z += span / 2 + 8;
     }
     // terminal
@@ -2974,6 +3028,11 @@ vec3 liveryAt(vec3 p, out float fus) {
     boxT(grp, 4, 0.6, a.apL * 0.86, MAT.roof, a.termX0 - 2, tH - 0.6, 0);                                  // roof overhang
     box(grp, a.termD + 6, 1.4, a.apL * 0.86 + 6, MAT.roof, tCx, tH, 0);
     if (intl) for (let k = -2; k <= 2; k++) box(grp, 16, 6, 16, MAT.wall2, tCx + 8, tH + 1.4, k * a.apL * 0.17);
+    // roof skylights, a floor line on the glass, and the landside drop-off canopy on columns
+    for (let k = -3; k <= 3; k++) boxT(grp, a.termD * 0.6, 0.5, 3, MAT.glass, tCx, tH + 1.4, k * a.apL * 0.11, 3);
+    boxT(grp, 1.1, 0.5, a.apL * 0.84, MAT.roof, a.termX0 - 0.6, tH * 0.45, 0, 4);
+    boxT(grp, 10, 0.7, a.apL * 0.7, MAT.roof, a.termX1 + 5, Math.min(tH - 1, 7), 0, 4);
+    for (let z = -a.apL * 0.34; z <= a.apL * 0.34; z += 18) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, Math.min(tH - 1, 7), 8), MAT.wall2); c.position.set(a.termX1 + 9, Math.min(tH - 1, 7) / 2, z); grp.add(c); }
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(a.apL * 0.5, 120), intl ? 12 : 8), new THREE.MeshBasicMaterial({ map: textTex(a.name.toUpperCase(), "#14385e", "#ffffff") }));
     sign.rotation.y = -Math.PI / 2; sign.position.set(a.termX0 - 0.8, tH + (intl ? 8 : 5.5), 0); grp.add(sign);
     // parked aircraft with jet bridges
@@ -2990,12 +3049,24 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (sp.glb) parkedQueue.push({ kind: st.kind, place: () => { const m = buildPlane(st.kind); if (m) placeAt(m); } });
       else placeAt(sp.build(livOf(st.kind, randomLiv(st.kind))));
       if (sp.big) {
-        const bl = 14, bx = a.termX0 - bl / 2 - 0.5;
-        const br = new THREE.Mesh(new THREE.BoxGeometry(bl, 3.2, 3.2), MAT.wall2); br.position.set(bx, 5.2, st.z - 4.2); grp.add(br);
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 3.6, 6), MAT.door); leg.position.set(a.termX0 - bl + 2, 1.8, st.z - 4.2); grp.add(leg);
-        const rot = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 4, 12), MAT.wall2); rot.position.set(a.termX0 - 1.5, 5.2, st.z - 4.2); grp.add(rot);
-        const cabB = new THREE.Mesh(new THREE.BoxGeometry(3, 3.4, 3.8), MAT.door); cabB.position.set(bx - bl / 2 - 1, 5.2, st.z - 4.2); grp.add(cabB);
-        for (const wx of [-1, 1]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.4, 10), APT.dark); w.rotation.x = Math.PI / 2; w.position.set(a.termX0 - bl + 2, 0.45, st.z - 4.2 + wx * 0.8); grp.add(w); }
+        // jet bridge: rotunda at the terminal, two telescoping tunnels, a drive column on wheels, and a cab
+        // that meets the aircraft's front left door at the door's own height
+        const po = packOpts(st.kind), L = DIMS[st.kind][1], noseX = a.termX0 - 9;
+        const doorX = noseX - Math.max(3.5, L * 0.11), sill = sp.gearH + 0.05 + po.cy - po.R * 0.42, side = st.z - po.R - 1.9;
+        const rX = a.termX0 - 3.2, rZ = side - 7, fy = sill;                                     // rotunda and floor height
+        const seg = (x0, z0, x1, z1, w, h, mat) => { const l = Math.hypot(x1 - x0, z1 - z0), m = boxT(grp, l, h, w, mat, (x0 + x1) / 2, fy - 0.3, (z0 + z1) / 2, 3); m.rotation.y = -Math.atan2(z1 - z0, x1 - x0); return m; };
+        const mid = [(rX + doorX) / 2 + 1, (rZ + side) / 2];
+        seg(rX, rZ, mid[0], mid[1], 3.3, 3.1, APT.bridge); seg(mid[0] + 0.6, mid[1], doorX + 2.2, side - 0.1, 3.0, 2.8, APT.bridge);
+        const rot = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 3.6, 16), MAT.wall2); rot.position.set(rX, fy + 1.2, rZ); grp.add(rot);
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, fy, 8), MAT.door); col.position.set(rX, fy / 2 - 0.3, rZ); grp.add(col);
+        // drive column with its wheel bogie under the outer tunnel
+        const dX = (mid[0] + doorX) / 2 + 2, dZ = (mid[1] + side) / 2;
+        for (const dx of [-0.35, 0.35]) { const lg = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, fy - 0.3, 6), APT.dark); lg.position.set(dX + dx, (fy - 0.3) / 2, dZ); grp.add(lg); }
+        boxT(grp, 1.6, 0.5, 2.4, APT.dark, dX, 0.35, dZ, 2);
+        for (const wz of [-0.8, 0.8]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.36, 12), APT.dark); w.rotation.x = Math.PI / 2; w.position.set(dX, 0.42, dZ + wz); grp.add(w); }
+        // cab: a short box turned to face the fuselage, with the dark bellows that seal against the door
+        const jbCab = boxT(grp, 3.4, 3.2, 3.4, MAT.wall2, doorX + 0.6, fy - 0.3, side - 0.4, 3);
+        const bel = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.6, 0.9), APT.dark); bel.position.set(doorX + 0.4, fy + 1.15, side + 1.6); grp.add(bel);
         const gn = new THREE.Mesh(new THREE.PlaneGeometry(4, 2.4), new THREE.MeshBasicMaterial({ map: textTex(String(stands.indexOf(st) + 1), "#f2c230", "#111", 128, 80) }));
         gn.rotation.y = -Math.PI / 2; gn.position.set(a.termX0 - 0.9, tH - 2.2, st.z); grp.add(gn);
       }
@@ -3019,6 +3090,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     for (let k = 0; k < hNum; k++) {
       const w = hWk(k), dd = hDk(k), hh = hHk(k), hz = hzCur + w / 2, hx = a.apX0 + dd / 2 + 30; hzCur += w + 20;
       buildHangar(grp, hx, hz, dd, w, hh, names[k]);
+      { const xa = a.tx, xb = hx - dd / 2 - 2; flat(grp, xb - xa, 0.4, MAT.yellow, (xa + xb) / 2, 0.09, hz); }   // taxi line from the taxiway into the hangar
       flat(grp, 44, w + 10, MAT.apron, hx - dd / 2 - 22, 0.04, hz);
       // an aircraft in for maintenance, nose in
       const kinds = Object.keys(PLANES).filter((kk) => PLANES[kk].packed && DIMS[kk][0] < w - 8 && DIMS[kk][1] < dd + 25 && (kk === "b737" || kk === "mh" || kk === "a321" || kk === "b763" || kk === "a350"));
@@ -3158,21 +3230,50 @@ vec3 liveryAt(vec3 p, out float fus) {
   }
 
   // ================= SOUND =================
-  let ac = null, eng = null, engGain = null, soundOn = false;
+  let ac = null, eng = null, engGain = null, soundOn = load("sw-sound") !== "0", SFX = null;
+  // ---------- sound: a small synthesiser, no audio files ----------
+  // jet: low rumble + fan buzz + a whine that rises with N1; wind over the airframe with airspeed; tyre rumble on the ground;
+  // one-shot effects for the gear, flaps, spoilers, touchdown and the cabin chime
   function initAudio() {
     if (ac) return;
     try {
       ac = new (window.AudioContext || window.webkitAudioContext)();
-      eng = ac.createOscillator(); eng.type = "sawtooth";
-      const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 500;
-      const noise = ac.createBufferSource(); const buf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate); const d = buf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; noise.buffer = buf; noise.loop = true;
-      const nf = ac.createBiquadFilter(); nf.type = "bandpass"; nf.frequency.value = 900; const ng = ac.createGain(); ng.gain.value = 0.25;
-      engGain = ac.createGain(); engGain.gain.value = 0;
-      eng.connect(lp).connect(engGain); noise.connect(nf).connect(ng).connect(engGain); engGain.connect(ac.destination);
-      eng.start(); noise.start();
-    } catch { ac = null; }
+      const master = ac.createGain(); master.gain.value = 0.9; master.connect(ac.destination);
+      const nbuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), d = nbuf.getChannelData(0);
+      let b0 = 0; for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; b0 = 0.97 * b0 + 0.03 * w; d[i] = w * 0.5 + b0 * 3; }   // white + a little brown
+      const loop = (filterType, freq, q) => { const src = ac.createBufferSource(); src.buffer = nbuf; src.loop = true; src.loopStart = Math.random(); const f = ac.createBiquadFilter(); f.type = filterType; f.frequency.value = freq; f.Q.value = q; const g = ac.createGain(); g.gain.value = 0; src.connect(f).connect(g).connect(master); src.start(); return { f, g }; };
+      const rumble = loop("lowpass", 180, 0.7), fan = loop("bandpass", 900, 1.2), wind = loop("bandpass", 600, 0.6), roll = loop("lowpass", 90, 1);
+      const wo = ac.createOscillator(); wo.type = "sine"; const wg = ac.createGain(); wg.gain.value = 0; wo.connect(wg).connect(master); wo.start();
+      eng = wo; engGain = wg;
+      const burst = (filterType, f0, f1, dur, vol, q = 1, at = 0) => {
+        const t0 = ac.currentTime + at, src = ac.createBufferSource(); src.buffer = nbuf; const f = ac.createBiquadFilter(); f.type = filterType; f.Q.value = q;
+        f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
+        const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        src.connect(f).connect(g).connect(master); src.start(t0, Math.random()); src.stop(t0 + dur + 0.05);
+      };
+      const thump = (f, dur, vol, at = 0) => { const t0 = ac.currentTime + at, o = ac.createOscillator(), g = ac.createGain(); o.type = "sine"; o.frequency.setValueAtTime(f, t0); o.frequency.exponentialRampToValueAtTime(f * 0.5, t0 + dur); g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); o.connect(g).connect(master); o.start(t0); o.stop(t0 + dur + 0.05); };
+      const ding = (f, at) => { const t0 = ac.currentTime + at, o = ac.createOscillator(), g = ac.createGain(); o.type = "sine"; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.09, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.4); o.connect(g).connect(master); o.start(t0); o.stop(t0 + 1.5); };
+      SFX = {
+        update(dt) {
+          const on = soundOn && (S.mode === "fly" || S.mode === "paused") && !S.crashed && S.mode !== "paused", t = ac.currentTime, n1 = S.n1 || 0, big = spec.big;
+          const ext = S.cam !== "cockpit" && S.cam !== "cabin";   // outside views hear more fan, less cabin
+          const sp = (S.ias || S.speed || 0), rev = S.reverse ? 1.5 : 1;
+          rumble.g.gain.setTargetAtTime(on ? (0.05 + n1 * 0.22) * rev : 0, t, 0.25); rumble.f.frequency.setTargetAtTime(110 + n1 * 260, t, 0.3);
+          fan.g.gain.setTargetAtTime(on ? (0.01 + n1 * n1 * 0.08) * (ext ? 1.3 : 0.6) * rev : 0, t, 0.25); fan.f.frequency.setTargetAtTime(500 + n1 * 1600, t, 0.4);
+          wg.gain.setTargetAtTime(on ? (0.004 + n1 * 0.016) * (ext ? 1 : 0.5) : 0, t, 0.3); wo.frequency.setTargetAtTime((big ? 1500 : 1900) + n1 * 2600, t, 0.5);
+          wind.g.gain.setTargetAtTime(on && !S.grounded ? Math.min(0.16, (sp / 140) * (sp / 140) * 0.12 + S.gearPos * 0.015 + S.spoiler * 0.03) : 0, t, 0.4); wind.f.frequency.setTargetAtTime(350 + sp * 6, t, 0.5);
+          roll.g.gain.setTargetAtTime(on && S.grounded ? Math.min(0.22, S.gs / 50 * 0.2) : 0, t, 0.15); roll.f.frequency.setTargetAtTime(60 + S.gs * 1.5, t, 0.2);
+        },
+        gear(down) { burst("bandpass", 380, 300, 3.2, 0.05, 2); thump(70, 0.25, 0.35, 3.1); if (down) burst("lowpass", 900, 200, 0.4, 0.06, 1, 3.1); },
+        flaps() { burst("bandpass", 650, 600, 1.8, 0.035, 3); },
+        spoiler() { burst("lowpass", 400, 120, 0.5, 0.08, 1); },
+        touch(fpm) { const k = Math.min(1, fpm / 600); burst("bandpass", 2600, 1500, 0.45, 0.06 + k * 0.08, 2.5); thump(55, 0.35, 0.25 + k * 0.4); burst("lowpass", 300, 80, 0.5, 0.1 + k * 0.15); },
+        chime() { ding(1046, 0); ding(784, 0.5); },
+        crash() { burst("lowpass", 1200, 40, 2.5, 0.5, 0.7); thump(40, 1.2, 0.8); },
+      };
+    } catch { ac = null; SFX = null; }
   }
+  const sfx = (name, ...args) => { if (SFX && soundOn) try { SFX[name](...args); } catch {} };
   function chime(f, d = 0.3) {
     if (!ac || !soundOn) return;
     const o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime;
@@ -3241,14 +3342,14 @@ vec3 liveryAt(vec3 p, out float fus) {
   function toggleGear() {
     if (!spec.retract) { flash("The Cessna 172 has fixed landing gear", 1.6); return; }
     if (S.grounded && S.gearDown) { flash("Can't raise the gear on the ground", 1.6); return; }
-    S.gearDown = !S.gearDown; flash(S.gearDown ? "Gear down" : "Gear up", 1.4); chime(S.gearDown ? 330 : 440, 0.2);
+    S.gearDown = !S.gearDown; flash(S.gearDown ? "Gear down" : "Gear up", 1.4); sfx("gear", S.gearDown);
   }
   function trimStep(noseUp) {
     if (S.mode !== "fly") return;
     if (ENV.model === "real" && !spec.fbw) { S.trimAlpha = clamp(S.trimAlpha + (noseUp ? 0.006 : -0.006), -0.05, 0.22); flash(`Trim ${(S.trimAlpha * 57.3).toFixed(1)}° (${noseUp ? "nose up, slower" : "nose down, faster"})`, 1.2); }
     else { S.trim = clamp(S.trim + (noseUp ? 0.05 : -0.05), -0.4, 0.4); flash(`Trim ${S.trim > 0 ? "nose up" : S.trim < 0 ? "nose down" : "neutral"} ${Math.round(Math.abs(S.trim) * 100)}%`, 1.2); }
   }
-  function cycleFlaps() { S.flaps = (S.flaps + 1) % 3; flash(`Flaps ${S.flaps}`, 1.2); chime(500 + S.flaps * 80, 0.15); }
+  function cycleFlaps() { S.flaps = (S.flaps + 1) % 3; flash(`Flaps ${S.flaps}`, 1.2); sfx("flaps"); chime(500 + S.flaps * 80, 0.15); }
 
   window.addEventListener("keydown", (e) => {
     if (e.target.closest && e.target.closest("input, select, textarea")) return;
@@ -3296,7 +3397,8 @@ vec3 liveryAt(vec3 p, out float fus) {
   const invBtn = $("invBtn"); const syncInv = () => invBtn.setAttribute("aria-pressed", String(invert)); syncInv();
   invBtn.addEventListener("click", () => { invert = !invert; save("sw-invert", invert ? "1" : "0"); syncInv(); });
   const sndBtn = $("sndBtn");
-  sndBtn.addEventListener("click", () => { soundOn = !soundOn; sndBtn.setAttribute("aria-pressed", String(soundOn)); if (soundOn) initAudio(); if (ac && ac.state === "suspended") ac.resume(); });
+  sndBtn.setAttribute("aria-pressed", String(soundOn));
+  sndBtn.addEventListener("click", () => { soundOn = !soundOn; save("sw-sound", soundOn ? "1" : "0"); sndBtn.setAttribute("aria-pressed", String(soundOn)); if (soundOn) initAudio(); if (ac && ac.state === "suspended") ac.resume(); });
   // graphics quality and FPS counter (saved)
   const qualBtn = $("qualBtn"), fpsBtn = $("fpsBtn"), fpsOut = $("fpsOut"), vibBtn = $("vibBtn");
   function applyQuality(name, announce, keep = true, keepRes = false) {
@@ -3339,7 +3441,19 @@ vec3 liveryAt(vec3 p, out float fus) {
   syncFps();
   vibBtn.hidden = !canVibrate; vibBtn.setAttribute("aria-pressed", String(vibOn));
   vibBtn.addEventListener("click", () => { vibOn = !vibOn; save("sw-vib", vibOn ? "1" : "0"); vibBtn.setAttribute("aria-pressed", String(vibOn)); if (vibOn) buzz(30); });
-  $("fsBtn").addEventListener("click", () => { try { if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen().catch(() => {}); } catch {} });
+  // full screen: the standard API, or Safari's prefixed one (iPad); iPhone Safari has neither, so the button hides there
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const fsCan = !!(stage.requestFullscreen || stage.webkitRequestFullscreen);
+  function toggleFullscreen() {
+    try {
+      if (fsEl()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      else { const r = (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage); if (r && r.catch) r.catch(() => {}); }
+    } catch {}
+  }
+  $("fsBtn").addEventListener("click", toggleFullscreen); $("fsTop").addEventListener("click", toggleFullscreen);
+  if (!fsCan) { $("fsTop").hidden = true; $("fsBtn").hidden = true; }
+  const syncFs = () => $("fsTop").setAttribute("aria-pressed", String(!!fsEl()));
+  document.addEventListener("fullscreenchange", syncFs); document.addEventListener("webkitfullscreenchange", syncFs);
   $("menuBtn").addEventListener("click", () => { if (S.mode === "fly") pause(); else if (S.mode === "paused") resume(); else if (S.mode === "replay") closeReplay(); });
 
   // touch stick
@@ -3488,15 +3602,15 @@ vec3 liveryAt(vec3 p, out float fus) {
     { id: "m8", title: "Against the clock", plane: "mh", from: "HBP", to: "EGT", start: "runway", time: "sunset", wx: "clear", wind: [8, 200], noAP: true, limit: 420, goals: [["time"]],
       desc: "The autopilot is broken and Eastgate is waiting. Fly the whole trip by hand and come to a stop on its runway within 7:00. Turn onto the final early, a tight last turn costs more time than it saves." },
     { id: "m9", title: "Over the mountains", plane: "b737", from: "SPT", to: "GRP", start: "runway", time: "sunset", wx: "cloudy", wind: [9, 0], goals: [["stop"]],
-      desc: "Granite Peak sits 830 m up between the eastern ridges, on a 1500 m runway. Climb early, clear the peaks, then follow the valley down to the field. Thin air means a faster touchdown, so brake firmly." },
+      desc: "Granite Peak sits 830 m up between the eastern ridges, on a 2400 m runway. Climb early, clear the peaks, then follow the valley down to the field. Thin air means a faster touchdown, so brake firmly." },
     { id: "m10", title: "Heavy into Highmoor", plane: "b77w", from: "HMR", to: "HMR", start: "approach", dist: 11000, time: "day", wx: "rain", wind: [14, -60], goals: [["fpm", 600], ["stop"]],
-      desc: "A 777 in rain and a gusty crosswind, onto Highmoor's 1800 m runway. The big jet is slow to respond: get it stable early, keep the sink rate low and stop before the end." },
+      desc: "A 777 in rain and a gusty crosswind, onto Highmoor's 2400 m runway. The big jet is slow to respond: get it stable early, keep the sink rate low and stop before the end." },
   ];
   let briefTab = "free", selMission = MISSIONS[0], briefCanResume = false;
   // hand-picked routes for the free-flight briefing
   const FEATURED = [
     { t: "Out to sea", f: "WFD", to: "PLC", plane: "mh", time: "day", wx: "clear", tip: "Pelican Isle is a lone island runway west of Westfield: nothing but water under the final approach." },
-    { t: "Ridge hop", f: "MLB", to: "GRP", plane: "b737", time: "day", wx: "cloudy", tip: "From the Millbrook plateau up to Granite Peak, 830 m high on a 1500 m runway. Climb straight away." },
+    { t: "Ridge hop", f: "MLB", to: "GRP", plane: "b737", time: "day", wx: "cloudy", tip: "From the Millbrook plateau up to Granite Peak, 830 m high on a 2400 m runway. Climb straight away." },
     { t: "Twin-runway hub", f: "HBP", to: "KBI", plane: "b763", time: "sunset", wx: "clear", tip: "Harbor Point to the new Kingsbridge hub on the eastern plain. Land on 09R, the longer of its two parallel runways." },
     { t: "Coast to coast", f: "NCP", to: "SNV", plane: "b77w", time: "day", wx: "cloudy", tip: "The longest trip on the map, from the north cape to Sunvale in the far south. A good one for the autopilot's NAV and APP." },
     { t: "Foggy arrival", f: "KBI", to: "HMR", plane: "b737", time: "day", wx: "fog", tip: "Fog closes in on Highmoor. Use the ILS: the runway only shows up in the last kilometre." },
@@ -3560,8 +3674,8 @@ vec3 liveryAt(vec3 p, out float fus) {
   });
   const noneOpt = document.createElement("option"); noneOpt.value = "-1"; noneOpt.textContent = "Free flight (no destination)"; toSel.append(noneOpt);
   fromSel.value = "0"; toSel.value = "1";
-  fromSel.addEventListener("change", () => { S.from = AIRPORTS[+fromSel.value]; if (toSel.value === fromSel.value) toSel.value = String((+fromSel.value + 1) % AIRPORTS.length); spawn(S.from); });
-  toSel.addEventListener("change", () => { if (toSel.value === fromSel.value) fromSel.value = String((+toSel.value + 1) % AIRPORTS.length); S.from = AIRPORTS[+fromSel.value]; spawn(S.from); });
+  fromSel.addEventListener("change", () => { S.from = AIRPORTS[+fromSel.value]; if (toSel.value === fromSel.value) toSel.value = String((+fromSel.value + 1) % AIRPORTS.length); spawn(S.from); updateSummary(); renderBoard(); });
+  toSel.addEventListener("change", () => { if (toSel.value === fromSel.value) fromSel.value = String((+toSel.value + 1) % AIRPORTS.length); S.from = AIRPORTS[+fromSel.value]; spawn(S.from); updateSummary(); renderBoard(); });
   const boardEl = $("routeBoard");
   function flapText(t, n) { const sp = document.createElement("span"); sp.className = "flap"; sp.textContent = t.padEnd(n, " ").slice(0, n); return sp; }
   function renderBoard() {
@@ -3732,7 +3846,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     flash(S.to ? `Cleared for takeoff, runway ${S.from.label}. Destination ${S.to.code}.` : `Cleared for takeoff. Rotate at ${rot} knots.`, 4);
     S.msgQ = [];
     if (ENV.model === "real" && !spec.fbw) S.msgQ.push([`Realistic: the trim holds your nose attitude. Full power pitches up, so after liftoff trim nose down with ${trimKeys(true)}.`, 5.5]);
-    if (soundOn) initAudio();
+    if (soundOn) { initAudio(); if (ac && ac.state === "suspended") ac.resume(); setTimeout(() => sfx("chime"), 600); }   // cabin chime as the flight begins
     RADIO.length = 0;
   }
 
@@ -3746,7 +3860,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const set = (id, on) => { const el = $(id); if (el) el.setAttribute("aria-pressed", String(!!on)); };
     set("tSpoil", S.spoiler > 0); set("tRev", S.reverse); set("tLights", S.lights);
   }
-  function toggleSpoiler() { S.spoiler = S.spoiler >= 1 ? 0 : S.spoiler + 0.5; S.autoSpoiler = false; flash(S.spoiler ? `Spoilers ${S.spoiler === 1 ? "full" : "half"}` : "Spoilers retracted", 1.3); chime(420, 0.12); syncTouchKeys(); }
+  function toggleSpoiler() { sfx("spoiler"); S.spoiler = S.spoiler >= 1 ? 0 : S.spoiler + 0.5; S.autoSpoiler = false; flash(S.spoiler ? `Spoilers ${S.spoiler === 1 ? "full" : "half"}` : "Spoilers retracted", 1.3); chime(420, 0.12); syncTouchKeys(); }
   function toggleReverse() {
     if (!S.grounded) { flash("Reverse thrust only works on the ground", 1.6); return; }
     S.reverse = !S.reverse; flash(S.reverse ? "Reverse thrust: add throttle to slow down" : "Reverse thrust off", 1.6); chime(S.reverse ? 260 : 520, 0.15); syncTouchKeys();
@@ -3780,7 +3894,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   let crashId = 0;
   function crash(reason) {
     if (S.crashed) return;
-    S.crashed = true; model.visible = false; boom.visible = true; boom.position.copy(S.pos); boom.scale.setScalar(1); S.boomT = 0; chime(80, 0.8);
+    sfx("crash"); S.crashed = true; model.visible = false; boom.visible = true; boom.position.copy(S.pos); boom.scale.setScalar(1); S.boomT = 0; chime(80, 0.8);
     buzz([180, 70, 180]);
     if (S.started && !S.mission) logFlight({ fpm: /landing/i.test(reason) ? Math.round(-S.vs * M2FT * 60) : null, res: "Crashed: " + reason.split(/[.!] /)[0].replace(/[.!]$/, ""), ok: false });
     const id = ++crashId;
@@ -3981,6 +4095,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         if (!gentle) { crash(S.vs <= -6.5 ? `Hard landing at ${Math.round(-S.vs * M2FT * 60)} ft/min: the gear collapsed. Aim for under 600.` : Math.abs(right.y) >= 0.31 ? "Wingtip strike: level the wings before touchdown." : "You flew into the ground."); return; }
         if (spec.retract && S.gearPos < 0.9) { crash("Belly landing! Press G to lower the gear before you land."); return; }
         if (!rw && am < 0.97) { crash("That wasn't a runway. Land on an airport runway."); return; }
+        sfx("touch", Math.round(-S.vs * M2FT * 60));
         S.grounded = true; S.sink = 0; S.pos.y = gy + spec.gearH; S.gs = Math.hypot(S.vel.x, S.vel.z); S.groundPitch = clamp(Math.asin(clamp(fwd.y, -1, 1)), 0, 0.2);
         { // the main wheels roll where the aircraft is actually going: a small crab angle is straightened out on touchdown
           const hNow = Math.atan2(-fwd.x, -fwd.z), hTrk = Math.atan2(-S.vel.x, -S.vel.z);
@@ -5254,10 +5369,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     scene.userData.sky.position.copy(camera.position);
     updateTiles(camera.position); clouds.update(camera.quaternion); rain.update(dt, camera.position); updateLightPool();
     waterNormal.offset.x += dt * 0.0025; waterNormal.offset.y += dt * 0.0012; WATER_T.value += dt;
-    if (engGain && ac) {
-      engGain.gain.setTargetAtTime(soundOn && S.mode === "fly" && !S.crashed ? 0.02 + S.throttle * 0.05 : 0, ac.currentTime, 0.15);
-      eng.frequency.setTargetAtTime((spec.big || spec.jetSound ? 90 : 50) + S.throttle * (spec.big || spec.jetSound ? 140 : 70), ac.currentTime, 0.2);
-    }
+    if (SFX && ac) SFX.update(dt);
     renderer.render(scene, camera); drawHud(now); autoQuality(now);
     if (fpsOn) { fpsMeter.n++; if (now - fpsMeter.t0 >= 500) { fpsOut.textContent = `${Math.round(fpsMeter.n * 1000 / (now - fpsMeter.t0))} FPS`; fpsMeter.n = 0; fpsMeter.t0 = now; } }
     requestAnimationFrame(frame);
