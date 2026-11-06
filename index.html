@@ -3869,7 +3869,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       try { r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: "high-performance" }); } catch { r = null; return false; }
       r.outputEncoding = THREE.sRGBEncoding; r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
-      sc = new THREE.Scene(); sc.background = new THREE.Color(0x1a1c20); sc.fog = new THREE.Fog(0x1a1c20, 160, 320);
+      sc = new THREE.Scene(); sc.background = new THREE.Color(0x8fa9c4); sc.fog = new THREE.Fog(0x8fa9c4, 300, 700);
       // reflections: a simple bright room baked into an environment map for this renderer
       try { const pm = new THREE.PMREMGenerator(r), room = new THREE.Scene(); room.background = new THREE.Color(0x30343a);
         for (let k = -2; k <= 2; k++) { const pnl = new THREE.Mesh(new THREE.PlaneGeometry(6, 40), new THREE.MeshBasicMaterial({ color: 0xffffff })); pnl.rotation.x = Math.PI / 2; pnl.position.set(k * 10, 20, 0); room.add(pnl); }
@@ -3878,16 +3878,15 @@ vec3 liveryAt(vec3 p, out float fus) {
       const key = new THREE.DirectionalLight(0xfff4e6, 0.9); key.position.set(-40, 70, -30); key.castShadow = true;
       Object.assign(key.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 220 }); key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0005; sc.add(key); sc.add(key.target);
       // the hangar: polished floor with markings, ribbed walls, roof trusses and rows of ceiling lights
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.MeshStandardMaterial({ color: 0x3c4046, roughness: 0.38, metalness: 0.05, envMapIntensity: 0.5 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; sc.add(floor);
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ color: 0x3c4046, roughness: 0.38, metalness: 0.05, envMapIntensity: 0.5 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; sc.add(floor);
       const lineM = new THREE.MeshBasicMaterial({ color: 0xe0b52a });
       for (const [w, l, x, z] of [[0.4, 120, 0, 0], [80, 0.4, 0, -40], [80, 0.4, 0, 40]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l), lineM); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.02, z); sc.add(m); }
-      const wallTex = canvasTex(128, 64, (g, W, H) => { for (let x = 0; x < W; x += 8) { const gr = g.createLinearGradient(x, 0, x + 8, 0); gr.addColorStop(0, "#4a4f56"); gr.addColorStop(0.5, "#6a7078"); gr.addColorStop(1, "#43484f"); g.fillStyle = gr; g.fillRect(x, 0, 8, H); } }).t;
-      wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping; wallTex.repeat.set(30, 4);
-      const wallM = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.6, metalness: 0.4, side: THREE.BackSide });
-      const shell = new THREE.Mesh(new THREE.CylinderGeometry(110, 110, 70, 48, 1, true, 0, Math.PI), wallM); shell.rotation.z = Math.PI / 2; shell.scale.set(1, 1.4, 0.5); shell.position.y = 0; sc.add(shell);
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(240, 60), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.6, metalness: 0.4 })); back.position.set(0, 30, -80); sc.add(back);
+      // the hangar itself: the "Airport Hangar" model, scaled up so a 747 fits with room to walk round it (open end behind the camera's start)
+      { const hg = new THREE.Group(); for (const pt of decodePack("apt_hangar").parts) { const m = new THREE.Mesh(pt.g, pt.mat); m.receiveShadow = true; hg.add(m); }
+        hg.scale.setScalar(2.1); hg.rotation.y = Math.PI / 2; sc.add(hg); }
       const lampM = new THREE.MeshBasicMaterial({ color: 0xfff6e2 });
-      for (let x = -60; x <= 60; x += 20) for (let z = -60; z <= 60; z += 20) { const l = new THREE.Mesh(new THREE.CircleGeometry(1.6, 16), lampM); l.rotation.x = Math.PI / 2; l.position.set(x, 48, z); sc.add(l); }
+      for (let x = -80; x <= 80; x += 26) for (let z = -100; z <= 100; z += 33) { const l = new THREE.Mesh(new THREE.CircleGeometry(1.8, 16), lampM); l.rotation.x = Math.PI / 2; l.position.set(x, 88, z); sc.add(l); }
+      { const pl = new THREE.PointLight(0xfff2dc, 0.6, 260); pl.position.set(0, 70, 0); sc.add(pl); }
       cam = new THREE.PerspectiveCamera(38, 16 / 9, 0.5, 900);
       // input: drag to orbit, wheel / pinch to zoom
       const pts = new Map(); let pinch0 = 0, dist0 = 1;
