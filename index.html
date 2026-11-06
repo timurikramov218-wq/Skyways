@@ -2697,6 +2697,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   function buildPacked(key, o, liv) {
     const pk = decodePack(key), root = new THREE.Group(), gearG = new THREE.Group(); root.add(gearG);
     for (const pt of paintPack(key, o, liv)) {
+      if (pt.gear && o.dropGear) continue;   // the model's own simple gear is replaced by the detailed gear below
       const mesh = new THREE.Mesh(pt.g, pt.mat); ((pt.gear && !o.bodyOnly) ? gearG : root).add(mesh);
       if (pt.src) mesh.userData.remat = (cabin) => liveryMat(pt.src, o, liv, cabin);   // the player's copy gets its own material for the cabin view
     }
@@ -2761,8 +2762,9 @@ vec3 liveryAt(vec3 p, out float fus) {
   }
   // measured on the source models: fuselage axis/radius, window line, nose/tail, fin [root y, tip y, root LE, root TE, tip LE, tip TE], engine [x, y, r, z front, z back]
   var PACK_OPTS = {
-    b737: { paintWindows: true, hideWin: true, pitch: 0.533, doors: [0.16, 0.43, 0.46, 0.89, -5], winRange: [0.19, 0.86], cy: 1.08, R: 2.16, win: 0.19, zNose: -19.9, zTail: 19.5, finTop: 9.2, fin: [3.1, 9.2, 12.0, 19.5, 17.57, 19.53], eng: [5.16, -0.9, 1.05, -6.6, -2.9], tailZ: 19.6, beaconY: 2.2 },
-    mh: { paintWindows: true, hideWin: true, pitch: 0.508, doors: [0.14, 0.46, 0.88, -5, -5], winRange: [0.17, 0.85], cy: 1.1, R: 2.1, win: 0.1, zNose: -17.7, zTail: 16.6, finTop: 10.7, fin: [3.0, 10.7, 10.53, 15.42, 15.42, 16.61], eng: [5.04, -1.23, 1.25, -4.9, -1.6], bodyOnly: true, addGear: true, gearH: 3.0, mainX: 2.7, mainZ: 1.6, noseZ: -13.6, tailZ: 17.6, beaconY: 2.0 },
+    b737: { paintWindows: true, hideWin: true, pitch: 0.533, doors: [0.16, 0.43, 0.46, 0.89, -5], winRange: [0.19, 0.86], cy: 1.08, R: 2.16, win: 0.19, zNose: -19.9, zTail: 19.5, finTop: 9.2, fin: [3.1, 9.2, 12.0, 19.5, 17.57, 19.53], eng: [5.16, -0.9, 1.05, -6.6, -2.9], tailZ: 19.6, beaconY: 2.2,
+      dropGear: true, addGear: true, gearH: 3.2, wheelR: 0.56, mainX: 3.0, mainZ: -0.95, noseZ: -16.1 },
+    mh: { paintWindows: true, hideWin: true, pitch: 0.508, doors: [0.14, 0.46, 0.88, -5, -5], winRange: [0.17, 0.85], cy: 1.1, R: 2.1, win: 0.1, zNose: -17.7, zTail: 16.6, finTop: 10.7, fin: [3.0, 10.7, 10.53, 15.42, 15.42, 16.61], eng: [5.04, -1.23, 1.25, -4.9, -1.6], bodyOnly: true, addGear: true, gearH: 3.0, wheelR: 0.56, mainX: 2.85, mainZ: 1.6, noseZ: -13.6, tailZ: 17.6, beaconY: 2.0 },
     b767: { cy: 0.2, R: 2.7, win: 0.21, zNose: -24.3, zTail: 24.3, finTop: 11.41, fin: [3.43, 11.41, 13.73, 21.3, 21.57, 24.25], eng: [7.97, -2.22, 1.42, -8.8, -4.6], bodyOnly: true, addGear: true, gearH: 4.2, mainX: 4.65, mainZ: 2.4, noseZ: -18.3, bogie: true, tailZ: 24.0, beaconY: 2.8 },
   };
   PACK_OPTS.b747 = { cy: 0.2, R: 3.35, win: 0.15, zNose: -35.3, zTail: 35.3, finTop: 14.1, fin: [4.2, 14.1, 22.0, 34.0, 30.4, 35.3],
