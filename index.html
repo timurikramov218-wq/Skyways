@@ -457,6 +457,25 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .route-pick select { appearance: none; -webkit-appearance: none; font: 500 15px var(--font-body); color: var(--fg); background: var(--g2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23b9b2a5' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 14px center; border: 1px solid var(--hair); border-radius: 12px; padding: 12px 38px 12px 14px; min-width: 0; width: 100%; }
 .route-pick select:focus-visible { outline: 1px solid var(--champ); outline-offset: 2px; }
 .route-arrow { font: 400 20px var(--font-display); color: var(--champ); padding-bottom: 10px; }
+
+/* ---------- 360° hangar ---------- */
+.show-open { margin-left: auto; padding: 8px 16px; font-size: 12px; letter-spacing: 0.08em; }
+#stepHangar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.showroom { position: absolute; inset: 0; z-index: 8; background: #0c0d10; }
+.showroom canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.showroom canvas:active { cursor: grabbing; }
+.show-top { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 30px; background: linear-gradient(180deg, rgba(10,10,12,0.75), rgba(10,10,12,0)); pointer-events: none; }
+.show-top > * { pointer-events: auto; }
+.show-top h2 { margin: 2px 0 2px; font: 400 30px var(--font-display); color: var(--fg); }
+.show-top p { margin: 0; font: 400 13px var(--font-body); color: var(--fg-2); }
+.show-acts { display: flex; gap: 8px; }
+.show-bottom { position: absolute; left: 0; right: 0; bottom: 0; display: grid; gap: 10px; padding: 36px 18px calc(16px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(0deg, rgba(10,10,12,0.85), rgba(10,10,12,0)); }
+.show-row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.show-row::-webkit-scrollbar { display: none; }
+.show-row .seg-btn { flex: none; background: rgba(22,23,27,0.8); border: 1px solid var(--hair); padding: 9px 15px; }
+.show-row .seg-btn[aria-pressed="true"] { border-color: rgba(214,191,150,0.7); }
+.show-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.show-hint { font: 400 12px var(--font-mono); color: var(--fg-3); }
 </style>
 
 <div class="wrap">
@@ -486,6 +505,7 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
           <button class="chip" id="fpsBtn" type="button" aria-pressed="false">FPS counter</button>
           <button class="chip" id="vibBtn" type="button" aria-pressed="true" hidden>Vibration</button>
           <hr>
+          <button class="chip" id="showBtn" type="button">360° hangar</button>
           <button class="chip" id="logBtn" type="button">Flight log</button>
           <button class="chip" id="fsBtn" type="button">Full screen</button>
         </div>
@@ -558,6 +578,16 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
       <button class="chip" id="rpExit" type="button">Exit replay</button>
     </div>
 
+    <div class="showroom" id="showroom" hidden role="dialog" aria-modal="true" aria-label="360° hangar">
+      <canvas id="showCv" aria-label="Aircraft in the hangar: drag to turn it, pinch or scroll to zoom"></canvas>
+      <div class="show-top"><div><div class="eyebrow">360° HANGAR</div><h2 id="showName">Aircraft</h2><p id="showType"></p></div>
+        <div class="show-acts"><button class="chip" id="showSpin" type="button" aria-pressed="true">Auto-turn</button><button class="chip" id="showGear" type="button" aria-pressed="true">Gear down</button><button class="chip icon" id="showClose" type="button" aria-label="Close">✕</button></div></div>
+      <div class="show-bottom">
+        <div class="show-row" id="showPlanes" role="group" aria-label="Aircraft"></div>
+        <div class="show-row" id="showLivs" role="group" aria-label="Livery"></div>
+        <div class="show-foot"><span class="show-hint">Drag to turn · pinch or scroll to zoom</span><button class="btn" id="showFly" type="button">Fly this one</button></div>
+      </div>
+    </div>
     <div class="dialog" id="brief">
       <div class="panel">
         <div class="brief-head">
@@ -576,7 +606,7 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
           <div class="missions" id="missionList"></div>
         </section>
         <section class="step free-only" aria-labelledby="stepHangar">
-          <h3 id="stepHangar"><span class="num">1</span>Hangar</h3>
+          <h3 id="stepHangar"><span class="num">1</span>Hangar <button class="btn alt show-open" id="showOpen" type="button">360° hangar · try liveries</button></h3>
           <div class="filters" id="planeFilter" role="group" aria-label="Aircraft type" hidden>
             <button type="button" class="seg-btn" data-cat="all" aria-pressed="true">All</button>
             <button type="button" class="seg-btn" data-cat="airliner" aria-pressed="false">Airliners</button>
@@ -3716,6 +3746,113 @@ vec3 liveryAt(vec3 p, out float fus) {
     grp.querySelectorAll("button").forEach((btn) => btn.addEventListener("click", () => { sel.value = btn.dataset.v; sel.dispatchEvent(new Event("change")); sync(); updateSummary(); }));
     sync();
   });
+  // ---------- 360° hangar: its own small scene and renderer, opened from the briefing or the ⋯ menu ----------
+  const SHOW = (function () {
+    const el = $("showroom"), cv = $("showCv"); let r = null, sc = null, cam = null, mdl = null, kind = null, raf = 0, last = 0;
+    const view = { yaw: 2.3, pitch: 0.12, dist: 1, spin: true, gear: true, idleT: 0 };
+    function ensure() {
+      if (r) return true;
+      try { r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: "high-performance" }); } catch { r = null; return false; }
+      r.outputEncoding = THREE.sRGBEncoding; r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+      sc = new THREE.Scene(); sc.background = new THREE.Color(0x1a1c20); sc.fog = new THREE.Fog(0x1a1c20, 160, 320);
+      // reflections: a simple bright room baked into an environment map for this renderer
+      try { const pm = new THREE.PMREMGenerator(r), room = new THREE.Scene(); room.background = new THREE.Color(0x30343a);
+        for (let k = -2; k <= 2; k++) { const pnl = new THREE.Mesh(new THREE.PlaneGeometry(6, 40), new THREE.MeshBasicMaterial({ color: 0xffffff })); pnl.rotation.x = Math.PI / 2; pnl.position.set(k * 10, 20, 0); room.add(pnl); }
+        sc.environment = pm.fromScene(room, 0.04).texture; pm.dispose(); } catch {}
+      sc.add(new THREE.HemisphereLight(0xdfe8f2, 0x3a3d42, 0.55));
+      const key = new THREE.DirectionalLight(0xfff4e6, 0.9); key.position.set(-40, 70, -30); key.castShadow = true;
+      Object.assign(key.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 220 }); key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0005; sc.add(key); sc.add(key.target);
+      // the hangar: polished floor with markings, ribbed walls, roof trusses and rows of ceiling lights
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.MeshStandardMaterial({ color: 0x3c4046, roughness: 0.38, metalness: 0.05, envMapIntensity: 0.5 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; sc.add(floor);
+      const lineM = new THREE.MeshBasicMaterial({ color: 0xe0b52a });
+      for (const [w, l, x, z] of [[0.4, 120, 0, 0], [80, 0.4, 0, -40], [80, 0.4, 0, 40]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l), lineM); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.02, z); sc.add(m); }
+      const wallTex = canvasTex(128, 64, (g, W, H) => { for (let x = 0; x < W; x += 8) { const gr = g.createLinearGradient(x, 0, x + 8, 0); gr.addColorStop(0, "#4a4f56"); gr.addColorStop(0.5, "#6a7078"); gr.addColorStop(1, "#43484f"); g.fillStyle = gr; g.fillRect(x, 0, 8, H); } }).t;
+      wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping; wallTex.repeat.set(30, 4);
+      const wallM = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.6, metalness: 0.4, side: THREE.BackSide });
+      const shell = new THREE.Mesh(new THREE.CylinderGeometry(110, 110, 70, 48, 1, true, 0, Math.PI), wallM); shell.rotation.z = Math.PI / 2; shell.scale.set(1, 1.4, 0.5); shell.position.y = 0; sc.add(shell);
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(240, 60), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.6, metalness: 0.4 })); back.position.set(0, 30, -80); sc.add(back);
+      const lampM = new THREE.MeshBasicMaterial({ color: 0xfff6e2 });
+      for (let x = -60; x <= 60; x += 20) for (let z = -60; z <= 60; z += 20) { const l = new THREE.Mesh(new THREE.CircleGeometry(1.6, 16), lampM); l.rotation.x = Math.PI / 2; l.position.set(x, 48, z); sc.add(l); }
+      cam = new THREE.PerspectiveCamera(38, 16 / 9, 0.5, 900);
+      // input: drag to orbit, wheel / pinch to zoom
+      const pts = new Map(); let pinch0 = 0, dist0 = 1;
+      cv.addEventListener("pointerdown", (e) => { cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); view.idleT = 0; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); dist0 = view.dist; } });
+      cv.addEventListener("pointermove", (e) => {
+        const p0 = pts.get(e.pointerId); if (!p0) return; view.idleT = 0;
+        if (pts.size === 1) { view.yaw -= (e.clientX - p0[0]) * 0.008; view.pitch = clamp(view.pitch + (e.clientY - p0[1]) * 0.005, -0.05, 1.2); }
+        pts.set(e.pointerId, [e.clientX, e.clientY]);
+        if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch0 > 0) view.dist = clamp(dist0 * pinch0 / d, 0.35, 1.8); }
+      });
+      const up = (e) => { pts.delete(e.pointerId); pinch0 = 0; };
+      cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+      cv.addEventListener("wheel", (e) => { e.preventDefault(); view.dist = clamp(view.dist * (e.deltaY > 0 ? 1.08 : 0.93), 0.35, 1.8); view.idleT = 0; }, { passive: false });
+      return true;
+    }
+    function setModel(k, livId) {
+      if (mdl) { sc.remove(mdl); mdl = null; }
+      const m = buildPlane(k, livId); if (!m) return; kind = k; mdl = m;
+      m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+      const box = new THREE.Box3().setFromObject(m); m.position.y = -box.min.y; sc.add(m); m.updateMatrixWorld(true);
+      $("showName").textContent = PLANES[k].name; $("showType").textContent = `${PLANES[k].type} · ${(livId && livId !== "house" && LIV[livId]) ? LIV[livId].name : "White"}`;
+      applyGear();
+    }
+    function applyGear() {
+      if (!mdl) return; const g = mdl.userData.gear, legs = g && g.userData && g.userData.legs;
+      if (legs) { legs.forEach((l) => { l.rotation[l.userData.fold.axis] = view.gear ? 0 : l.userData.fold.sign * Math.PI / 2; }); g.visible = view.gear; } else if (g) g.visible = view.gear;
+      const box = new THREE.Box3().setFromObject(mdl); mdl.position.y += (view.gear ? 0 : 1.2) - box.min.y;   // gear up: the aircraft "floats" on stands
+    }
+    function renderPlanes() {
+      const row = $("showPlanes"); row.replaceChildren();
+      for (const k of Object.keys(PLANES)) { if (!PLANES[k].packed) continue;
+        const b = document.createElement("button"); b.type = "button"; b.className = "seg-btn"; b.textContent = PLANES[k].name; b.setAttribute("aria-pressed", String(k === kind));
+        b.addEventListener("click", () => { setModel(k, chosenLiv[k]); renderPlanes(); renderLivs(); }); row.append(b); }
+    }
+    function renderLivs() {
+      const row = $("showLivs"); row.replaceChildren(); const list = LIVERIES[kind] || [];
+      for (const id of ["house"].concat(list)) {
+        const b = document.createElement("button"); b.type = "button"; b.className = "seg-btn"; b.textContent = id === "house" ? "White" : LIV[id].name;
+        b.setAttribute("aria-pressed", String((chosenLiv[kind] || "house") === id));
+        b.addEventListener("click", () => {
+          chosenLiv[kind] = id; save("sw-liv", JSON.stringify(chosenLiv)); setModel(kind, id); renderLivs();
+          const img = planesEl.querySelector(`input[value="${kind}"]`)?.closest(".plane-card")?.querySelector("img"); if (img) queuePhoto(kind, img, id);
+          if (kind === chosen) { setPlane(chosen); spawn(S.from); renderLiveries(); updateSummary(); }
+        });
+        row.append(b);
+      }
+    }
+    function resize() { const w = el.clientWidth, h = el.clientHeight; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+    function loop(now) {
+      if (el.hidden) return; raf = requestAnimationFrame(loop);
+      const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now; view.idleT += dt;
+      if (view.spin && view.idleT > 2.5) view.yaw += dt * 0.25;
+      if (mdl) {
+        const box = new THREE.Box3().setFromObject(mdl), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+        const d = Math.max(size.x, size.z) * 1.15 * view.dist;
+        cam.position.set(c.x + Math.sin(view.yaw) * Math.cos(view.pitch) * d, Math.max(1.2, c.y + Math.sin(view.pitch) * d), c.z + Math.cos(view.yaw) * Math.cos(view.pitch) * d); cam.lookAt(c.x, c.y * 0.8, c.z);
+        (mdl.userData.fans || []).forEach((f) => (f.rotation.z += dt * 2.5));
+        const blink = (now % 1200) < 80; (mdl.userData.strobes || []).forEach((st) => (st.visible = blink)); if (mdl.userData.beacon) mdl.userData.beacon.visible = (now % 1000) < 500;
+      }
+      r.render(sc, cam);
+    }
+    function open(k) {
+      if (!ensure()) { flash("This device can't show the 3D hangar", 2); return; }
+      el.hidden = false; SHOW.on = true; resize(); setModel(k || chosen, chosenLiv[k || chosen]); renderPlanes(); renderLivs(); last = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+    }
+    function close() { el.hidden = true; SHOW.on = false; cancelAnimationFrame(raf); }
+    $("showClose").addEventListener("click", close);
+    $("showSpin").addEventListener("click", (e) => { view.spin = !view.spin; e.currentTarget.setAttribute("aria-pressed", String(view.spin)); });
+    $("showGear").addEventListener("click", (e) => { view.gear = !view.gear; e.currentTarget.setAttribute("aria-pressed", String(view.gear)); e.currentTarget.textContent = view.gear ? "Gear down" : "Gear up"; applyGear(); });
+    $("showFly").addEventListener("click", () => {
+      const inp = planesEl.querySelector(`input[value="${kind}"]`); if (inp && !inp.checked) { inp.checked = true; inp.dispatchEvent(new Event("change")); }
+      close();
+    });
+    window.addEventListener("resize", () => { if (!el.hidden) resize(); });
+    document.addEventListener("keydown", (e) => { if (!el.hidden && e.key === "Escape") close(); });
+    return { open, close, on: false };
+  })();
+  $("showOpen").addEventListener("click", () => SHOW.open(chosen));
+  $("showBtn").addEventListener("click", () => { $("moreMenu").hidden = true; SHOW.open(chosen); });
   function renderLiveries() {
     const row = $("livRow"), list = LIVERIES[chosen];
     row.replaceChildren(); row.hidden = !list;
@@ -5353,6 +5490,7 @@ vec3 liveryAt(vec3 p, out float fus) {
 
   let last = performance.now();
   function frame(now) {
+    if (SHOW.on) { last = now; requestAnimationFrame(frame); return; }   // the 360° hangar has the GPU to itself
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (S.mode === "fly" && !S.crashed) { step(dt / 2); if (!S.crashed && S.mode === "fly") step(dt / 2); }
     else if (S.mode === "paused") readPad();
