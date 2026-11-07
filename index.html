@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Skyways Flight Sim — free 3D flight simulator in your browser</title>
-<meta name="description" content="Skyways: a free 3D flight simulator that runs in the browser. Fly the A320, A321, 737, 767, 777 and 747 between 17 airports, with real airline liveries, autopilot, ILS landings, day and night. No download.">
+<meta name="description" content="Skyways: a free 3D flight simulator that runs in the browser. Fly the A320, A321, 737, 767, 777 and 747 between 10 famous airports (London Heathrow, New York JFK, Dubai, Paris, Amsterdam, Frankfurt, Istanbul, Moscow, Singapore, Innsbruck), with real airline liveries, autopilot, ILS landings, day and night. No download.">
 <meta name="keywords" content="Skyways, Skyways flight sim, flight simulator, browser flight simulator, 3D plane game, airplane game, Boeing 747, Boeing 777, Airbus A320, симулятор самолёта, игра самолёт">
 <link rel="canonical" href="https://skyways8.netlify.app/">
 <meta property="og:type" content="website">
@@ -498,7 +498,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
   <header class="masthead">
     <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" fill="currentColor"/></svg></span>
       <h1>Skyways <span>Flight Sim</span></h1></div>
-    <p class="tagline">8 aircraft · 17 airports · 10 missions · replays · 32 km world · day, sunset and night</p>
+    <p class="tagline">8 aircraft · 10 real airports · 10 missions · replays · 32 km world · day, sunset and night</p>
   </header>
 
   <div class="stage" id="stage">
@@ -747,45 +747,30 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
 
   // ================= WORLD DATA =================
   const AIRPORTS = [
-    { code: "HBP", name: "Harbor Point Intl", x: -200, z: -1250, hdg: 20, elev: 12, kind: "intl",
-      rwys: [{ off: 0, len: 2400, w: 50, sfx: "R" }, { off: -380, len: 2000, w: 45, sfx: "L" }], stands: ["a321", "mh", "b77w", "b737", "mh", "b763", "b737", "b77w", "b763", "a321"] },
-    { code: "SPT", name: "Southport", x: 3100, z: 1300, hdg: 120, elev: 20, kind: "intl",
-      rwys: [{ off: 0, len: 1900, w: 45, sfx: "" }], stands: ["mh", "b763", "b737", "mh", "b763"] },
-    { code: "WFD", name: "Westfield Regional", x: -2900, z: 2350, hdg: 160, elev: 148, kind: "regional",
-      rwys: [{ off: 0, len: 1700, w: 45, sfx: "" }], stands: ["b763", "b737", "mh", "b763"] },
-    { code: "CDR", name: "Cedar Ridge", x: 3100, z: -2900, hdg: 60, elev: 192, kind: "ga",
-      rwys: [{ off: 0, len: 1300, w: 35, sfx: "" }], stands: ["b737", "mh", "b763", "b737"] },
-    { code: "CRK", name: "Coral Key", x: -2300, z: -3050, hdg: 300, elev: 6, kind: "ga",
-      rwys: [{ off: 0, len: 1250, w: 35, sfx: "" }], stands: ["mh", "b763"] },
-    { code: "EGT", name: "Eastgate Intl", x: 6500, z: -6750, hdg: 140, elev: 88, kind: "intl",
-      rwys: [{ off: 0, len: 2600, w: 50, sfx: "" }], stands: ["b77w", "a321", "mh", "a330", "b737", "mh", "b77w"] },
-    { code: "SNV", name: "Sunvale Intl", x: 2000, z: 10750, hdg: 90, elev: 126, kind: "intl",
-      rwys: [{ off: 0, len: 2400, w: 50, sfx: "" }], stands: ["b737", "mh", "b744", "b737", "b747"] },
-    { code: "HMR", name: "Highmoor", x: 12500, z: 2500, hdg: 30, elev: 185, kind: "regional",
-      rwys: [{ off: 0, len: 1800, w: 45, sfx: "" }], stands: ["mh", "b763", "b737"] },
-    { code: "BYF", name: "Bayford", x: -4250, z: 11500, hdg: 170, elev: 50, kind: "regional",
-      rwys: [{ off: 0, len: 1700, w: 45, sfx: "" }], stands: ["b763", "b737", "mh", "b763"] },
-    { code: "NCP", name: "Northcape", x: 2500, z: -12750, hdg: 70, elev: 27, kind: "regional",
-      rwys: [{ off: 0, len: 1700, w: 45, sfx: "" }], stands: ["b737", "mh"] },
-    { code: "PMW", name: "Port Merrow", x: -6000, z: -7250, hdg: 250, elev: 13, kind: "ga",
-      rwys: [{ off: 0, len: 1300, w: 35, sfx: "" }], stands: ["mh", "b763", "b737"] },
-    { code: "FRC", name: "Far Reach", x: -12250, z: 5250, hdg: 10, elev: 33, kind: "ga",
-      rwys: [{ off: 0, len: 1250, w: 35, sfx: "" }], stands: ["b763", "b737", "mh"] },
-    // mountain field 830 m up between the eastern ridges: thin air, mountain runway, snow on the peaks around it
-    { code: "GRP", name: "Granite Peak", x: 11250, z: -4000, hdg: 30, elev: 830, kind: "regional",
-      rwys: [{ off: 0, len: 1500, w: 40, sfx: "" }], stands: ["b737", "mh"] },
-    // a runway on its own little island far out in the western sea
-    { code: "PLC", name: "Pelican Isle", x: -8250, z: 5000, hdg: 60, elev: 4, kind: "regional",
-      rwys: [{ off: 0, len: 1900, w: 45, sfx: "" }], stands: ["mh", "b737", "b763"] },
-    // the big new hub on the eastern coastal plain, with two parallel runways
-    { code: "KBI", name: "Kingsbridge Intl", x: 6750, z: 4000, hdg: 90, elev: 30, kind: "intl",
-      rwys: [{ off: 0, len: 2800, w: 50, sfx: "R" }, { off: -400, len: 2500, w: 45, sfx: "L" }], stands: ["b77w", "b737", "mh", "b763", "b77w", "b737", "mh", "b763"] },
-    // small regional strip on the central plateau
-    { code: "MLB", name: "Millbrook", x: 7500, z: -1500, hdg: 105, elev: 240, kind: "regional",
-      rwys: [{ off: 0, len: 1400, w: 40, sfx: "" }], stands: ["mh", "b737"] },
-    // a hill-top general aviation field in the south
-    { code: "HLC", name: "Hillcrest", x: -1500, z: 8000, hdg: 100, elev: 165, kind: "ga",
-      rwys: [{ off: 0, len: 1300, w: 35, sfx: "" }], stands: ["b737", "mh"] },
+    // ten of the world's best-known airports, with their real runway headings, lengths and parallel-runway names
+    // (the map is smaller than the real world, so they sit closer together, but roughly where they are on a globe:
+    // London in the middle, Amsterdam north, Paris south, Frankfurt and the Alps east, Moscow north-east, Istanbul and Dubai south-east, Singapore far south, New York far west)
+    { code: "LHR", name: "London Heathrow", x: -1250, z: -800, hdg: 90, elev: 38, kind: "intl",
+      rwys: [{ off: 0, len: 3660, w: 50, sfx: "R" }, { off: -520, len: 3900, w: 50, sfx: "L" }], stands: ["b77w", "a321", "b744", "a330", "b737", "b77w", "a321", "b763", "b747", "a330", "mh", "b737"] },
+    { code: "AMS", name: "Amsterdam Schiphol", x: -2000, z: -5100, hdg: 180, elev: 6, kind: "intl",
+      rwys: [{ off: 0, len: 3800, w: 60, sfx: "R" }, { off: -480, len: 3300, w: 45, sfx: "C" }], stands: ["b737", "b77w", "mh", "a330", "b737", "b744", "a321", "b77w"] },
+    { code: "CDG", name: "Paris Charles de Gaulle", x: -1700, z: 4050, hdg: 90, elev: 12, kind: "intl",
+      rwys: [{ off: 0, len: 4200, w: 45, sfx: "R" }, { off: -380, len: 2700, w: 60, sfx: "L" }], stands: ["a321", "b77w", "a330", "b737", "b77w", "a321", "mh", "a330"] },
+    { code: "FRA", name: "Frankfurt Main", x: 5600, z: -3000, hdg: 70, elev: 143, kind: "intl",
+      rwys: [{ off: 0, len: 4000, w: 60, sfx: "R" }, { off: -520, len: 4000, w: 45, sfx: "C" }], stands: ["b744", "a321", "b747", "a330", "b737", "b77w", "a321", "mh"] },
+    // Innsbruck: the mountain airport, 760 m up among the ridges, runway 08/26
+    { code: "INN", name: "Innsbruck", x: 10750, z: -3750, hdg: 80, elev: 760, kind: "regional",
+      rwys: [{ off: 0, len: 2400, w: 45, sfx: "" }], stands: ["a321", "b737", "mh"] },
+    { code: "SVO", name: "Moscow Sheremetyevo", x: 6000, z: -6450, hdg: 60, elev: 75, kind: "intl",
+      rwys: [{ off: 0, len: 3700, w: 60, sfx: "R" }, { off: -300, len: 3550, w: 60, sfx: "L" }], stands: ["a321", "b77w", "a330", "b737", "a321", "b77w", "mh"] },
+    { code: "IST", name: "Istanbul", x: 5550, z: 4100, hdg: 160, elev: 6, kind: "intl",
+      rwys: [{ off: 0, len: 4100, w: 60, sfx: "R" }, { off: -400, len: 3750, w: 60, sfx: "L" }], stands: ["b77w", "a321", "a330", "b737", "b77w", "mh", "a330", "a321", "b744"] },
+    { code: "DXB", name: "Dubai International", x: 10000, z: 4500, hdg: 120, elev: 32, kind: "intl",
+      rwys: [{ off: 0, len: 4000, w: 60, sfx: "R" }, { off: -385, len: 4000, w: 60, sfx: "L" }], stands: ["b77w", "b77w", "a330", "b744", "b77w", "b737", "b77w", "a321", "b747"] },
+    { code: "SIN", name: "Singapore Changi", x: 2500, z: 10250, hdg: 20, elev: 90, kind: "intl",
+      rwys: [{ off: 0, len: 4000, w: 60, sfx: "C" }, { off: -450, len: 4000, w: 60, sfx: "L" }], stands: ["a330", "b77w", "a321", "b737", "b77w", "a330", "b744", "mh"] },
+    { code: "JFK", name: "New York JFK", x: -10750, z: 5550, hdg: 130, elev: 6, kind: "intl",
+      rwys: [{ off: 0, len: 4000, w: 60, sfx: "R" }, { off: -500, len: 3050, w: 45, sfx: "L" }], stands: ["b77w", "b763", "a321", "b744", "b737", "a330", "b77w", "mh"] },
   ];
   const WORLD = 16000;
   const DIMS = { a330: [60.3, 63.7], b744: [64.4, 70.6], b747: [64.4, 70.6], b773: [60.9, 73.6], a350: [64.8, 66.9], b77w: [64.8, 73.6], b763: [47.6, 55.2], a321: [35.8, 46.5], b739: [37.8, 43.0], b777: [60.9, 63.7], trainer: [11, 8.3], aero: [8, 6.6], islander: [35.8, 39.5], breeze: [27.1, 27.2], swift: [15.5, 17.7], atlas: [42.4, 45.1], arrow: [9.1, 14.4], regio: [28.7, 36.2], skyliner: [60.1, 62.8], jumbo: [64.4, 70.7], commuter: [17.7, 17.6], b772: [64.8, 73.9], b737: [35.8, 39.7], mh: [37.8, 35.5], b767: [47.6, 48.5] };
@@ -1236,7 +1221,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   }
   const towns = [];
   AIRPORTS.forEach((a, i) => {
-    const big = a.code === "HBP";
+    const big = a.code === "LHR";
     const t = findTown(a, big ? 2100 : 1500, big ? 2900 : 2300, i * 7 + 1);
     if (t) { buildTown(t[0], t[1], big ? 620 : a.kind === "intl" ? 420 : 260, big || a.kind === "intl", i); towns.push({ x: t[0], z: t[1], a }); }
   });
@@ -3765,36 +3750,37 @@ vec3 liveryAt(vec3 p, out float fus) {
   // the time, weather and wind (speed in knots, direction relative to the runway: 0 = headwind, 90 = from the right),
   // and can add goals of its own on top of landing at the destination. The usual landing rating gives the stars.
   const MISSIONS = [
-    { id: "m1", title: "Short final", plane: "b737", from: "HBP", to: "HBP", start: "approach", dist: 6000, time: "day", wx: "clear", wind: [5, 0], goals: [],
-      desc: "You're lined up on a 6 km final to Harbor Point in perfect weather, gear and flaps already down. Keep the ILS diamonds centred, close the throttle near the ground and flare gently." },
-    { id: "m2", title: "First hop", plane: "b737", from: "HBP", to: "SPT", start: "runway", time: "day", wx: "clear", wind: [6, 10], goals: [],
-      desc: "A whole flight: take off from Harbor Point, climb out, turn towards Southport and land. Follow the amber arrow and the magenta line on the map." },
-    { id: "m3", title: "Sea-breeze crosswind", plane: "mh", from: "PLC", to: "PLC", start: "approach", dist: 8000, time: "day", wx: "cloudy", wind: [20, 80], goals: [["centre", 8]],
-      desc: "Pelican Isle sits alone in the western sea and the wind blows straight across its runway. Point the nose into the wind to track the centreline, then straighten up with the rudder (Q / E) just before touchdown." },
-    { id: "m4", title: "Short field", plane: "b737", from: "CRK", to: "CRK", start: "approach", dist: 6000, time: "day", wx: "clear", wind: [8, -20], goals: [["stop"]],
-      desc: "Coral Key has only 1250 m of runway. Fly the final slow and on the glide path, touch down early, then brake hard (Space), with spoilers (X) and reverse thrust (T)." },
-    { id: "m5", title: "Night ILS", plane: "a321", from: "EGT", to: "EGT", start: "approach", dist: 15000, time: "night", wx: "cloudy", wind: [10, 30], goals: [],
-      desc: "A dark, overcast night into Eastgate. The runway lights are all you'll see, so fly the ILS and keep both diamonds centred. The autopilot's APP mode is allowed." },
-    { id: "m6", title: "Fog at Kingsbridge", plane: "b763", from: "KBI", to: "KBI", start: "approach", dist: 12000, time: "day", wx: "fog", vis: 900, wind: [4, 0], goals: [],
-      desc: "Visibility is under a kilometre. You won't see the runway until the last seconds, so trust the instruments: the ILS diamonds, the 3° path and the radio-altitude callouts." },
-    { id: "m7", title: "Engine failure", plane: "b737", from: "SNV", to: "SNV", start: "runway", time: "day", wx: "clear", wind: [6, 0], engFail: 400, goals: [],
-      desc: "A normal departure from Sunvale, until the right engine quits at 400 ft. Keep flying: left rudder, wings level, speed up. Then turn back and land on the runway you just left." },
-    { id: "m8", title: "Against the clock", plane: "mh", from: "HBP", to: "EGT", start: "runway", time: "sunset", wx: "clear", wind: [8, 200], noAP: true, limit: 420, goals: [["time"]],
-      desc: "The autopilot is broken and Eastgate is waiting. Fly the whole trip by hand and come to a stop on its runway within 7:00. Turn onto the final early, a tight last turn costs more time than it saves." },
-    { id: "m9", title: "Over the mountains", plane: "b737", from: "SPT", to: "GRP", start: "runway", time: "sunset", wx: "cloudy", wind: [9, 0], goals: [["stop"]],
-      desc: "Granite Peak sits 830 m up between the eastern ridges, on a 2400 m runway. Climb early, clear the peaks, then follow the valley down to the field. Thin air means a faster touchdown, so brake firmly." },
-    { id: "m10", title: "Heavy into Highmoor", plane: "b77w", from: "HMR", to: "HMR", start: "approach", dist: 11000, time: "day", wx: "rain", wind: [14, -60], goals: [["fpm", 600], ["stop"]],
-      desc: "A 777 in rain and a gusty crosswind, onto Highmoor's 2400 m runway. The big jet is slow to respond: get it stable early, keep the sink rate low and stop before the end." },
+    { id: "m1", title: "Short final", plane: "b737", from: "LHR", to: "LHR", start: "approach", dist: 6000, time: "day", wx: "clear", wind: [5, 0], goals: [],
+      desc: "You're lined up on a 6 km final to Heathrow's runway 09R in perfect weather, gear and flaps already down. Keep the ILS diamonds centred, close the throttle near the ground and flare gently." },
+    { id: "m2", title: "London to Paris", plane: "b737", from: "LHR", to: "CDG", start: "runway", time: "day", wx: "clear", wind: [6, 10], goals: [],
+      desc: "A whole flight: take off from Heathrow, climb out, turn towards Paris Charles de Gaulle and land on its 4.2 km runway. Follow the amber arrow and the magenta line on the map." },
+    { id: "m3", title: "Schiphol crosswind", plane: "mh", from: "AMS", to: "AMS", start: "approach", dist: 8000, time: "day", wx: "cloudy", wind: [20, 80], goals: [["centre", 8]],
+      desc: "Schiphol lies on flat land by the North Sea and the wind blows straight across the Polderbaan. Point the nose into the wind to track the centreline, then straighten up with the rudder (Q / E) just before touchdown." },
+    { id: "m4", title: "Stop on the runway", plane: "b737", from: "JFK", to: "JFK", start: "approach", dist: 6000, time: "day", wx: "clear", wind: [8, -20], goals: [["stop"]],
+      desc: "A visual final into New York JFK over the water. Fly the final slow and on the glide path, touch down early, then brake hard (Space), with spoilers (X) and reverse thrust (T)." },
+    { id: "m5", title: "Night ILS", plane: "a321", from: "SVO", to: "SVO", start: "approach", dist: 15000, time: "night", wx: "cloudy", wind: [10, 30], goals: [],
+      desc: "A dark, overcast night into Moscow Sheremetyevo. The runway lights are all you'll see, so fly the ILS and keep both diamonds centred. The autopilot's APP mode is allowed." },
+    { id: "m6", title: "Fog at Istanbul", plane: "b763", from: "IST", to: "IST", start: "approach", dist: 12000, time: "day", wx: "fog", vis: 900, wind: [4, 0], goals: [],
+      desc: "Fog rolls in from the Black Sea and visibility is under a kilometre. You won't see the runway until the last seconds, so trust the instruments: the ILS diamonds, the 3° path and the radio-altitude callouts." },
+    { id: "m7", title: "Engine failure", plane: "b737", from: "SIN", to: "SIN", start: "runway", time: "day", wx: "clear", wind: [6, 0], engFail: 400, goals: [],
+      desc: "A normal departure from Singapore Changi, until the right engine quits at 400 ft. Keep flying: left rudder, wings level, speed up. Then turn back and land on the runway you just left." },
+    { id: "m8", title: "Against the clock", plane: "mh", from: "LHR", to: "SVO", start: "runway", time: "sunset", wx: "clear", wind: [8, 200], noAP: true, limit: 450, goals: [["time"]],
+      desc: "The autopilot is broken and Moscow is waiting. Fly the whole trip from Heathrow by hand and come to a stop on Sheremetyevo's runway within 7:30. Turn onto the final early, a tight last turn costs more time than it saves." },
+    { id: "m9", title: "Into the Alps", plane: "b737", from: "FRA", to: "INN", start: "runway", time: "sunset", wx: "cloudy", wind: [9, 0], goals: [["stop"]],
+      desc: "Innsbruck sits 760 m up among the mountains, on a 2400 m runway. Climb early, clear the ridges, then find the field on its plateau. Thin air means a faster touchdown, so brake firmly." },
+    { id: "m10", title: "Heavy into Dubai", plane: "b77w", from: "DXB", to: "DXB", start: "approach", dist: 11000, time: "day", wx: "cloudy", wind: [14, -60], goals: [["fpm", 600], ["stop"]],
+      desc: "A fully loaded 777 into Dubai with a gusty desert crosswind. The big jet is slow to respond: get it stable early, keep the sink rate low and stop before the end." },
   ];
   let briefTab = "free", selMission = MISSIONS[0], briefCanResume = false;
   // hand-picked routes for the free-flight briefing
   const FEATURED = [
-    { t: "Out to sea", f: "WFD", to: "PLC", plane: "mh", time: "day", wx: "clear", tip: "Pelican Isle is a lone island runway west of Westfield: nothing but water under the final approach." },
-    { t: "Ridge hop", f: "MLB", to: "GRP", plane: "b737", time: "day", wx: "cloudy", tip: "From the Millbrook plateau up to Granite Peak, 830 m high on a 2400 m runway. Climb straight away." },
-    { t: "Twin-runway hub", f: "HBP", to: "KBI", plane: "b763", time: "sunset", wx: "clear", tip: "Harbor Point to the new Kingsbridge hub on the eastern plain. Land on 09R, the longer of its two parallel runways." },
-    { t: "Coast to coast", f: "NCP", to: "SNV", plane: "b77w", time: "day", wx: "cloudy", tip: "The longest trip on the map, from the north cape to Sunvale in the far south. A good one for the autopilot's NAV and APP." },
-    { t: "Foggy arrival", f: "KBI", to: "HMR", plane: "b737", time: "day", wx: "fog", tip: "Fog closes in on Highmoor. Use the ILS: the runway only shows up in the last kilometre." },
-    { t: "Hill country", f: "BYF", to: "HLC", plane: "mh", time: "sunset", wx: "clear", tip: "A short evening hop from Bayford to the hill-top strip at Hillcrest: only 1300 m, so come in slow." },
+    { t: "Channel hop", f: "LHR", to: "AMS", plane: "mh", time: "day", wx: "clear", tip: "Heathrow to Amsterdam Schiphol across the North Sea. Land on 18R, the long Polderbaan." },
+    { t: "Alpine valley", f: "FRA", to: "INN", plane: "b737", time: "day", wx: "cloudy", tip: "Frankfurt to Innsbruck, 760 m up in the mountains on a 2400 m runway. Climb straight away." },
+    { t: "Europe to Asia", f: "LHR", to: "IST", plane: "b763", time: "sunset", wx: "clear", tip: "Heathrow to the big new Istanbul hub. Land on 16R, the longer of its two parallel runways." },
+    { t: "Transatlantic", f: "JFK", to: "LHR", plane: "b77w", time: "day", wx: "cloudy", tip: "The classic long-haul route, New York JFK to London Heathrow. A good one for the autopilot's NAV and APP." },
+    { t: "Foggy Paris", f: "AMS", to: "CDG", plane: "b737", time: "day", wx: "fog", tip: "Fog closes in on Charles de Gaulle. Use the ILS: the runway only shows up in the last kilometre." },
+    { t: "Desert hub", f: "IST", to: "DXB", plane: "b77w", time: "sunset", wx: "clear", tip: "An evening flight from Istanbul down to Dubai's twin 4 km runways." },
+    { t: "Gateway to Asia", f: "DXB", to: "SIN", plane: "a330", time: "day", wx: "cloudy", tip: "Dubai to Singapore Changi, the long way south over the sea." },
   ];
   const routeKm = (f, t) => (Math.hypot(f.x - t.x, f.z - t.z) / 1000).toFixed(1);
 
