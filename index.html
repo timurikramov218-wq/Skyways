@@ -476,6 +476,22 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .show-row .seg-btn[aria-pressed="true"] { border-color: rgba(214,191,150,0.7); }
 .show-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .show-hint { font: 400 12px var(--font-mono); color: var(--fg-3); }
+
+/* phones held sideways: little height, so the six switches sit in a 3 × 2 grid left of the throttle, everything smaller */
+@media (pointer: coarse) and (max-height: 500px) and (min-width: 481px) {
+  .stick { width: 96px; height: 96px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .knob { width: 40px; height: 40px; margin: -20px 0 0 -20px; }
+  .throttle { height: 104px; width: 42px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .tbtns { right: 64px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); grid-template-columns: repeat(3, 70px); width: auto; gap: 5px; }
+  .tbtns .tbtn, .tbtns2 .tbtn { height: 30px; font-size: 9px; letter-spacing: 0.04em; }
+  .tbtns2 { left: 116px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); grid-template-columns: repeat(2, 60px); gap: 5px; }
+  .tbtns2 .tbtn { width: 60px; }
+  .ap { max-height: 46vh; overflow-y: auto; }
+}
+
+/* full screen: the game view covers the whole screen */
+body.fs-on { overflow: hidden; }
+body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height: 100vh; height: 100dvh; max-height: none; aspect-ratio: auto; margin: 0; border: 0; border-radius: 0; }
 </style>
 
 <div class="wrap">
@@ -3421,10 +3437,19 @@ vec3 liveryAt(vec3 p, out float fus) {
         touch(fpm) { const k = Math.min(1, fpm / 600); burst("bandpass", 2600, 1500, 0.45, 0.06 + k * 0.08, 2.5); thump(55, 0.35, 0.25 + k * 0.4); burst("lowpass", 300, 80, 0.5, 0.1 + k * 0.15); },
         chime() { ding(1046, 0); ding(784, 0.5); },
         crash() { burst("lowpass", 1200, 40, 2.5, 0.5, 0.7); thump(40, 1.2, 0.8); },
+        click() { const t0 = ac.currentTime, o = ac.createOscillator(), g = ac.createGain(); o.type = "triangle"; o.frequency.setValueAtTime(1800, t0); o.frequency.exponentialRampToValueAtTime(900, t0 + 0.03); g.gain.setValueAtTime(0.05, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05); o.connect(g).connect(master); o.start(t0); o.stop(t0 + 0.06); },
+        radio() { burst("bandpass", 2400, 2200, 0.16, 0.05, 1.5); burst("bandpass", 2400, 2200, 0.12, 0.04, 1.5, 0.05); },     // squelch break before an ATC call
+        apOff() { [0, 0.24, 0.48].forEach((at) => { ding(988, at); ding(1318, at + 0.1); }); },                               // the autopilot-disconnect "cavalry charge"
+        horn() { const t0 = ac.currentTime; for (let k = 0; k < 3; k++) { const o = ac.createOscillator(), g = ac.createGain(); o.type = "square"; o.frequency.value = 440; g.gain.setValueAtTime(0.0001, t0 + k * 0.3); g.gain.linearRampToValueAtTime(0.04, t0 + k * 0.3 + 0.01); g.gain.setValueAtTime(0.04, t0 + k * 0.3 + 0.18); g.gain.linearRampToValueAtTime(0.0001, t0 + k * 0.3 + 0.2); o.connect(g).connect(master); o.start(t0 + k * 0.3); o.stop(t0 + k * 0.3 + 0.22); } },
+        clacker() { for (let k = 0; k < 8; k++) burst("highpass", 3000, 2800, 0.04, 0.07, 1, k * 0.08); },                // overspeed
       };
+      const rain = loop("highpass", 1800, 0.4);
+      const upd0 = SFX.update;
+      SFX.update = (dt) => { upd0(dt); rain.g.gain.setTargetAtTime(soundOn && S.mode === "fly" && ENV.weather === "rain" ? 0.09 : 0, ac.currentTime, 0.6); };
     } catch { ac = null; SFX = null; }
   }
   const sfx = (name, ...args) => { if (SFX && soundOn) try { SFX[name](...args); } catch {} };
+  document.addEventListener("pointerdown", (e) => { if (e.target.closest && e.target.closest("button")) { if (!ac && soundOn) initAudio(); sfx("click"); } }, true);
   function chime(f, d = 0.3) {
     if (!ac || !soundOn) return;
     const o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime;
@@ -3594,16 +3619,20 @@ vec3 liveryAt(vec3 p, out float fus) {
   vibBtn.addEventListener("click", () => { vibOn = !vibOn; save("sw-vib", vibOn ? "1" : "0"); vibBtn.setAttribute("aria-pressed", String(vibOn)); if (vibOn) buzz(30); });
   // full screen: the standard API, or Safari's prefixed one (iPad); iPhone Safari has neither, so the button hides there
   const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
-  const fsCan = !!(stage.requestFullscreen || stage.webkitRequestFullscreen);
-  function toggleFullscreen() {
+  // the whole page goes full screen and the game view is stretched over it (a CSS class): every panel stays reachable,
+  // and Safari is asked to keep the keyboard working (without ALLOW_KEYBOARD_INPUT it swallows key presses)
+  const docEl = document.documentElement, fsCan = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
+  function toggleFullscreen(e) {
     try {
       if (fsEl()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-      else { const r = (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage); if (r && r.catch) r.catch(() => {}); }
+      else if (docEl.requestFullscreen) { const r = docEl.requestFullscreen({ navigationUI: "hide" }); if (r && r.catch) r.catch(() => {}); }
+      else docEl.webkitRequestFullscreen(window.Element && Element.ALLOW_KEYBOARD_INPUT);
     } catch {}
+    if (e && e.currentTarget && e.currentTarget.blur) e.currentTarget.blur();   // a focused button would catch Space and the arrow keys
   }
   $("fsBtn").addEventListener("click", toggleFullscreen); $("fsTop").addEventListener("click", toggleFullscreen);
   if (!fsCan) { $("fsTop").hidden = true; $("fsBtn").hidden = true; }
-  const syncFs = () => $("fsTop").setAttribute("aria-pressed", String(!!fsEl()));
+  const syncFs = () => { const on = !!fsEl(); $("fsTop").setAttribute("aria-pressed", String(on)); document.body.classList.toggle("fs-on", on); setTimeout(resize, 50); };
   document.addEventListener("fullscreenchange", syncFs); document.addEventListener("webkitfullscreenchange", syncFs);
   $("menuBtn").addEventListener("click", () => { if (S.mode === "fly") pause(); else if (S.mode === "paused") resume(); else if (S.mode === "replay") closeReplay(); });
 
@@ -4599,7 +4628,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     box(rx, "ALT FT", String(ft), HC.hud, [`VS ${vsfpm > 0 ? "+" : ""}${vsfpm}`, `AGL ${agl}`]);
 
     // heading tape
-    const hdg = ((Math.atan2(fwd.x, -fwd.z) * 57.3) + 360) % 360, ty = Math.max(54, h * 0.1) + fs, tw = Math.min(w * 0.46, 380);
+    const apOpenTop = !apEls.panel.hidden && !phoneMQ.matches ? apEls.panel.getBoundingClientRect().bottom - stage.getBoundingClientRect().top + 10 : 0;   // the open autopilot panel pushes the heading tape down
+    const hdg = ((Math.atan2(fwd.x, -fwd.z) * 57.3) + 360) % 360, ty = Math.max(54, h * 0.1, apOpenTop) + fs, tw = Math.min(w * 0.46, 380);
     // minimap geometry (phones: below the destination and taxi lines) and, on phones, the text slot between it and the speed boxes
     const MS = Math.round(clamp(Math.min(w, h) * (showMap === 2 ? 0.42 : 0.24), w < 480 ? 88 : 96, showMap === 2 ? 320 : 170));
     const MX = w - MS - 10, MY = w < 480 ? Math.round(ty + 24 + fs * 4) : Math.max(48, h * 0.09) + (w < 700 ? 40 : 0);
@@ -4716,10 +4746,11 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (!S.grounded && S.load > gLim) items.push(["OVERSTRESS", HC.warn]);
       if (S.flaps > 0 && iasKt > vmaxKt * 0.62) items.push(["FLAP OVERSPEED", HC.warn]);
       if (spec.retract && S.gearPos > 0.5 && !S.grounded && iasKt > vmaxKt * 0.7) items.push(["GEAR OVERSPEED", HC.warn]);
+      if (!S.grounded && iasKt > vmaxKt * 0.97 && now > (S.clackT || 0)) { S.clackT = now + 900; sfx("clacker"); }
     }
     // bottom inset: touch controls, and the autopilot sheet on phones (folded: controls sit above it; open: it covers them)
     const sheetOpen = apDock.open && !apDock.mini, ctlLift = apDock.open && apDock.mini ? (narrowTouch ? 62 : apDock.h) : 0;
-    const stripB = sheetOpen ? apDock.h + 14 + (narrowTouch ? apDock.tb + 8 : 0) : (narrowTouch ? 152 : coarseMQ.matches && !cock ? 30 : 20) + ctlLift;
+    const stripB = sheetOpen ? apDock.h + 14 + (narrowTouch ? apDock.tb + 8 : 0) : (narrowTouch ? 152 : coarseMQ.matches && !cock ? (w < 900 ? 150 : 30) : 20) + ctlLift;
     const stripY = h - dashH - stripB;
     // the strip wraps into rows instead of overlapping; on phones it is left-aligned between the stick and the throttle
     const gapX = Math.round(14 * Math.max(0.8, sc)), rowH = Math.round(fs * 1.1), left0 = 14, maxW = narrowTouch && !sheetOpen ? w - left0 - 74 : w - 24;
@@ -4742,6 +4773,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     else if (AL.terrPull && blink) warnTxt("TERRAIN · PULL UP", HC.warn, warnY);
     else if (stall && blink) warnTxt("STALL", HC.warn, warnY);
     else if (!S.grounded && spec.retract && S.gearPos < 0.5 && agl < 800 && S.vs < -1 && S.throttle < 0.6 && blink) warnTxt("GEAR · press G", HC.warn, warnY);
+    if (!S.grounded && spec.retract && S.gearPos < 0.5 && agl < 800 && S.vs < -1 && S.throttle < 0.6 && now > (S.hornT || 0)) { S.hornT = now + 2500; sfx("horn"); }
     else if (AL.terrain) warnTxt("TERRAIN", HC.caution, warnY);
     // phones: messages and ATC calls share the text slot above the speed boxes: below the minimap when it has room,
     // otherwise in the column beside the map; text wraps to the slot width instead of being squeezed
@@ -4754,15 +4786,23 @@ vec3 liveryAt(vec3 p, out float fus) {
     let msgBottom = 0;
     if (S.msgT > 0) {
       // long messages wrap onto a second line instead of being squeezed
-      hud.font = `${Math.round(fs * 1.0)}px ${MONO}`; hud.fillStyle = HC.nav; hud.globalAlpha = clamp(S.msgT, 0, 1);
-      const maxM = phoneSlot ? phoneSlot.x1 - phoneSlot.x0 : w - 28, lines = wrapTo(S.msg, maxM), lhM = fs * 1.2;
+      hud.font = `500 ${Math.round(fs * 0.95)}px ${MONO}`; hud.globalAlpha = clamp(S.msgT, 0, 1);
+      const clearMap = showMap && MX > cx ? 2 * (MX - 18 - cx) : w - 28;
+      const maxM = phoneSlot ? phoneSlot.x1 - phoneSlot.x0 : Math.min(w - 28, clearMap, 640), lines = wrapTo(S.msg, maxM - 24), lhM = fs * 1.25;
       const shownL = lines.slice(0, phoneSlot ? clamp(Math.floor((phoneSlot.bot - phoneSlot.top) / lhM), 1, 3) : 3);
       if (shownL.length < lines.length) shownL[shownL.length - 1] += "…";
       if (phoneSlot) {
         // phones: in the text slot, reading downwards, so it never sits on the map or the speed boxes
         const y0 = phoneSlot.top + fs * 0.6, mx0 = (phoneSlot.x0 + phoneSlot.x1) / 2;
+        hud.fillStyle = "rgba(14,34,58,0.78)"; hud.fillRect(phoneSlot.x0 - 4, y0 - lhM / 2, maxM + 8, shownL.length * lhM); hud.fillStyle = "#eaf4ff";
         shownL.forEach((ln, i) => hud.fillText(ln, mx0, y0 + i * lhM, maxM)); msgBottom = y0 + (shownL.length - 1) * lhM + fs * 0.6;
-      } else shownL.forEach((ln, i, arr) => hud.fillText(ln, cx, cy - 135 * sc - (arr.length - 1 - i) * lhM, maxM));
+      } else {
+        const yB = Math.max(cy - 135 * sc, ty + 24 + fs * 3.6 + (shownL.length - 1) * lhM), y0 = yB - (shownL.length - 1) * lhM;
+        const bw = Math.min(maxM, Math.max(...shownL.map((ln) => hud.measureText(ln).width)) + 30), bh = shownL.length * lhM + fs * 0.6;
+        hud.shadowBlur = 0; hud.fillStyle = "rgba(14,34,58,0.78)"; hud.beginPath(); hud.roundRect(cx - bw / 2, y0 - lhM / 2 - fs * 0.3, bw, bh, 10); hud.fill();
+        hud.fillStyle = "#5fb4ff"; hud.fillRect(cx - bw / 2 + 6, y0 - lhM / 2 - fs * 0.05, 3, bh - fs * 0.5);
+        hud.fillStyle = "#eaf4ff"; shownL.forEach((ln, i) => hud.fillText(ln, cx + 3, y0 + i * lhM, maxM - 24));
+      }
       hud.globalAlpha = 1;
     }
     hud.shadowBlur = 0;
@@ -4792,8 +4832,8 @@ vec3 liveryAt(vec3 p, out float fus) {
         for (let i = RADIO.length - 1; i >= 0; i--) { const ls = wrapTo(RADIO[i].text, tw); if (used + ls.length * lh > phoneSlot.bot - top) { if (!pick.length && phoneSlot.bot - top >= lh) { const n = Math.floor((phoneSlot.bot - top) / lh); ls.length = n; ls[n - 1] += "…"; pick.unshift([RADIO[i], ls]); } break; } pick.unshift([RADIO[i], ls]); used += ls.length * lh; }
         let ry = top + lh / 2;
         for (const [r, ls] of pick) {
-          hud.globalAlpha = clamp(r.t, 0, 1); hud.fillStyle = "rgba(15,15,17,0.62)"; hud.fillRect(x0, ry - lh / 2, phoneSlot.x1 - x0, ls.length * lh);
-          hud.fillStyle = HC.nav; hud.fillText("ATC", x0 + 4, ry); hud.fillStyle = HC.text; ls.forEach((ln, i) => hud.fillText(ln, x0 + 4 + atcW, ry + i * lh, tw)); ry += ls.length * lh;
+          hud.globalAlpha = clamp(r.t, 0, 1); hud.fillStyle = "rgba(10,36,28,0.72)"; hud.fillRect(x0, ry - lh / 2, phoneSlot.x1 - x0, ls.length * lh);
+          hud.fillStyle = "#4fe39b"; hud.fillText("ATC", x0 + 4, ry); hud.fillStyle = HC.text; ls.forEach((ln, i) => hud.fillText(ln, x0 + 4 + atcW, ry + i * lh, tw)); ry += ls.length * lh;
         }
         hud.globalAlpha = 1;
       }
@@ -4801,8 +4841,8 @@ vec3 liveryAt(vec3 p, out float fus) {
       let ry = h - dashH - (sheetOpen ? stripB + rows.length * rowH + 16 : (coarse && !cock ? (narrowTouch ? 290 : 190) : 46) + ctlLift) - (RADIO.length - 1) * lh;
       for (const r of shown) {
         hud.globalAlpha = clamp(r.t, 0, 1); const tw = Math.min(hud.measureText(r.text).width, w - 40);
-        hud.fillStyle = "rgba(15,15,17,0.62)"; hud.fillRect(10, ry - lh / 2, Math.min(tw + hud.measureText("ATC ").width + 26, w - 20), lh);
-        hud.fillStyle = HC.nav; hud.fillText("ATC", 14, ry); const atcW = hud.measureText("ATC ").width + 18; hud.fillStyle = HC.text; hud.fillText(r.text, atcW, ry, w - atcW - 16); ry += lh;
+        hud.fillStyle = "rgba(10,36,28,0.72)"; hud.fillRect(10, ry - lh / 2, Math.min(tw + hud.measureText("ATC ").width + 26, w - 20), lh);
+        hud.fillStyle = "#4fe39b"; hud.fillText("ATC", 14, ry); const atcW = hud.measureText("ATC ").width + 18; hud.fillStyle = HC.text; hud.fillText(r.text, atcW, ry, w - atcW - 16); ry += lh;
       }
       hud.globalAlpha = 1;
     }
@@ -4878,6 +4918,14 @@ vec3 liveryAt(vec3 p, out float fus) {
   // ================= AI TRAFFIC =================
   // Other aircraft fly real circuits: hold at the runway, take off, climb, cruise to another airport, fly a 3° final, land, and go again.
   const AI = [], RADIO = [];
+  RADIO.push = function (...items) {
+    for (const it of items) if (it && it.text && S.mode === "fly") { sfx("radio"); setTimeout(() => radioVoice(it.text), 280); }
+    return Array.prototype.push.apply(this, items);
+  };
+  function radioVoice(t) {
+    if (!soundOn) return;
+    try { const ss = window.speechSynthesis; if (!ss || ss.speaking) return; const u = new SpeechSynthesisUtterance(t.replace(/·/g, ",")); u.lang = "en-US"; u.rate = 1.15; u.pitch = 0.9; u.volume = 0.8; ss.speak(u); } catch {}
+  }
   const TAN3 = Math.tan(3 * Math.PI / 180);
   const AI_FLEET = [["mh", "OCEANA 301"], ["b77w", "OCEANA 88"], ["b737", "ISLA 214"], ["mh", "ISLANDER 52"], ["b763", "SOUTHWIND 640"], ["b737", "ISLANDER 17"], ["mh", "SKYLARK 42"], ["b77w", "FALCON 7"], ["b737", "PACIFICA 12"],
     ["mh", "EASTGATE 410"], ["a330", "SUNVALE 9"], ["a321", "NORTHCAPE 77"], ["mh", "ISLANDER 63"], ["b77w", "OCEANA 515"], ["b737", "SKYLARK 18"], ["mh", "FALCON 22"],
@@ -5121,7 +5169,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       AP.hdg = Math.round(curHdgDeg()); AP.alt = Math.max(1000, Math.round(S.pos.y * M2FT / 100) * 100);
       if (!AP.athr) { AP.athr = true; AP.spd = Math.max(Math.round(spec.stall * 1.45 * MS2KT / 5) * 5, Math.round(S.speed * MS2KT / 5) * 5); }
       flash("Autopilot on", 1.4); chime(880, 0.15);
-    } else { AP.app = false; AP.lat = "HDG"; flash("Autopilot off", 1.4); chime(330, 0.3); }
+    } else { AP.app = false; AP.lat = "HDG"; flash("Autopilot off", 1.4); sfx("apOff"); }
     apSync();
   }
   // on phones the panel is a bottom sheet; folded, it is one row and the touch controls move up above it
@@ -5137,7 +5185,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     apDock.tbTop = tb && tb.offsetHeight ? tb.getBoundingClientRect().top - stage.getBoundingClientRect().top : 1e9;
     if (tb && !tb.dataset.tw) { tb.dataset.tw = "1"; tb.addEventListener("transitionend", syncApDock); }   // the buttons slide: measure where they stop
   }
-  $("apToggle").addEventListener("click", () => { apEls.panel.hidden = !apEls.panel.hidden; $("apToggle").setAttribute("aria-pressed", String(!apEls.panel.hidden)); syncApDock(); });
+  $("apToggle").addEventListener("click", () => { if (apEls.panel.hidden && phoneMQ.matches && !apDock.seen) { apDock.seen = true; apEls.panel.classList.add("mini"); } apEls.panel.hidden = !apEls.panel.hidden; $("apToggle").setAttribute("aria-pressed", String(!apEls.panel.hidden)); syncApDock(); });
   apGrip.addEventListener("click", () => { apEls.panel.classList.toggle("mini"); syncApDock(); });
   if (phoneMQ.addEventListener) phoneMQ.addEventListener("change", syncApDock); else if (phoneMQ.addListener) phoneMQ.addListener(syncApDock);
   syncApDock();
