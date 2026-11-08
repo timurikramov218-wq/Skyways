@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://skyways8.netlify.app/sitemap.xml
+Sitemap: https://timurikramov218-wq.github.io/Skyways/sitemap.xml
