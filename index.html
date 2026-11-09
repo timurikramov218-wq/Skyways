@@ -3492,7 +3492,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       const kinds = Object.keys(PLANES).filter((kk) => PLANES[kk].packed && DIMS[kk][0] < w - 8 && DIMS[kk][1] < dd + 25 && (kk === "b737" || kk === "mh" || kk === "a321" || kk === "b763" || kk === "a350"));
       if (!ga && kinds.length && (k === 0 || (intl && k === 2))) {
         const kk = k === 2 ? kinds.filter((q) => DIMS[q][0] > 40)[0] || kinds[0] : kinds[Math.floor(hash(a.x, k) * kinds.length)], sp = PLANES[kk];
-        const mdl = sp.build(livOf(kk, randomLiv(kk))); mdl.rotation.y = -Math.PI / 2; mdl.position.set(hx - dd / 2 + DIMS[kk][1] * 0.42, sp.gearH + 0.05, hz);
+        const mdl = sp.build(livOf(kk, randomLiv(kk))); mdl.rotation.y = -Math.PI / 2; mdl.position.set(hx - dd / 2 + DIMS[kk][1] * 0.42, sp.gearH + 0.05 + 0.72 * sc, hz);   // on the hangar model's raised floor (0.72 model units)
         mdl.userData.strobes.forEach((st) => (st.visible = false)); grp.add(mdl);
       }
     }
