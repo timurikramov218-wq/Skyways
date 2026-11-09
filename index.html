@@ -462,6 +462,22 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .show-open { margin-left: auto; padding: 8px 16px; font-size: 12px; letter-spacing: 0.08em; }
 #stepHangar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .showroom { position: absolute; inset: 0; z-index: 8; background: #0c0d10; }
+/* ground services at the gate: fuel and passengers before departure, passengers off after arrival */
+.svc { position: absolute; left: 14px; top: 64px; z-index: 3; width: min(300px, calc(100% - 28px)); display: grid; gap: 9px; padding: 14px 14px 12px; border-radius: 16px;
+  background: rgba(15,15,17,0.86); border: 1px solid var(--hair-2); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: var(--fg); animation: sheet-up 0.25s ease-out; }
+.svc-h { display: grid; gap: 2px; }
+.svc-h b { font: 400 19px var(--font-display); }
+.svc-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.svc-row[hidden] { display: none; }
+.svc-l { display: grid; line-height: 1.15; }
+.svc-l span { font: 500 13px var(--font-body); }
+.svc-l small { font: 400 11px var(--font-mono); color: var(--fg-2); }
+.svc-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.svc-bar i { display: block; height: 100%; width: 0; background: var(--champ); border-radius: 3px; transition: width 0.2s linear; }
+.svc-row.done .svc-bar i { background: #6fd39b; }
+.svc .chip:disabled { opacity: 0.45; cursor: default; }
+.svc-note { margin: 0; font-size: 12px; color: var(--fg-2); }
+@media (max-width: 480px) { .svc { top: 58px; left: 10px; padding: 10px 11px; gap: 7px; } .svc-row { grid-template-columns: 74px minmax(0, 1fr) auto; } .svc-h b { font-size: 16px; } }
 /* step-by-step start: welcome → hangar → route → fly */
 .welcome { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; padding: 24px 16px; overflow: auto;
   background: radial-gradient(900px 520px at 50% 30%, rgba(23,23,26,0.55), rgba(10,10,12,0.9)); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
@@ -581,6 +597,12 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       <button class="apb" id="apApp" type="button" aria-pressed="false">APP</button>
     </div>
     <button class="pushbtn" id="pushBtn" type="button" hidden><span>Push back</span></button>
+    <div class="svc" id="svc" hidden role="group" aria-label="Ground services">
+      <div class="svc-h"><span class="eyebrow" id="svcEyebrow">GROUND SERVICES</span><b id="svcTitle">Before departure</b></div>
+      <div class="svc-row" id="svcFuel"><div class="svc-l"><span>Fuel</span><small id="svcFuelTxt">0 kg</small></div><div class="svc-bar"><i></i></div><button class="chip" type="button" id="svcFuelBtn">Refuel</button></div>
+      <div class="svc-row" id="svcPax"><div class="svc-l"><span id="svcPaxName">Passengers</span><small id="svcPaxTxt">0</small></div><div class="svc-bar"><i></i></div><button class="chip" type="button" id="svcPaxBtn">Board</button></div>
+      <p class="svc-note" id="svcNote">Refuel and board the passengers, then push back.</p>
+    </div>
 
     <div class="help" id="help" hidden>
       <h3>Controls</h3>
@@ -3568,6 +3590,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (typeof syncTouchKeys === "function") syncTouchKeys();
     if (typeof AP !== "undefined") { AP.on = false; AP.athr = false; AP.app = false; AP.lat = "HDG"; AP.flare = false; apSync(); pushBtn.hidden = true; }
     boom.visible = false; model.visible = true; flyby.set = false;
+    S.guide = null; S.svc = null; S.arrPending = null; S.gateFlow = false; S.parked = false;
+    { const se = document.getElementById("svc"); if (se) se.hidden = true; } if (S.guideMesh) S.guideMesh.visible = false; if (S.truck) S.truck.visible = false;
   }
   // smooth pseudo-random wave in -1..1 (sum of incommensurate sines; seed picks the phases)
   const wave = (t, seed) => Math.sin(t * 0.73 + seed * 1.9) * 0.5 + Math.sin(t * 1.41 + seed * 4.3) * 0.32 + Math.sin(t * 2.63 + seed * 7.1) * 0.18;
@@ -4312,7 +4336,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     if ($("startSel").value === "gate") spawnAtGate(S.from); else if (hiddenParked) { hiddenParked.visible = true; hiddenParked = null; }
     S.mode = "fly"; brief.hidden = true;
     const rot = Math.round(spec.stall * 1.05 * 0.9 * MS2KT);
-    flash(S.to ? `Cleared for takeoff, runway ${S.from.label}. Destination ${S.to.code}.` : `Cleared for takeoff. Rotate at ${rot} knots.`, 4);
+    if (S.gateFlow) flash("At the gate: refuel and board the passengers first (panel on the left)", 4.5);
+    else flash(S.to ? `Cleared for takeoff, runway ${S.from.label}. Destination ${S.to.code}.` : `Cleared for takeoff. Rotate at ${rot} knots.`, 4);
     S.msgQ = [];
     if (ENV.model === "real" && !spec.fbw) S.msgQ.push([`Realistic: the trim holds your nose attitude. Full power pitches up, so after liftoff trim nose down with ${trimKeys(true)}.`, 5.5]);
     if (soundOn) { initAudio(); if (ac && ac.state === "suspended") ac.resume(); setTimeout(() => sfx("chime"), 600); }   // cabin chime as the flight begins
@@ -4399,6 +4424,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     S.brake = brake;
     if (S.throttle > 0.05) S.started = true;
     if (stepPushback(dt)) return;
+    if (stepServices(dt)) return;
 
     S.gearPos = clamp(S.gearPos + (S.gearDown ? 1 : -1) * dt * 0.5, 0, 1);
     S.flapPos = lerp(S.flapPos, S.flaps / 2, Math.min(1, dt * 1.2));
@@ -4486,8 +4512,9 @@ vec3 liveryAt(vec3 p, out float fus) {
         const sl = Math.abs(heightAt(S.pos.x + 5, S.pos.z) - heightAt(S.pos.x - 5, S.pos.z)) + Math.abs(heightAt(S.pos.x, S.pos.z + 5) - heightAt(S.pos.x, S.pos.z - 5));
         if (sl > 4) { crash("You ran off the runway into rough ground."); return; }
       }
-      if (S.landedAt && S.gs < 1.5) completeLanding();
-      if (S.taxiOut && runwayAt(S.pos.x, S.pos.z) === S.from) { S.taxiOut = false; RADIO.push({ text: `${S.from.name} Tower: runway ${S.from.label}, wind ${windText()}, cleared for takeoff.`, t: 10 }); flash("Lined up. Full throttle and go!", 3); }
+      if (S.landedAt && (S.gs < 1.5 || (S.gateFlow && !S.mission && S.landedAt === S.to && S.gs < 12))) completeLanding();
+      updateGuide();
+      if (S.taxiOut && runwayAt(S.pos.x, S.pos.z) === S.from) { S.taxiOut = false; if (S.guide && S.guide.kind === "dep") { S.guide = null; if (S.guideMesh) S.guideMesh.visible = false; } RADIO.push({ text: `${S.from.name} Tower: runway ${S.from.label}, wind ${windText()}, cleared for takeoff.`, t: 10 }); flash("Lined up. Full throttle and go!", 3); }
     } else {
       const va = V.air.copy(S.vel).sub(wind), sp = Math.max(va.length(), 0.5);   // airspeed = ground velocity minus wind
       const vf = va.dot(fwd), vu = va.dot(up), vr = va.dot(right);
@@ -4589,19 +4616,29 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (Math.hypot(S.pos.x, S.pos.z) > 15500 && !S.grounded && S.msgT <= 0) flash("You're leaving the map. Turn back!", 2);
   }
 
+  // after taxiing in and deboarding: the arrival report, with the landing as it was rated at touchdown
+  function finishArrival(p) {
+    S.parkedDone = S.parked ? S.parked.n : null; S.touchFpm = p.fpm; S.flightT = p.t; S.landedAt = p.a; S.gateFlow = false;
+    completeLanding(); S.parkedDone = null;
+  }
   function completeLanding() {
     const a = S.landedAt; S.landedAt = null;
     if (!S.to || a !== S.to) { logFlight({ to: a.code, fpm: S.touchFpm, res: S.to ? `Landed at ${a.code} instead of ${S.to.code}` : `Landed at ${a.code}`, ok: null }); flash(`Stopped at ${a.name}. Throttle up to take off again.`, 4); S.touchFpm = null; return; }
     const fpm = S.touchFpm, off = Math.abs(S.touchOff || 0), tdz = S.touchDist || 0;
     let stars = fpm < 240 ? 3 : fpm < 480 ? 2 : 1;
     if (off > 8 || tdz > 900 || tdz < 0) stars = Math.max(1, stars - 1);
+    if (S.gateFlow && !S.mission && !S.arrPending) {
+      S.arrPending = { a, stars, fpm, off, tdz, t: S.flightT };
+      if (arrivalGuide(a)) { flash(`Landed: ${"★".repeat(stars)}${"☆".repeat(3 - stars)}. Now taxi to the gate.`, 3.5); return; }
+      S.arrPending = null;
+    }
     S.mode = "over";
     if (S.mission) { missionResult(true, { stars, fpm, off: S.touchOff || 0, tdz, kt: S.touchKt, onRwy: runwayAt(S.pos.x, S.pos.z) === a }); return; }
     const wrap = document.createElement("div"); wrap.style.display = "grid"; wrap.style.gap = "4px";
     const st = document.createElement("div"); st.className = "stars"; st.textContent = "★".repeat(stars) + "☆".repeat(3 - stars); st.setAttribute("aria-label", `${stars} of 3 stars`);
     const r = document.createElement("p"); r.className = "result";
     const m = Math.floor(S.flightT / 60), s = Math.floor(S.flightT % 60);
-    r.textContent = `${S.from.code} → ${a.code} · ${m}:${String(s).padStart(2, "0")}`;
+    r.textContent = `${S.from.code} → ${a.code} · ${m}:${String(s).padStart(2, "0")}${S.parkedDone ? ` · parked at gate ${S.parkedDone}, ${seatsOf(spec.kind)} passengers off` : ""}`;
     const det = document.createElement("p"); det.className = "result"; det.style.opacity = "0.8";
     det.textContent = `Touchdown ${fpm} ft/min · ${S.touchKt || "–"} kt · ${Math.round(tdz)} m past threshold · ${off < 1 ? "on centreline" : `${off.toFixed(1)} m ${(S.touchOff || 0) > 0 ? "right" : "left"} of centreline`}`;
     wrap.append(st, r, det);
@@ -4833,11 +4870,11 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (modes) { hud.font = `${Math.round(fs * 0.8)}px ${MONO}`; hud.textAlign = "center"; hud.fillStyle = HC.box; const mw = hud.measureText(modes).width + 20; hud.fillRect(cx - mw / 2, ty - fs * 2.6, mw, fs * 1.4); hud.fillStyle = HC.hud; hud.fillText(modes, cx, ty - fs * 1.9); }
     }
     // taxi guidance from the gate
-    if (S.grounded && S.taxiOut && !S.push) {
-      const [gx, gz] = taxiTarget(); proj.set(gx, S.from.elev + 3, gz).project(camera);
+    if (S.grounded && S.guide) {
+      const G = S.guide, [gx, gz] = G.pts[G.i], ga = G.kind === "arr" ? S.parked.a : S.from; proj.set(gx, ga.elev + 3, gz).project(camera);
       const dist = Math.hypot(gx - S.pos.x, gz - S.pos.z);
       hud.fillStyle = HC.nav; hud.font = `${Math.round(fs * 0.85)}px ${MONO}`; hud.textAlign = "center";
-      hud.fillText(`TAXI TO RWY ${S.from.label} · ${Math.round(dist)} m`, cx, ty + 24 + fs * 3.2, w - 24);
+      hud.fillText(`${G.labels[G.i]} · ${Math.round(dist)} m`, cx, ty + 24 + fs * 3.2, w - 24);
       if (proj.z < 1 && Math.abs(proj.x) < 1 && Math.abs(proj.y) < 1) {
         const sx = (proj.x + 1) / 2 * w, sy = (1 - proj.y) / 2 * (h - dashH);
         hud.strokeStyle = HC.nav; hud.lineWidth = 2; hud.beginPath(); hud.moveTo(sx, sy - 14); hud.lineTo(sx + 10, sy); hud.lineTo(sx, sy + 14); hud.lineTo(sx - 10, sy); hud.closePath(); hud.stroke();
@@ -4963,7 +5000,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const phoneSlot = !phoneMQ.matches ? null : (() => {
       const bot = cy - bh / 2 - fs * 1.05, below = showMap ? MY + MS + 6 : ty + 24 + fs * 3.9;
       if (!showMap || bot - below >= fs * 7) return { x0: 12, x1: w - 12, top: below, bot };
-      return { x0: 12, x1: MX - 8, top: ty + 24 + fs * (S.grounded && S.taxiOut && !S.push ? 3.9 : S.to ? 2.7 : 1.5), bot };
+      return { x0: 12, x1: MX - 8, top: ty + 24 + fs * (S.grounded && S.guide ? 3.9 : S.to ? 2.7 : 1.5), bot };
     })();
     const wrapTo = (t, maxW) => { const out = []; let cur = ""; for (const word of String(t).split(" ")) { const tryL = cur ? cur + " " + word : word; if (cur && hud.measureText(tryL).width > maxW) { out.push(cur); cur = word; } else cur = tryL; } if (cur) out.push(cur); return out; };
     let msgBottom = 0;
@@ -5474,10 +5511,144 @@ vec3 liveryAt(vec3 p, out float fus) {
     const len = DIMS[spec.kind][1], [x, z] = toWorld(a, -g.z, a.termX0 - 9 - len / 2);
     S.pos.set(x, a.elev + 0.05 + spec.gearH, z);
     S.q.setFromAxisAngle(AY, -(a.hdg + 90) * Math.PI / 180);
-    S.gate = { a, g, len }; S.taxiOut = true; S.push = null;
-    pushBtn.hidden = false;
-    RADIO.push({ text: `${a.name} Ground: ${PLANES[spec.kind].name}, at gate. Push back when ready, then taxi to runway ${a.label}.`, t: 12 });
+    S.gate = { a, g, len }; S.taxiOut = true; S.push = null; S.gateFlow = true;
+    pushBtn.hidden = true; startServices("dep");
+    RADIO.push({ text: `${a.name} Ground: ${PLANES[spec.kind].name}, welcome to gate ${a.gates.indexOf(g) + 1}. Fuel truck and boarding on request.`, t: 12 });
     return true;
+  }
+  // ---------- ground services: fuel and boarding before departure, deboarding after arrival ----------
+  const svcEl = $("svc");
+  const seatsOf = (k) => Math.round(DIMS[k][1] * 4.4 / 5) * 5, fuelOf = (k) => Math.round(DIMS[k][1] * DIMS[k][1] * 12 / 100) * 100;
+  function truckModel() {
+    if (S.truck) return S.truck;
+    const g = new THREE.Group(), body = new THREE.MeshLambertMaterial({ color: 0xe8e3d6 }), cab = new THREE.MeshLambertMaterial({ color: 0xd94b2b }), dark = new THREE.MeshLambertMaterial({ color: 0x222428 });
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 6.2, 16), body); tank.rotation.x = Math.PI / 2; tank.position.set(0, 1.9, 1.2); g.add(tank);
+    const c = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.2, 2.2), cab); c.position.set(0, 1.6, -3.1); g.add(c);
+    const ch = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.5, 8.6), dark); ch.position.set(0, 0.75, -0.2); g.add(ch);
+    for (const z of [-3, 0.2, 2.8]) for (const x of [-1.1, 1.1]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 12), dark); w.rotation.z = Math.PI / 2; w.position.set(x, 0.5, z); g.add(w); }
+    const hose = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4, 6), dark); hose.rotation.z = Math.PI / 2; hose.position.set(-2.6, 1.0, 1.0); g.add(hose);
+    g.visible = false; scene.add(g); S.truck = g; return g;
+  }
+  function placeTruck(on) {
+    const t = truckModel(); t.visible = on; if (!on) return;
+    const fwd = V.fwd.set(0, 0, -1).applyQuaternion(S.q).setY(0).normalize(), right = V.right.set(-fwd.z, 0, fwd.x), sp = DIMS[spec.kind][0];
+    const x = S.pos.x - fwd.x * 3 - right.x * sp * 0.3, z = S.pos.z - fwd.z * 3 - right.z * sp * 0.3;
+    t.position.set(x, groundY(x, z), z); t.rotation.y = Math.atan2(-fwd.x, -fwd.z);
+  }
+  function startServices(mode) {
+    const k = spec.kind, dep = mode === "dep";
+    S.svc = { mode, fuel: dep ? 0 : 1, pax: 0, fuelOn: false, paxOn: false, done: false, seats: seatsOf(k), kg: fuelOf(k), t: 0 };
+    $("svcTitle").textContent = dep ? "Before departure" : `Gate ${S.parked ? S.parked.n : ""} · ${S.arrPending ? S.arrPending.a.code : ""}`;
+    $("svcFuel").hidden = !dep; $("svcPaxName").textContent = dep ? "Boarding" : "Deboarding";
+    $("svcPaxBtn").textContent = dep ? "Board" : "Open doors"; $("svcFuelBtn").disabled = false; $("svcPaxBtn").disabled = false;
+    $("svcNote").textContent = dep ? "Refuel and board the passengers, then push back." : "Open the doors and let the passengers off.";
+    svcEl.querySelectorAll(".svc-row").forEach((r) => r.classList.remove("done"));
+    svcEl.hidden = false; syncSvc();
+  }
+  function syncSvc() {
+    const v = S.svc; if (!v) return;
+    svcEl.querySelector("#svcFuel .svc-bar i").style.width = `${Math.round(v.fuel * 100)}%`;
+    svcEl.querySelector("#svcPax .svc-bar i").style.width = `${Math.round(v.pax * 100)}%`;
+    $("svcFuelTxt").textContent = `${Math.round(v.fuel * v.kg).toLocaleString("en-US")} / ${v.kg.toLocaleString("en-US")} kg`;
+    const n = Math.round(v.pax * v.seats); $("svcPaxTxt").textContent = v.mode === "dep" ? `${n} / ${v.seats} on board` : `${v.seats - n} on board`;
+    $("svcFuel").classList.toggle("done", v.fuel >= 1); $("svcPax").classList.toggle("done", v.pax >= 1);
+  }
+  $("svcFuelBtn").addEventListener("click", () => { const v = S.svc; if (!v || v.fuelOn || v.fuel >= 1) return; v.fuelOn = true; $("svcFuelBtn").disabled = true; placeTruck(true); RADIO.push({ text: "Ground: fuel truck on its way to your left wing.", t: 6 }); });
+  $("svcPaxBtn").addEventListener("click", () => {
+    const v = S.svc; if (!v || v.paxOn || v.pax >= 1) return; v.paxOn = true; $("svcPaxBtn").disabled = true;
+    if (v.mode === "dep") RADIO.push({ text: "Cabin: boarding started.", t: 6 }); else { chime(660, 0.2); RADIO.push({ text: "Cabin: doors open, passengers leaving.", t: 6 }); }
+  });
+  // while services run, the aircraft stays parked; returns true to skip the flight physics this frame
+  function stepServices(dt) {
+    const v = S.svc; if (!v) return false;
+    if (v.fuelOn && v.fuel < 1) { v.fuel = Math.min(1, v.fuel + dt / 14); if (v.fuel >= 1) { v.fuelOn = false; placeTruck(false); chime(880, 0.15); flash("Refuelling complete", 2); } }
+    if (v.paxOn && v.pax < 1) { v.pax = Math.min(1, v.pax + dt / (v.mode === "dep" ? 18 : 14)); if (v.pax >= 1) { v.paxOn = false; chime(880, 0.15); flash(v.mode === "dep" ? "Boarding complete, doors closed" : "All passengers are off", 2.4); } }
+    v.t += dt; if (v.t > 0.1) { v.t = 0; syncSvc(); }
+    if (!v.done || v.mode === "arr") { S.throttle = 0; S.speed = 0; S.gs = 0; S.vel.set(0, 0, 0); }
+    if (!v.done && v.fuel >= 1 && v.pax >= 1) {
+      v.done = true; syncSvc();
+      if (v.mode === "dep") {
+        $("svcNote").textContent = "Ready. Press Push back."; pushBtn.hidden = false;
+        RADIO.push({ text: `${S.from.name} Ground: ${PLANES[spec.kind].name}, ready to go. Push back approved when you are.`, t: 10 });
+        setTimeout(() => { if (S.svc === v) { svcEl.hidden = true; S.svc = null; } }, 2500);
+      } else {
+        setTimeout(() => { if (S.svc === v) { svcEl.hidden = true; S.svc = null; const pend = S.arrPending; S.arrPending = null; if (pend) finishArrival(pend); } }, 1800);
+      }
+    }
+    return !v.done || v.mode === "arr";
+  }
+  // ---------- taxi guidance: a lit path along the taxiways, the next turn marked, a hint at every turn ----------
+  function guideMesh() {
+    if (S.guideMesh) return S.guideMesh;
+    const m = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xffc94d, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }));
+    m.frustumCulled = false; m.renderOrder = 2; scene.add(m); S.guideMesh = m; return m;
+  }
+  function buildGuidePath(pts) {
+    const pos = [], idx = [], w = 0.9;
+    const path = [[S.pos.x, S.pos.z], ...pts];
+    for (let i = 0; i < path.length - 1; i++) {
+      const [x0, z0] = path[i], [x1, z1] = path[i + 1], L = Math.hypot(x1 - x0, z1 - z0); if (L < 0.5) continue;
+      const n = Math.max(1, Math.ceil(L / 6)), nx = -(z1 - z0) / L * w, nz = (x1 - x0) / L * w;
+      for (let k = 0; k < n; k++) {   // dashes, 4 m long every 6 m, laid on the ground
+        const t0 = k / n, t1 = Math.min(1, t0 + 4 / L);
+        const ax = x0 + (x1 - x0) * t0, az = z0 + (z1 - z0) * t0, bx = x0 + (x1 - x0) * t1, bz = z0 + (z1 - z0) * t1, ya = groundY(ax, az) + 0.3, yb = groundY(bx, bz) + 0.3, b = pos.length / 3;
+        pos.push(ax + nx, ya, az + nz, ax - nx, ya, az - nz, bx + nx, yb, bz + nz, bx - nx, yb, bz - nz); idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2);
+      }
+    }
+    const m = guideMesh(), g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+    m.geometry.dispose(); m.geometry = g; m.visible = true;
+  }
+  // pts: world [x, z]; labels: what the HUD says while heading to each point; hints: said on arriving at each point
+  function setGuide(kind, pts, labels, hints, onDone) { S.guide = { kind, pts, labels, hints, i: 0, onDone, warnT: 0 }; buildGuidePath(pts); }
+  // "left" or "right": the turn at p1 going from p0 to p2 (x east, z south)
+  const turnWord = (p0, p1, p2) => ((p1[0] - p0[0]) * (p2[1] - p1[1]) - (p1[1] - p0[1]) * (p2[0] - p1[0]) > 0 ? "right" : "left");
+  function departureGuide() {
+    const a = S.from, r = a.rwys[0], tl = r.len * 0.92, alHold = -(tl / 2 - 12), [alNow] = local(a, S.pos.x, S.pos.z), rw = a.label;
+    const P = (al, ac) => toWorld(a, al, ac), here = [S.pos.x, S.pos.z];
+    const pts = [P(alNow, a.tx), P(alHold, a.tx), P(alHold, r.off + r.w / 2 + 48), P(alHold, r.off)], lineup = P(alHold + 100, r.off);
+    setGuide("dep", pts,
+      ["TAXI TO TAXIWAY A", `TAXIWAY A · TO RWY ${rw}`, `HOLD SHORT RWY ${rw}`, `LINE UP RWY ${rw}`],
+      [`On taxiway A: turn ${turnWord(here, pts[0], pts[1])} and follow the yellow line, under 20 knots.`, `Turn ${turnWord(pts[0], pts[1], pts[2])} onto the link to runway ${rw}, stop at the hold line.`,
+        `${a.name} Tower: line up runway ${rw}.`, `Turn ${turnWord(pts[2], pts[3], lineup)} onto the runway centreline.`]);
+    flash("Taxi: follow the yellow dashes to taxiway A", 3.5);
+  }
+  function arrivalGuide(a) {
+    const r = a.rwys[0], tl = r.len * 0.92, [alNow] = local(a, S.pos.x, S.pos.z);
+    const fwd = V.fwd.set(0, 0, -1).applyQuaternion(S.q), dir = Math.sign(fwd.x * a.s - fwd.z * a.c) || 1;   // rolling along the runway's heading or against it
+    const exits = [tl / 2 - 12, -(tl / 2 - 12)]; for (let z = -tl / 2 + 450; z < tl / 2 - 300; z += 480) exits.push(-z);
+    const ahead = exits.filter((e) => (e - alNow) * dir > 120).sort((p, q) => (p - alNow) * dir - (q - alNow) * dir);
+    const alExit = ahead.length ? ahead[0] : exits.sort((p, q) => (q - p) * dir)[0];
+    const want = DIMS[spec.kind][0], g = a.gates.slice().sort((g1, g2) => Math.abs(DIMS[g1.kind][0] - want) - Math.abs(DIMS[g2.kind][0] - want))[0];
+    if (!g) return false;
+    if (hiddenParked) hiddenParked.visible = true;
+    if (g.model) { g.model.visible = false; hiddenParked = g.model; } else hiddenParked = null;   // your stand is free for you
+    const n = a.gates.indexOf(g) + 1, alGate = -g.z, len = DIMS[spec.kind][1], P = (al, ac) => toWorld(a, al, ac);
+    setGuide("arr", [P(alExit, r.off), P(alExit, a.tx), P(alGate, a.tx), P(alGate, a.apX0 + 14), P(alGate, a.termX0 - 9 - len / 2)],
+      ["EXIT RUNWAY", "VACATE TO TAXIWAY A", `TAXIWAY A · GATE ${n}`, `TURN IN · GATE ${n}`, `PARK · GATE ${n}`],
+      [`Turn ${turnWord([S.pos.x, S.pos.z], ...[[P(alExit, r.off), P(alExit, a.tx)]].flat())} off the runway here, onto the yellow line.`, `Runway vacated. Turn ${turnWord(P(alExit, r.off), P(alExit, a.tx), P(alGate, a.tx))} onto taxiway A towards gate ${n}.`,
+        `Turn ${turnWord(P(alExit, a.tx), P(alGate, a.tx), P(alGate, a.apX0 + 14))} towards the terminal at gate ${n}.`, "Follow the stand line slowly and stop at the end.", null]);
+    S.parked = { a, g, n };
+    RADIO.push({ text: `${a.name} Ground: welcome. Vacate the runway ahead, taxi via A to gate ${n}.`, t: 12 });
+    return true;
+  }
+  function updateGuide() {
+    const G = S.guide; if (!G) return;
+    if (!S.grounded) { if (S.guideMesh) S.guideMesh.visible = false; return; }
+    const [x, z] = G.pts[G.i], d = Math.hypot(x - S.pos.x, z - S.pos.z), last = G.i === G.pts.length - 1;
+    G.warnT -= 1 / 60; if (S.gs > 15 && G.warnT <= 0 && G.kind !== "done") { flash("Taxi slower: under 20 knots", 1.6); G.warnT = 4; }
+    if (last && G.kind === "arr") {
+      if (d < 6 && S.gs < 1.2) {   // on the stand: park, set the brakes, open up
+        const a = S.parked.a; S.q.setFromAxisAngle(AY, -(a.hdg + 90) * Math.PI / 180); S.throttle = 0; S.speed = 0; S.gs = 0; S.vel.set(0, 0, 0);
+        S.guide = null; S.guideMesh.visible = false; chime(660, 0.25);
+        flash(`Parked at gate ${S.parked.n}. Engines off.`, 3); startServices("arr");
+      } else if (d < 14 && S.gs > 3) flash("Slow down, stop on the stand", 1);
+      return;
+    }
+    if (d < (last ? 10 : 16)) {
+      const h = G.hints[G.i]; if (h) { if (/Tower|Ground/.test(h)) RADIO.push({ text: h, t: 8 }); else flash(h, 3.2); }
+      if (last) { S.guide = null; S.guideMesh.visible = false; if (G.onDone) G.onDone(); return; }
+      G.i++;
+    }
   }
   function startPushback() {
     if (!S.gate || S.push || S.mode !== "fly") return;
@@ -5493,7 +5664,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     S.q.setFromAxisAngle(AY, yaw);
     const fwd = V.fwd.set(0, 0, -1).applyQuaternion(S.q);
     S.pos.x -= fwd.x * v * dt; S.pos.z -= fwd.z * v * dt; S.pos.y = groundY(S.pos.x, S.pos.z) + spec.gearH; S.speed = 0; S.gs = 0;
-    if (k >= 1) { S.push = null; S.gate = null; flash(`Pushback complete. Taxi to runway ${S.from.label}: follow the amber marker.`, 4); }
+    if (k >= 1) { S.push = null; S.gate = null; departureGuide(); }
     return true;
   }
   function taxiTarget() {
