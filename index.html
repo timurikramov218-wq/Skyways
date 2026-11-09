@@ -573,7 +573,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
 
     <div class="topbar">
       <div class="cams" id="cams" role="group" aria-label="Camera view" hidden></div>
-      <button class="chip" id="camCycle" type="button" title="Change camera (C, or keys 1–6)"><span class="lbl-sm">View</span> <span id="camName">Chase</span></button>
+      <button class="chip" id="camCycle" type="button" title="Change camera (C, or keys 1–9)"><span class="lbl-sm">View</span> <span id="camName">Chase</span></button>
       <button class="chip" id="apToggle" type="button" aria-pressed="false" title="Autopilot (U)">Autopilot</button>
       <button class="chip" id="atcToggle" type="button" aria-pressed="false" aria-expanded="false" aria-controls="atcPanel" title="Radio: talk to the tower (key Y)">ATC</button>
       <span class="topbar-gap"></span>
@@ -838,6 +838,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>/* Airport models: terminal from "Low Poly Airport" and the people mover from "Monorail" (Sketchfab, uploaded by the game's author);
    "Air Port Buildings" by EmbersStorm (CC BY 4.0); "Low poly Airport Control Tower" and "Airport Hangar" by assetfactory (Sketchfab Standard license), "Air Traffic Control Tower" by abass20 (CC BY 4.0).
    Aircraft models, packed for this game. "B777 Mesh boeing plane" by yes / MrModels (Sketchfab, CC BY 4.0); "Boeing 747-400f" by Aviation_Liker 3D (Sketchfab, CC BY 4.0); "1/400 Boeing 737 Airplane For Free" by businessyuen, "Medium haul plane (low poly)" by reeledzin, "Boeing 767-200ER" by beanz_ncheese; all Sketchfab, CC BY 4.0. */
@@ -1509,18 +1510,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       buildTown(x, z, big ? 330 : 200, false, 100 + v); towns.push({ x, z }); v++;
     }
   }
-  // access roads from each airport's landside road to its town, and a highway linking the towns
-  AIRPORTS.forEach((a) => {
-    const lz = a.apL / 2 + 120, [x0, z0] = toWorld(a, -lz, a.roadX), [x1, z1] = toWorld(a, lz, a.roadX);
-    addRoad(line(x0, z0, x1, z1), 12);
-    const t = towns.find((tt) => tt.a === a);
-    if (t) addRoad(line(x1, z1, t.x, t.z, 25), 11);
-  });
-  for (let i = 0; i < towns.length - 1; i++) {
-    let best = null, bd = 1e9;
-    for (let j = i + 1; j < towns.length; j++) { const d = Math.hypot(towns[i].x - towns[j].x, towns[i].z - towns[j].z); if (d < bd) { bd = d; best = towns[j]; } }
-    if (best && bd < 4200) addRoad(line(towns[i].x, towns[i].z, best.x, best.z, 30), 10);
-  }
+  // no public roads: the landscape stays clean (towns have their own streets between the blocks)
   flushRoads();
   (function () {
     // houses
@@ -2995,6 +2985,37 @@ vec3 liveryAt(vec3 p, out float fus) {
   }
   // ---------- flight deck: built for your own plane, seen from the captain's seat ----------
   // eye: the captain's eye point in model space; airbus: side-sticks instead of control wheels
+  // the flight deck model ("Free Plane Cockpit", a 777-style deck, in inches): loaded from cockpit.glb the first time the
+  // cockpit view is chosen, then shared by every aircraft, scaled to its fuselage, the captain's eye on the aircraft's eye point
+  const COCKPIT = { scene: null, status: "idle" };
+  const CK_EYE = new THREE.Vector3(40, 63, -42), CK_MID_X = 21;   // captain's eye and the deck's centre line, model inches (front is +z)
+  function loadCockpit() {
+    if (COCKPIT.status !== "idle" || !THREE.GLTFLoader) return;
+    COCKPIT.status = "loading"; flash("Loading the flight deck…", 2);
+    fetch("cockpit.glb").then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then((buf) => new Promise((res, rej) => new THREE.GLTFLoader().parse(buf, "", res, rej)))
+      .then((g) => {
+        g.scene.traverse((o) => { if (o.isMesh) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m) => { if (m.map) m.map.encoding = THREE.sRGBEncoding; m.envMapIntensity = 0.6; }); o.frustumCulled = false; } });
+        COCKPIT.scene = g.scene; COCKPIT.status = "ready";
+        if (model && model.userData.deck) seatCockpit(model.userData.deck);
+      })
+      .catch((e) => { COCKPIT.status = "failed"; try { console.warn("cockpit", e); } catch {} flash("The flight deck couldn't load: plain cockpit view", 2.4); });
+  }
+  // the aircraft's own bounding box in model space (measured once per model, unrotated)
+  function modelBox() {
+    if (model.userData.bb) return model.userData.bb;
+    const c = model.clone(); c.position.set(0, 0, 0); c.quaternion.identity(); c.scale.set(1, 1, 1); c.updateMatrixWorld(true);
+    return (model.userData.bb = new THREE.Box3().setFromObject(c));
+  }
+  function seatCockpit(fd) {
+    if (!COCKPIT.scene || fd.userData.seated) return;
+    const o = packOpts(spec.kind) || {}, k = clamp((o.R || 2.6) / 3.2, 0.74, 1.05), sc = 0.0254 * k, seat = fd.userData.seat;
+    const g = COCKPIT.scene.clone(); g.rotation.y = Math.PI; g.scale.setScalar(sc);
+    // after the half turn an inch-point (x, y, z) sits at (-x, y, -z) * sc: put the captain's eye on the seat, the deck centred
+    g.position.set(CK_MID_X * sc, seat.y - CK_EYE.y * sc, seat.z - (-CK_EYE.z) * sc);
+    seat.x = (-CK_EYE.x + CK_MID_X) * sc;
+    fd.add(g); fd.userData.seated = true;
+  }
   function buildCockpit(eye, airbus, nEng = 2) {
     const g = new THREE.Group(), E = eye;
     const mat = (c, e = 0.18) => new THREE.MeshLambertMaterial({ color: c, emissive: c, emissiveIntensity: e, side: THREE.DoubleSide });
@@ -3537,7 +3558,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     // taxiway strip from one point to another (airport coordinates), with its yellow centreline
     const strip = (g, x0, z0, x1, z1, w, mat, y) => { const m = flat(g, Math.hypot(x1 - x0, z1 - z0), w, mat, (x0 + x1) / 2, y, (z0 + z1) / 2); m.rotation.z = -Math.atan2(z1 - z0, x1 - x0); return m; };
-    const taxiLink = (x0, z0, x1, z1) => { strip(grp, x0, z0, x1, z1, 23, MAT.taxi, 0.05); strip(grp, x0, z0, x1, z1, 0.5, MAT.yellow, 0.08); };
+    const TW = 34, TH = TW / 2;   // taxiway width: wide enough to steer a wide-body along comfortably
+    const taxiLink = (x0, z0, x1, z1) => { strip(grp, x0, z0, x1, z1, TW, MAT.taxi, 0.05); strip(grp, x0, z0, x1, z1, 0.5, MAT.yellow, 0.08); };
     const r0 = a.rwys[0], tl = r0.len * 0.92;
     const xrBlue = [];
     for (const r of a.xr) {
@@ -3562,13 +3584,13 @@ vec3 liveryAt(vec3 p, out float fus) {
       }
       // parallel taxiway on the terminal side, three connectors with hold lines, blue edge lights
       const tlx = r.len * 0.9;
-      flat(gD, 23, tlx, MAT.taxi, r.tw, 0.05, 0); flat(gD, 0.5, tlx, MAT.yellow, r.tw, 0.08, 0);
-      for (let z = -tlx / 2; z <= tlx / 2; z += 60) for (const sx of [-1, 1]) pt(xrBlue, r.tw + sx * 13, 0.25, z);
+      flat(gD, TW, tlx, MAT.taxi, r.tw, 0.05, 0); flat(gD, 0.5, tlx, MAT.yellow, r.tw, 0.08, 0);
+      for (let z = -tlx / 2; z <= tlx / 2; z += 60) for (const sx of [-1, 1]) pt(xrBlue, r.tw + sx * (TH + 1.5), 0.25, z);
       const cl = Math.abs(r.tw) - r.w / 2;
       for (const f of [-0.45, -0.15, 0.15, 0.45]) {
         const z = f * r.len, xm = sd2 * (r.w / 2 + cl / 2);
-        flat(gD, cl, 23, MAT.taxi, xm, 0.05, z); flat(gD, cl, 0.5, MAT.yellow, xm, 0.08, z);
-        for (const dx of [62, 63]) flat(gD, 0.3, 23, MAT.yellow, sd2 * (r.w / 2 + dx), 0.09, z);
+        flat(gD, cl, TW, MAT.taxi, xm, 0.05, z); flat(gD, cl, 0.5, MAT.yellow, xm, 0.08, z);
+        for (const dx of [62, 63]) flat(gD, 0.3, TW, MAT.yellow, sd2 * (r.w / 2 + dx), 0.09, z);
       }
       // link from this runway's taxiway to the main one (parallels: at both ends of the terminal area; crossing runways: the nearest end)
       const tx0 = a.tx, clampZ = (z) => Math.max(-tl / 2 + 15, Math.min(tl / 2 - 15, z));
@@ -3578,21 +3600,21 @@ vec3 liveryAt(vec3 p, out float fus) {
     instanced(grp, lightG, MAT.blue, xrBlue);
     for (const [mat, list] of [[MAT.edge, edgeL], [MAT.green, thrG], [MAT.redL, thrR], [MAT.white, appr]]) instanced(grp, lightG, mat, list).userData.keep = true;
     // taxiways
-    flat(grp, 23, tl, MAT.taxi, a.tx, 0.05, 0); flat(grp, 0.5, tl, MAT.yellow, a.tx, 0.08, 0);
-    for (let z = -tl / 2; z <= tl / 2; z += 60) for (const sx of [-1, 1]) blueL.push([a.tx + sx * 13, 0.25, z]);
+    flat(grp, TW, tl, MAT.taxi, a.tx, 0.05, 0); flat(grp, 0.5, tl, MAT.yellow, a.tx, 0.08, 0);
+    for (let z = -tl / 2; z <= tl / 2; z += 60) for (const sx of [-1, 1]) blueL.push([a.tx + sx * (TH + 1.5), 0.25, z]);
     const conns = [-tl / 2 + 12, tl / 2 - 12]; for (let z = -tl / 2 + 450; z < tl / 2 - 300; z += 480) conns.push(z);
     // taxiway edge lines (double yellow is for shoulders; a single 15 cm line marks the paved edge), broken where connectors join
     { const cuts = conns.slice().sort((p, q) => p - q), segs = []; let z0 = -tl / 2;
-      for (const c of cuts) { if (c - 12.5 > z0) segs.push([z0, c - 12.5]); z0 = c + 12.5; } if (tl / 2 > z0) segs.push([z0, tl / 2]);
-      for (const [za, zb] of segs) flat(grp, 0.18, zb - za, MAT.yellow, a.tx - 11.2, 0.085, (za + zb) / 2);
-      flat(grp, 0.18, tl, MAT.yellow, a.tx + 11.2, 0.085, 0); }
+      for (const c of cuts) { if (c - TH - 1 > z0) segs.push([z0, c - TH - 1]); z0 = c + TH + 1; } if (tl / 2 > z0) segs.push([z0, tl / 2]);
+      for (const [za, zb] of segs) flat(grp, 0.18, zb - za, MAT.yellow, a.tx - TH + 0.3, 0.085, (za + zb) / 2);
+      flat(grp, 0.18, tl, MAT.yellow, a.tx + TH - 0.3, 0.085, 0); }
     for (const [ci, z] of conns.entries()) {
       const x0 = r0.off + r0.w / 2, len = a.tx - x0;
-      flat(grp, len, 23, MAT.taxi, x0 + len / 2, 0.05, z); flat(grp, len - 30, 0.4, MAT.yellow, x0 + 30 + (len - 30) / 2, 0.08, z);
-      for (const sz of [-1, 1]) flat(grp, len - 23, 0.18, MAT.yellow, x0 + (len - 11.5) / 2, 0.085, z + sz * 11.2);   // connector edges
+      flat(grp, len, TW, MAT.taxi, x0 + len / 2, 0.05, z); flat(grp, len - 30, 0.4, MAT.yellow, x0 + 30 + (len - 30) / 2, 0.08, z);
+      for (const sz of [-1, 1]) flat(grp, len - TW, 0.18, MAT.yellow, x0 + (len - TH) / 2, 0.085, z + sz * (TH - 0.3));   // connector edges
       // runway holding position: two solid lines on the taxiway side, two dashed on the runway side
-      for (const dx of [7.6, 8.6]) flat(grp, 0.3, 23, MAT.yellow, x0 + 30 + dx, 0.09, z);
-      for (const dx of [5.4, 6.4]) for (let k = -10.5; k <= 10.5; k += 3) flat(grp, 0.3, 1.8, MAT.yellow, x0 + 30 + dx, 0.09, z + k);
+      for (const dx of [7.6, 8.6]) flat(grp, 0.3, TW, MAT.yellow, x0 + 30 + dx, 0.09, z);
+      for (const dx of [5.4, 6.4]) for (let k = -TH + 1.5; k <= TH - 1.5; k += 3) flat(grp, 0.3, 1.8, MAT.yellow, x0 + 30 + dx, 0.09, z + k);
       // centreline lead-on curving into the runway centreline (toward the runway's middle)
       { const dir = z > 0 ? -1 : 1, rad = Math.min(60, x0 - r0.off + 30), cx = r0.off + rad, cz = z;
         for (let k = 0; k < 10; k++) {
@@ -3612,15 +3634,15 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     if (a.rwys[1]) {
       const r1 = a.rwys[1], mx = (r1.off + r1.w / 2 + r0.off - r0.w / 2) / 2;
-      flat(grp, 23, r1.len * 0.9, MAT.taxi, mx, 0.05, 0); flat(grp, 0.5, r1.len * 0.9, MAT.yellow, mx, 0.08, 0);
+      flat(grp, TW, r1.len * 0.9, MAT.taxi, mx, 0.05, 0); flat(grp, 0.5, r1.len * 0.9, MAT.yellow, mx, 0.08, 0);
       for (const z of [-r1.len * 0.45 + 12, -r1.len * 0.15, r1.len * 0.15, r1.len * 0.45 - 12]) {
-        const x0 = r1.off + r1.w / 2, x1 = r0.off - r0.w / 2; flat(grp, x1 - x0, 23, MAT.taxi, (x0 + x1) / 2, 0.05, z); flat(grp, x1 - x0, 0.5, MAT.yellow, (x0 + x1) / 2, 0.08, z);
+        const x0 = r1.off + r1.w / 2, x1 = r0.off - r0.w / 2; flat(grp, x1 - x0, TW, MAT.taxi, (x0 + x1) / 2, 0.05, z); flat(grp, x1 - x0, 0.5, MAT.yellow, (x0 + x1) / 2, 0.08, z);
       }
     }
     instanced(grp, lightG, MAT.blue, blueL);
     // apron with stand markings
     flat(grp, a.apD, a.apL, MAT.apron, a.apX0 + a.apD / 2, 0.04, 0);
-    flat(grp, 14, a.apL * 0.9, MAT.taxi, a.apX0 - 4, 0.05, 0);
+    flat(grp, 20, a.apL * 0.9, MAT.taxi, a.apX0 - 4, 0.05, 0);
     flat(grp, 0.3, a.apL, MAT.yellow, a.apX0 + 3.2, 0.085, 0);                                                     // apron taxilane edge
     for (let z = -a.apL / 2 + 4; z < a.apL / 2 - 4; z += 8) for (const dx of [-4.5, 4.5]) flat(grp, 0.25, 4, MAT.white, a.termX0 - 15 + dx, 0.085, z);   // service road beside the terminal
     let z = -a.apL / 2 + 50; a.gates = [];
@@ -3840,7 +3862,13 @@ vec3 liveryAt(vec3 p, out float fus) {
     spec = PLANES[kind];
     if (model) scene.remove(model);
     model = m; model.userData.kind = kind; scene.add(model);
-    if (model.userData.cabin && false) {   // cabin and flight-deck views are switched off
+    if (model.userData.cabin) {   // the flight deck (no passenger cabin view): hide your own skin from inside, seat the cockpit model
+      model.traverse((o) => { if (o.isMesh && o.userData.remat) o.material = o.userData.remat(CABIN); });
+      const fd = new THREE.Group(); fd.visible = false; model.add(fd); model.userData.deck = fd;
+      fd.userData = { glb: true, seat: new THREE.Vector3(-0.5, spec.cock[0], spec.cock[1]) };
+      if (COCKPIT.scene) seatCockpit(fd);
+    }
+    if (model.userData.cabin && false) {   // the old procedural cabin and deck (unused)
       model.traverse((o) => { if (o.isMesh && o.userData.remat) o.material = o.userData.remat(CABIN); });
       if (!spec.freighter) { const cg = buildCabin(model.userData.cabin); cg.visible = false; model.add(cg); model.userData.cabinG = cg; }
       const fd = buildCockpit(new THREE.Vector3(-0.55, spec.cock[0], spec.cock[1]), /Airbus/.test(spec.name), spec.kind === "b747" ? 4 : 2); fd.visible = false; model.add(fd); model.userData.deck = fd;
@@ -3976,7 +4004,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   // ================= INPUT =================
   const keys = new Set(); let invert = load("sw-invert") === "1", showMap = 1;
   const stick = { x: 0, y: 0 }; let touchBrake = false, touchYaw = 0;
-  const CAMS = [["chase", "Chase"], ["wing", "Wing"], ["tower", "Tower"], ["orbit", "Orbit"], ["flyby", "Fly-by"], ["free", "Free"]];
+  const CAMS = [["chase", "Chase"], ["cockpit", "Cockpit"], ["wing", "Wing"], ["tail", "Tail"], ["gear", "Nose gear"], ["belly", "Belly"], ["side", "Side"], ["tower", "Tower"], ["orbit", "Orbit"], ["flyby", "Fly-by"], ["free", "Free"]];
   const freeCam = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, speed: 40, on: false };
   const camWrap = $("cams");
   CAMS.forEach(([id, label], i) => {
@@ -3991,6 +4019,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       freeCam.yaw = Math.atan2(-d.x, -d.z); freeCam.pitch = Math.asin(clamp(d.y, -1, 1));
     }
     S.cam = id; flyby.set = false;
+    if (id === "cockpit") { if (COCKPIT.status === "idle") loadCockpit(); else if (COCKPIT.scene && model && model.userData.deck) seatCockpit(model.userData.deck); }
     { const nm = document.getElementById("camName"); if (nm) nm.textContent = CAMS.find((c) => c[0] === id)[1]; }
     camWrap.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.cam === id)));
     if (id === "cabin" && !(model && model.userData.cabinG)) { flash(spec.freighter ? "A freighter has no passenger cabin" : "This aircraft has no cabin view", 1.6); id = "chase"; S.cam = id; }
@@ -4030,12 +4059,12 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (e.repeat) return;
       if (k === "Space" && !onBtn) rpToggle();
       if (k === "Escape" || k === "KeyP") closeReplay();
-      if (/^Digit[1-6]$/.test(k)) setCam(CAMS[+k.slice(5) - 1][0]);
+      if (/^Digit[1-9]$/.test(k)) setCam(CAMS[+k.slice(5) - 1][0]);
       if (k === "KeyC") cycleCam();
       return;
     }
     if (e.repeat) return;
-    if (/^Digit[1-6]$/.test(k)) setCam(CAMS[+k.slice(5) - 1][0]);
+    if (/^Digit[1-9]$/.test(k)) setCam(CAMS[+k.slice(5) - 1][0]);
     if (k === "KeyC") cycleCam();
     if (k === "KeyG" && S.mode === "fly") toggleGear();
     if (k === "KeyV" && S.mode === "fly") cycleFlaps();
@@ -5006,7 +5035,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       const cg = model && model.userData.cabinG, fd = model && model.userData.deck, live = !S.crashed && S.mode !== "brief" && S.mode !== "over";
       const inCab = !!cg && S.cam === "cabin" && live, inDeck = !!fd && S.cam === "cockpit" && live;
       CABIN.value = inCab || inDeck ? 1 : 0; if (cg) cg.visible = inCab; if (fd) fd.visible = inDeck;
-      if (inDeck) updateFlightDeck(fd, now);
+      if (inDeck && !fd.userData.glb) updateFlightDeck(fd, now);
       if (inCab && now - (cg.userData.ifeT || 0) > 250) {   // seat-back moving map
         cg.userData.ifeT = now; const { g: q, t } = cg.userData.ife;
         q.fillStyle = "#0d2a4a"; q.fillRect(0, 0, 128, 80); q.fillStyle = "#1f4a3a"; q.beginPath(); q.ellipse(40, 50, 40, 22, 0.3, 0, Math.PI * 2); q.ellipse(100, 30, 30, 18, -0.4, 0, Math.PI * 2); q.fill();
@@ -5034,6 +5063,21 @@ vec3 liveryAt(vec3 p, out float fus) {
     } else if (S.cam === "cabin" && !S.crashed && model.userData.cabinG) {
       camera.position.copy(model.userData.cabinG.userData.seat).applyQuaternion(S.q).add(S.pos);
       camera.quaternion.copy(S.q).multiply(V.q2.setFromEuler(V.eul.set(cabinLook.pitch, cabinLook.yaw, 0, "YXZ"))); fov = 64;
+    } else if (S.cam === "tail" && !S.crashed) {   // on top of the fin, looking forward along the fuselage
+      const bb = modelBox();
+      camera.position.copy(S.pos).addScaledVector(up, bb.max.y + 1.2).addScaledVector(fwd, -bb.max.z * 0.82);
+      camera.quaternion.copy(S.q).multiply(V.q2.setFromEuler(V.eul.set(-0.06, 0, 0, "YXZ"))); fov = 62;
+    } else if (S.cam === "gear" && !S.crashed) {   // behind the nose wheel, looking ahead down the runway
+      const bb = modelBox();
+      camera.position.copy(S.pos).addScaledVector(up, -spec.gearH + 1.5).addScaledVector(fwd, -bb.min.z * 0.92).addScaledVector(right, 0.9);
+      camera.quaternion.copy(S.q).multiply(V.q2.setFromEuler(V.eul.set(-0.04, 0, 0, "YXZ"))); fov = 76;
+    } else if (S.cam === "belly" && !S.crashed) {   // under the fuselage, looking down and ahead
+      const bb = modelBox();
+      camera.position.copy(S.pos).addScaledVector(up, bb.min.y * 0.5 - 0.6).addScaledVector(fwd, -bb.min.z * 0.2);
+      camera.quaternion.copy(S.q).multiply(V.q2.setFromEuler(V.eul.set(-0.95, 0, 0, "YXZ"))); fov = 70;
+    } else if (S.cam === "side" && !S.crashed) {   // alongside, level with the aircraft: the whole profile
+      const d = spec.cam[0] * 1.15; camera.position.copy(S.pos).addScaledVector(right, d).addScaledVector(fwd, d * 0.12); camera.position.y += spec.cam[1] * 0.12;
+      clampCam(camera.position); camera.up.copy(WUP); camera.lookAt(S.pos); fov = 52;
     } else if (S.cam === "wing" && !S.crashed) {
       camera.position.copy(S.pos).addScaledVector(right, spec.wingX * 0.92).addScaledVector(up, spec.cam[1] * 0.22).addScaledVector(fwd, -spec.cam[0] * 0.12);
       camera.quaternion.copy(S.q); camera.rotateY(0.12); fov = 70;
@@ -5134,7 +5178,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     thrFill.style.height = `${Math.round(S.throttle * (thrEl.clientHeight - 8))}px`; thrLbl.textContent = `THR ${Math.round(S.throttle * 100)}%`;
     if (S.mode === "replay") { drawReplayHud(w, h); return; }
     if (S.mode !== "fly" && S.mode !== "paused") return;
-    if (S.cam === "cockpit" && CABIN.value) {   // 3D flight deck: the instruments are on the panel; only messages and warnings float on top
+    if (S.cam === "cockpit" && CABIN.value && !(model && model.userData.deck && model.userData.deck.userData.glb)) {   // 3D flight deck: the instruments are on the panel; only messages and warnings float on top
       const fs = Math.max(12, Math.round(Math.min(w, h) / 44));
       hud.font = `${fs}px ${MONO}`; hud.textAlign = "center"; hud.textBaseline = "middle";
       if (S.msgT > 0) { hud.fillStyle = HC.amber; hud.globalAlpha = clamp(S.msgT, 0, 1); hud.fillText(S.msg, w / 2, fs * 3.5, w - 24); hud.globalAlpha = 1; }
@@ -5157,7 +5201,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     const fwd = V.fwd.set(0, 0, -1).applyQuaternion(S.q), up = V.up.set(0, 1, 0).applyQuaternion(S.q), right = V.right.set(1, 0, 0).applyQuaternion(S.q);
     const pitchDeg = Math.asin(clamp(fwd.y, -1, 1)) * 57.3, rollR = Math.atan2(right.y, up.y);
-    const cock = S.cam === "cockpit" && !S.crashed;
+    const cock = S.cam === "cockpit" && !S.crashed && !(model && model.userData.deck && model.userData.deck.userData.seated);   // the model deck has its own panel: no gauge strip
     const dashH = cock ? Math.min(h * 0.26, 170) : 0;
     const cx = w / 2, cy = (h - dashH) * 0.48, sc = Math.min(w, h) / 620, fs = Math.max(12, Math.round(16 * sc));
     hud.lineWidth = 2; hud.strokeStyle = HC.hud; hud.fillStyle = HC.hud; hud.font = `${fs}px ${MONO}`; hud.shadowColor = "rgba(0,0,0,0.75)"; hud.shadowBlur = 4;
