@@ -1274,7 +1274,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       const h = lerp(lerp(hh(i, j), hh(i + 1, j), fx - i), lerp(hh(i, j + 1), hh(i + 1, j + 1), fx - i), fz - j);
       if (h < 5 || h > 700) continue;
       if (Math.abs(hh(i + 1, j) - hh(i, j)) / st > 0.6 || Math.abs(hh(i, j + 1) - hh(i, j)) / st > 0.6) continue;
-      if (airportMask(x, z)[0] > 0.01 || townCircles.some(([tx, tz, r]) => Math.abs(x - tx) < r && Math.hypot(x - tx, z - tz) < r * 0.85)) continue;
+      if (airportMask(x, z)[0] > 0.01 || townCircles.some(([tx, tz, r]) => Math.abs(x - tx) < r * 1.05 && Math.hypot(x - tx, z - tz) < r * 1.02)) continue;
       const conifer = h > 260 ? hash(x, 3) < 0.85 : hash(x, 3) < 0.35; (conifer ? cones : balls).push([x, h, z]);
     }
     const grp = new THREE.Group();
@@ -1405,28 +1405,53 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   // ---------- towns, city and countryside ----------
   const houseSpots = [], towerSpots = [], townCircles = [];
   function landOK(x, z, maxSlope = 0.18) { const h = heightAt(x, z); return h > 3 && h < 420 && airportMask(x, z)[0] < 0.01 && slopeAt(x, z) < maxSlope; }
+  // how uneven the ground is within r metres (the biggest height difference to 8 points round the edge)
+  function roughness(x, z, r) { const h0 = heightAt(x, z); let m = 0; for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; m = Math.max(m, Math.abs(heightAt(x + Math.cos(t) * r, z + Math.sin(t) * r) - h0)); } return m; }
   function findTown(a, dMin, dMax, seed) {
-    for (let t = 0; t < 120; t++) {
+    let best = null;
+    for (let t = 0; t < 120; t++) {   // try many places round the airport and keep the flattest low ground (a town grows on the plain, not on a hillside)
       const ang = hash(seed, t) * Math.PI * 2, d = lerp(dMin, dMax, hash(t, seed + 3));
       const x = a.x + Math.cos(ang) * d, z = a.z + Math.sin(ang) * d;
-      if (landOK(x, z, 0.12) && heightAt(x, z) < 200) return [x, z];
+      if (!landOK(x, z, 0.12) || heightAt(x, z) > 200) continue;
+      const sc = roughness(x, z, 300) + roughness(x, z, 150) * 0.5;
+      if (!best || sc < best[2]) best = [x, z, sc];
     }
-    return null;
+    return best ? [best[0], best[1]] : null;
   }
+  // a town: a park in the middle, (a city's) towers round it, then apartment blocks, then houses with gardens in short
+  // streets on a grid turned to suit the town; a church, a school and warehouses on the edge. No road grid is drawn:
+  // the gaps between the blocks are the streets. Nothing is built on slopes, water or the airport.
+  const parkSpots = [], aptSpots = [], landmarks = [], houseTypes = [[], [], [], []], gardenTrees = [];
   function buildTown(cx, cz, radius, city, seed) {
     townCircles.push([cx, cz, radius]);
-    const step = 90;
-    for (let gx = -radius; gx <= radius; gx += step) { const pts = line(cx + gx, cz - radius, cx + gx, cz + radius).filter(([x, z]) => Math.hypot(x - cx, z - cz) < radius); addRoad(pts, 9); }
-    for (let gz = -radius; gz <= radius; gz += step) { const pts = line(cx - radius, cz + gz, cx + radius, cz + gz).filter(([x, z]) => Math.hypot(x - cx, z - cz) < radius); addRoad(pts, 9); }
-    for (let gx = -radius; gx <= radius; gx += 24) for (let gz = -radius; gz <= radius; gz += 24) {
-      const mx = ((gx % step) + step) % step, mz = ((gz % step) + step) % step;
-      if (mx < 14 || mx > step - 14 || mz < 14 || mz > step - 14) continue;
-      const x = cx + gx + (hash(gx, gz + seed) - 0.5) * 6, z = cz + gz + (hash(gz, gx - seed) - 0.5) * 6, r = Math.hypot(x - cx, z - cz);
-      if (r > radius || hash(x, z) < r / radius * 0.55) continue;
-      if (!landOK(x, z, 0.22)) continue;
-      if (city && r < radius * 0.4 && hash(z, x) > 0.25) towerSpots.push([x, z, 1 - r / (radius * 0.4)]);
-      else houseSpots.push([x, z]);
+    const ang = hash(seed, 11) * Math.PI / 2, ca = Math.cos(ang), sa = Math.sin(ang);
+    const W = (u, v) => [cx + u * ca - v * sa, cz + u * sa + v * ca];
+    // the park: off-centre a little, with a pond if the ground is flat
+    const [px, pz] = W((hash(seed, 2) - 0.5) * radius * 0.2, (hash(seed, 3) - 0.5) * radius * 0.2), pr = radius * (city ? 0.16 : 0.2);
+    if (landOK(px, pz, 0.1)) parkSpots.push([px, pz, pr, roughness(px, pz, pr) < 3]);
+    const inPark = (x, z) => Math.hypot(x - px, z - pz) < pr + 10;
+    // blocks: 4 x 2 lots, then a 14 m street
+    const lot = 24, bx = 4, bz = 2, street = 14, cellU = bx * lot + street, cellV = bz * lot + street;
+    for (let u = -radius; u <= radius; u += lot) for (let v = -radius; v <= radius; v += lot) {
+      const iu = Math.floor((u + radius) / cellU), iv = Math.floor((v + radius) / cellV), fu = u + radius - iu * cellU, fv = v + radius - iv * cellV;
+      if (fu > bx * lot - 2 || fv > bz * lot - 2) continue;                                   // street
+      const [x, z] = W(u + (hash(u, v + seed) - 0.5) * 3, v + (hash(v, u - seed) - 0.5) * 3), r = Math.hypot(x - cx, z - cz) / radius;
+      if (r > 1 || hash(x, z) < r * r * 0.55) continue;                                         // thinner towards the edge
+      if (inPark(x, z) || !landOK(x, z, 0.12)) continue;
+      const rot = ang + (iv % 2 ? Math.PI : 0);                                                 // houses face their street
+      if (city && r < 0.32) { if (hash(z, x) > 0.2) towerSpots.push([x, z, 1 - r / 0.32]); continue; }
+      if ((city && r < 0.62) || (!city && radius > 300 && r < 0.38)) { if (hash(x, 7) > 0.35) aptSpots.push([x, z, rot, city ? 1 : 0.6]); continue; }
+      const kind = Math.floor(hash(x * 1.3, z * 0.7) * 4);
+      houseTypes[kind].push([x, z, rot]);
+      if (hash(z, x * 3) > 0.55) { const [tx, tz] = W(u + 7 * (hash(x, 9) - 0.5), v + (iv % 2 ? -10 : 10)); if (landOK(tx, tz, 0.15)) gardenTrees.push([tx, heightAt(tx, tz), tz]); }   // a tree in the back garden
     }
+    // landmarks
+    const spot = (r0, r1, tries = 30) => { for (let t = 0; t < tries; t++) { const a2 = hash(seed, t + 40) * Math.PI * 2, d = radius * lerp(r0, r1, hash(t, seed + 41)), x = cx + Math.cos(a2) * d, z = cz + Math.sin(a2) * d; if (landOK(x, z, 0.08) && !inPark(x, z)) return [x, z]; } return null; };
+    { const c = spot(0.0, 0.3); if (c) landmarks.push(["church", c[0], c[1], ang]); }
+    { const c = spot(0.35, 0.6); if (c) landmarks.push(["school", c[0], c[1], ang]); }
+    for (let k = 0; k < (city ? 6 : radius > 300 ? 4 : 2); k++) { const c = spot(0.85, 1.05); if (c) landmarks.push(["warehouse", c[0], c[1], ang + (k % 2) * Math.PI / 2]); }
+    if (city && radius > 500) { const c = spot(0.45, 0.75, 60); if (c) landmarks.push(["stadium", c[0], c[1], ang]); }
+    if (!city) { const c = spot(0.6, 0.9); if (c) landmarks.push(["watertower", c[0], c[1], 0]); }
   }
   const towns = [];
   AIRPORTS.forEach((a, i) => {
@@ -1434,11 +1459,25 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     const t = findTown(a, a.reach + (big ? 1100 : 900), a.reach + (big ? 2000 : 1700), i * 7 + 1);
     if (t) { buildTown(t[0], t[1], big ? 620 : a.kind === "intl" ? 420 : 260, big || a.kind === "intl", i); towns.push({ x: t[0], z: t[1], a }); }
   });
-  for (let v = 0, tries = 0; v < 24 && tries < 1500; tries++) {
-    const x = (hash(tries, 77) - 0.5) * 28000, z = (hash(91, tries) - 0.5) * 28000;
-    if (!landOK(x, z, 0.1) || heightAt(x, z) > 120) continue;
-    if (townCircles.some(([tx, tz, r]) => Math.hypot(x - tx, z - tz) < r + 700)) continue;
-    buildTown(x, z, 170, false, 100 + v); towns.push({ x, z }); v++;
+  {
+    // villages where people would really build: flat, low ground, best near the coast, not crowding each other or the airports
+    const cand = [];
+    for (let tries = 0; tries < 2400; tries++) {
+      const x = (hash(tries, 77) - 0.5) * 26000, z = (hash(91, tries) - 0.5) * 26000;
+      if (Math.hypot(x, z) > 12800) continue;
+      const h0 = heightAt(x, z); if (h0 < 4 || h0 > 220 || !landOK(x, z, 0.12)) continue;
+      const rough = roughness(x, z, 220); if (rough > 40) continue;
+      let coast = 0; for (let k = 0; k < 12 && !coast; k++) { const t = k * Math.PI / 6; if (heightAt(x + Math.cos(t) * 1200, z + Math.sin(t) * 1200) < 0) coast = 1; }
+      cand.push([x, z, coast - rough / 40 * 0.9 + hash(tries, 5) * 0.25 - h0 / 500]);
+    }
+    cand.sort((p, q) => q[2] - p[2]);
+    let v = 0;
+    for (const [x, z] of cand) {
+      if (v >= 16) break;
+      if (townCircles.some(([tx, tz, r]) => Math.hypot(x - tx, z - tz) < r + 1700)) continue;
+      const big = v < 5;   // the best few sites become small towns with apartment blocks
+      buildTown(x, z, big ? 330 : 200, false, 100 + v); towns.push({ x, z }); v++;
+    }
   }
   // access roads from each airport's landside road to its town, and a highway linking the towns
   AIRPORTS.forEach((a) => {
@@ -1458,17 +1497,59 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     const walls = [0xe8e1d3, 0xd9c6a5, 0xc9d4dc, 0xe3d0c0, 0xf0ece4, 0xcfd9c3].map((c) => new THREE.Color(c).convertSRGBToLinear());
     const roofs = [0x8a3b2e, 0x5b4a42, 0x3e4a57, 0x9c5a3c, 0x6b6e72].map((c) => new THREE.Color(c).convertSRGBToLinear());
     const bodyG = new THREE.BoxGeometry(1, 1, 1); bodyG.translate(0, 0.5, 0);
-    const roofG = new THREE.ConeGeometry(0.72, 1, 4); roofG.rotateY(Math.PI / 4); roofG.translate(0, 0.5, 0);
-    const N = houseSpots.length;
-    const body = new THREE.InstancedMesh(bodyG, new THREE.MeshLambertMaterial(), N), roof = new THREE.InstancedMesh(roofG, new THREE.MeshLambertMaterial(), N);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
-    houseSpots.forEach(([x, z], i) => {
-      const w = 9 + hash(x, 1) * 8, d = 8 + hash(z, 2) * 6, h = 4.5 + hash(x, z) * 4, y = heightAt(x, z) - 0.5, rot = Math.round(hash(z, x) * 2) * Math.PI / 2;
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot);
-      m.compose(p.set(x, y, z), q, s.set(w, h, d)); body.setMatrixAt(i, m); body.setColorAt(i, walls[Math.floor(hash(i, 3) * walls.length)]);
-      m.compose(p.set(x, y + h, z), q, s.set(w * 1.05, 3 + hash(i, 5) * 2, d * 1.05)); roof.setMatrixAt(i, m); roof.setColorAt(i, roofs[Math.floor(hash(i, 4) * roofs.length)]);
-    });
-    scene.add(body, roof);
+    const hipG = new THREE.ConeGeometry(0.72, 1, 4); hipG.rotateY(Math.PI / 4); hipG.translate(0, 0.5, 0);           // hipped roof
+    const gableG = new THREE.CylinderGeometry(0.62, 0.62, 1, 3); gableG.rotateZ(Math.PI / 2); gableG.rotateX(Math.PI / 6); gableG.translate(0, 0.31, 0);   // pitched (gable) roof
+    const Y = new THREE.Vector3(0, 1, 0), m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+    const inst = (geo, mat, list, fill) => { if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((it, i) => fill(im, it, i)); scene.add(im); return im; };
+    const put = (im, i, x, y, z, rot, w, h, d, col) => { q.setFromAxisAngle(Y, rot); m.compose(p.set(x, y, z), q, s.set(w, h, d)); im.setMatrixAt(i, m); if (col) im.setColorAt(i, col); };
+    const lam = () => new THREE.MeshLambertMaterial();
+    // 0: cottage with a hipped roof; 1: long house with a pitched roof; 2: modern flat-roofed villa in two blocks; 3: semi-detached pair
+    const [h0, h1, h2, h3] = houseTypes, gy = (x, z) => heightAt(x, z) - 0.4;
+    const dims = (x, z) => [9 + hash(x, 1) * 5, 8 + hash(z, 2) * 4, 4.8 + hash(x, z) * 2.5];
+    inst(bodyG, lam(), h0, (im, [x, z, r], i) => { const [w, d, h] = dims(x, z); put(im, i, x, gy(x, z), z, r, w, h, d, walls[i % walls.length]); });
+    inst(hipG, lam(), h0, (im, [x, z, r], i) => { const [w, d, h] = dims(x, z); put(im, i, x, gy(x, z) + h, z, r, w * 1.06, 3.2 + hash(i, 5) * 1.6, d * 1.06, roofs[i % roofs.length]); });
+    inst(bodyG, lam(), h1, (im, [x, z, r], i) => { const [w, d, h] = dims(x, z); put(im, i, x, gy(x, z), z, r, w * 1.35, h, d * 0.85, walls[(i + 2) % walls.length]); });
+    inst(gableG, lam(), h1, (im, [x, z, r], i) => { const [w, d, h] = dims(x, z); put(im, i, x, gy(x, z) + h, z, r, w * 1.42, 3.6 + hash(i, 6) * 1.4, d * 0.98, roofs[(i + 1) % roofs.length]); });
+    const villaC = [0xf2f0ec, 0xe6e1d8, 0xd5d8da, 0x3b3f44].map((c) => new THREE.Color(c).convertSRGBToLinear());
+    inst(bodyG, lam(), h2, (im, [x, z, r], i) => { const [w, d, h] = dims(x, z); put(im, i, x, gy(x, z), z, r, w * 1.2, h * 1.1, d, villaC[i % 3]); });
+    inst(bodyG, lam(), h2, (im, [x, z, r], i) => { const [w, d, h] = dims(x, z); put(im, i, x + Math.cos(r) * w * 0.25, gy(x, z) + h * 1.1, z + Math.sin(r) * w * 0.25, r, w * 0.6, h * 0.85, d * 0.8, villaC[(i + 1) % 4]); });
+    inst(bodyG, lam(), h3, (im, [x, z, r], i) => { const [w, d, h] = dims(x, z); put(im, i, x, gy(x, z), z, r, w * 1.7, h * 1.15, d, walls[(i + 4) % walls.length]); });
+    inst(gableG, lam(), h3, (im, [x, z, r], i) => { const [w, d, h] = dims(x, z); put(im, i, x, gy(x, z) + h * 1.15, z, r, w * 1.76, 3.4, d * 1.02, roofs[(i + 3) % roofs.length]); });
+    // parks: grass, a ring path, trees round the edge, a pond when the ground is flat
+    { const grassM = new THREE.MeshLambertMaterial({ color: new THREE.Color(0x5f9447).convertSRGBToLinear() }), pathM = new THREE.MeshLambertMaterial({ color: new THREE.Color(0xcbbf9f).convertSRGBToLinear() }), pondM = new THREE.MeshPhongMaterial({ color: 0x3f7f9c, shininess: 80, specular: 0x9fc6dc });
+      const trees = [];
+      for (const [x, z, r, flat] of parkSpots) {
+        const y = heightAt(x, z);
+        const g = new THREE.Mesh(new THREE.CircleGeometry(r, 40), grassM); g.rotation.x = -Math.PI / 2; g.position.set(x, y + 0.35, z); scene.add(g);
+        const pth = new THREE.Mesh(new THREE.RingGeometry(r * 0.62, r * 0.62 + 3.2, 48), pathM); pth.rotation.x = -Math.PI / 2; pth.position.set(x, y + 0.45, z); scene.add(pth);
+        if (flat) { const pd = new THREE.Mesh(new THREE.CircleGeometry(r * 0.3, 32), pondM); pd.rotation.x = -Math.PI / 2; pd.scale.set(1.3, 0.8, 1); pd.position.set(x + r * 0.12, y + 0.5, z - r * 0.08); scene.add(pd); }
+        for (let k = 0; k < Math.round(r / 3.2); k++) { const t = hash(k, x) * Math.PI * 2, rr = r * (hash(z, k) < 0.6 ? 0.75 + hash(k, 3) * 0.2 : 0.3 + hash(k, 4) * 0.25), tx = x + Math.cos(t) * rr, tz = z + Math.sin(t) * rr; trees.push([tx, heightAt(tx, tz), tz]); }
+      }
+      trees.push(...gardenTrees);
+      inst(treeBall, new THREE.MeshLambertMaterial(), trees, (im, [x, y, z], i) => { const sc = 0.8 + hash(i, x) * 0.6; m.makeScale(sc, sc, sc); m.setPosition(x, y - 0.5, z); im.setMatrixAt(i, m); im.setColorAt(i, new THREE.Color().setHSL(0.26 + hash(i, 2) * 0.06, 0.45, 0.26 + hash(i, 9) * 0.08)); });
+    }
+    // landmarks: church with a spire, school, warehouses, stadium, water tower
+    { const L = (k) => landmarks.filter((l) => l[0] === k);
+      const stoneM = new THREE.MeshLambertMaterial({ color: new THREE.Color(0xd8cfbf).convertSRGBToLinear() }), slateM = new THREE.MeshLambertMaterial({ color: new THREE.Color(0x4b4f57).convertSRGBToLinear() });
+      const brickM = new THREE.MeshLambertMaterial({ color: new THREE.Color(0xb8735a).convertSRGBToLinear() }), shedM = new THREE.MeshLambertMaterial({ color: new THREE.Color(0xc7ccd1).convertSRGBToLinear() });
+      const spG = new THREE.ConeGeometry(0.5, 1, 8); spG.translate(0, 0.5, 0);
+      inst(bodyG, stoneM, L("church"), (im, [, x, z, r], i) => put(im, i, x, gy(x, z), z, r, 30, 12, 13));
+      inst(gableG, slateM, L("church"), (im, [, x, z, r], i) => put(im, i, x, gy(x, z) + 12, z, r, 31, 7, 13.4));
+      inst(bodyG, stoneM, L("church"), (im, [, x, z, r], i) => put(im, i, x + Math.cos(r) * 17, gy(x, z), z + Math.sin(r) * 17, r, 7, 26, 7));
+      inst(spG, slateM, L("church"), (im, [, x, z, r], i) => put(im, i, x + Math.cos(r) * 17, gy(x, z) + 26, z + Math.sin(r) * 17, 0, 8, 18, 8));
+      inst(bodyG, brickM, L("school"), (im, [, x, z, r], i) => put(im, i, x, gy(x, z), z, r, 60, 9, 16));
+      inst(bodyG, brickM, L("school"), (im, [, x, z, r], i) => put(im, i, x + Math.cos(r + Math.PI / 2) * 20, gy(x, z), z + Math.sin(r + Math.PI / 2) * 20, r, 16, 9, 34));
+      inst(bodyG, shedM, L("warehouse"), (im, [, x, z, r], i) => put(im, i, x, gy(x, z), z, r, 70 + hash(i, x) * 40, 11, 36 + hash(z, i) * 16));
+      inst(gableG, shedM, L("warehouse"), (im, [, x, z, r], i) => put(im, i, x, gy(x, z) + 11, z, r, 72 + hash(i, x) * 40, 2.5, 37 + hash(z, i) * 16));
+      { const tw = L("watertower"), legM = new THREE.MeshLambertMaterial({ color: 0x8a9096 }), tankG = new THREE.SphereGeometry(0.5, 16, 10);
+        inst(new THREE.CylinderGeometry(0.5, 0.5, 1, 10).translate(0, 0.5, 0), legM, tw, (im, [, x, z], i) => put(im, i, x, gy(x, z), z, 0, 2.4, 26, 2.4));
+        inst(tankG, shedM, tw, (im, [, x, z], i) => put(im, i, x, gy(x, z) + 30, z, 0, 14, 10, 14)); }
+      for (const [, x, z, r] of L("stadium")) {
+        const y = gy(x, z), bowl = new THREE.Mesh(new THREE.CylinderGeometry(95, 80, 26, 48, 1, true), new THREE.MeshLambertMaterial({ color: 0xdfe3e7, side: THREE.DoubleSide }));
+        bowl.scale.set(1, 1, 0.72); bowl.rotation.y = r; bowl.position.set(x, y + 13, z); scene.add(bowl);
+        const pitch = new THREE.Mesh(new THREE.CircleGeometry(78, 40), new THREE.MeshLambertMaterial({ color: new THREE.Color(0x3f8a3a).convertSRGBToLinear() })); pitch.rotation.x = -Math.PI / 2; pitch.scale.set(1, 0.72, 1); pitch.rotation.z = -r; pitch.position.set(x, y + 0.6, z); scene.add(pitch);
+      }
+    }
     // ---------- city skyline ----------
     // Facades are drawn by the shader in world space (window grid, mullions, glass reflection, lit offices at night), so
     // one instanced mesh per building shape gives crisp detail at any size without textures or heavy models.
@@ -1518,6 +1599,16 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       list.forEach(([x, y, z, w, h, d, col], i) => { mm.compose(pp.set(x, y, z), qq, ss.set(w, h, d)); im.setMatrixAt(i, mm); if (col) im.setColorAt(i, col); });
       scene.add(im); return im;
     };
+    // apartment blocks round the centre: 4-10 floors, brick, render or concrete, with balconies' window rhythm from the facade shader
+    { const aptTints = [0xb98a72, 0xd9d0c2, 0xa9adb0, 0xc7b79e, 0x8f9aa3, 0xe2d9c8].map((c) => new THREE.Color(c).convertSRGBToLinear()), aptM = facadeMat([3.2, 3.0, 0.3, 0.38], 0xe8e2d6, 15);
+      const al = [], rl = [];
+      aptSpots.forEach(([x, z, rot, k], i) => {
+        const floors = 4 + Math.floor(hash(x, i) * 7 * k), w = 18 + hash(z, 3) * 14, d = 12 + hash(i, 4) * 6, gy0 = heightAt(x, z) - 0.6, h = floors * 3;
+        al.push([x, gy0, z, w, h, d, aptTints[i % aptTints.length], rot]); rl.push([x, gy0 + h, z, w * 0.3, 2.4, d * 0.4, null, rot]);
+      });
+      const buildR = (list, geo, mat) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, mat, list.length), mm = new THREE.Matrix4(), pp = new THREE.Vector3(), ss = new THREE.Vector3(), qq = new THREE.Quaternion(), YY = new THREE.Vector3(0, 1, 0);
+        list.forEach(([x, y, z, w, h, d, col, r], i) => { qq.setFromAxisAngle(YY, r); mm.compose(pp.set(x, y, z), qq, ss.set(w, h, d)); im.setMatrixAt(i, mm); if (col) im.setColorAt(i, col); }); scene.add(im); };
+      buildR(al, boxG, aptM); buildR(rl, boxG, roofBoxM); }
     build(lists.glass, boxG, glassM); build(lists.office, boxG, officeM); build(lists.dark, boxG, darkGlassM); build(lists.cyl, cylG, glassM); build(lists.oct, octG, darkGlassM);
     build(lists.roof, boxG, roofBoxM); build(lists.spire, spireG, metalM); build(lists.light, boxG, redLightM);
   })();
