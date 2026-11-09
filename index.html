@@ -4126,7 +4126,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   });
   // ---------- 360° hangar: its own small scene and renderer, opened from the briefing or the ⋯ menu ----------
   const SHOW = (function () {
-    const el = $("showroom"), cv = $("showCv"); let r = null, sc = null, cam = null, mdl = null, kind = null, raf = 0, last = 0;
+    const el = $("showroom"), cv = $("showCv"); let r = null, sc = null, cam = null, mdl = null, kind = null, raf = 0, last = 0, floorY = 0;
     const view = { yaw: 2.3, pitch: 0.12, dist: 1, spin: true, gear: true, idleT: 0 };
     function ensure() {
       if (r) return true;
@@ -4144,10 +4144,14 @@ vec3 liveryAt(vec3 p, out float fus) {
       // the hangar: polished floor with markings, ribbed walls, roof trusses and rows of ceiling lights
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ color: 0x3c4046, roughness: 0.38, metalness: 0.05, envMapIntensity: 0.5 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; sc.add(floor);
       const lineM = new THREE.MeshBasicMaterial({ color: 0xe0b52a });
-      for (const [w, l, x, z] of [[0.4, 120, 0, 0], [80, 0.4, 0, -40], [80, 0.4, 0, 40]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l), lineM); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.02, z); sc.add(m); }
+      const lines = []; for (const [w, l, x, z] of [[0.4, 120, 0, 0], [80, 0.4, 0, -40], [80, 0.4, 0, 40]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l), lineM); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.02, z); sc.add(m); lines.push(m); }
       // the hangar itself: the "Airport Hangar" model, scaled up so a 747 fits with room to walk round it (open end behind the camera's start)
       { const hg = new THREE.Group(); for (const pt of decodePack("apt_hangar").parts) { const m = new THREE.Mesh(pt.g, pt.mat); m.receiveShadow = true; hg.add(m); }
-        hg.scale.setScalar(2.1); hg.rotation.y = Math.PI / 2; sc.add(hg); }
+        hg.scale.setScalar(2.1); hg.rotation.y = Math.PI / 2; sc.add(hg); hg.updateMatrixWorld(true);
+        // the model has a raised concrete floor (about 1.5 m at this scale): find its top so the wheels stand on it
+        const rc = new THREE.Raycaster(); let top = 0;
+        for (const [x, z] of [[0, 0], [12, 8], [-12, -8], [20, -15], [-20, 15]]) { rc.set(new THREE.Vector3(x, 20, z), new THREE.Vector3(0, -1, 0)); const h = rc.intersectObject(hg, true)[0]; if (h && h.point.y < 6) top = Math.max(top, h.point.y); }
+        floorY = top; floor.position.y = top - 0.03; lines.forEach((m) => (m.position.y = top + 0.02)); }
       const lampM = new THREE.MeshBasicMaterial({ color: 0xfff6e2 });
       for (let x = -80; x <= 80; x += 26) for (let z = -100; z <= 100; z += 33) { const l = new THREE.Mesh(new THREE.CircleGeometry(1.8, 16), lampM); l.rotation.x = Math.PI / 2; l.position.set(x, 88, z); sc.add(l); }
       { const pl = new THREE.PointLight(0xfff2dc, 0.6, 260); pl.position.set(0, 70, 0); sc.add(pl); }
@@ -4170,14 +4174,14 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (mdl) { sc.remove(mdl); mdl = null; }
       const m = buildPlane(k, livId); if (!m) return; kind = k; mdl = m;
       m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
-      const box = new THREE.Box3().setFromObject(m); m.position.y = -box.min.y; sc.add(m); m.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(m); m.position.y = floorY - box.min.y; sc.add(m); m.updateMatrixWorld(true);
       $("showName").textContent = PLANES[k].name; $("showType").textContent = `${PLANES[k].type} · ${(livId && livId !== "house" && LIV[livId]) ? LIV[livId].name : "White"}`;
       applyGear();
     }
     function applyGear() {
       if (!mdl) return; const g = mdl.userData.gear, legs = g && g.userData && g.userData.legs;
       if (legs) { legs.forEach((l) => { l.rotation[l.userData.fold.axis] = view.gear ? 0 : l.userData.fold.sign * Math.PI / 2; }); g.visible = view.gear; } else if (g) g.visible = view.gear;
-      const box = new THREE.Box3().setFromObject(mdl); mdl.position.y += (view.gear ? 0 : 1.2) - box.min.y;   // gear up: the aircraft "floats" on stands
+      const box = new THREE.Box3().setFromObject(mdl); mdl.position.y += floorY + (view.gear ? 0 : 1.2) - box.min.y;   // gear up: the aircraft "floats" on stands
     }
     function renderPlanes() {
       const row = $("showPlanes"); row.replaceChildren();
