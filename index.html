@@ -465,7 +465,19 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 /* ground services at the gate: fuel and passengers before departure, passengers off after arrival */
 .svc { position: absolute; left: 14px; top: 64px; z-index: 3; width: min(300px, calc(100% - 28px)); display: grid; gap: 9px; padding: 14px 14px 12px; border-radius: 16px;
   background: rgba(15,15,17,0.86); border: 1px solid var(--hair-2); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: var(--fg); animation: sheet-up 0.25s ease-out; }
+.taxi { position: absolute; left: 50%; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 3; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  width: min(520px, calc(100% - 28px)); padding: 10px 16px 10px 10px; border-radius: 16px; background: rgba(18,16,8,0.88); border: 1px solid rgba(255,201,77,0.55); color: #fff3d6; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+.taxi-arrow { width: 54px; height: 54px; border-radius: 12px; background: #ffc94d; color: #1a1406; display: grid; place-items: center; font: 700 34px/1 var(--font-body); }
+.taxi-arrow.stop { background: #ff5a4e; color: #fff; font-size: 15px; letter-spacing: 0.06em; }
+.taxi-txt { display: grid; gap: 2px; min-width: 0; }
+.taxi-txt b { font: 700 18px/1.15 var(--font-body); letter-spacing: 0.01em; }
+.taxi-txt span { font: 400 13px/1.3 var(--font-body); color: #e9d9b0; }
+.taxi-meta { display: grid; gap: 4px; justify-items: end; font: 500 12px var(--font-mono); color: #e9d9b0; }
+.taxi-meta .fast { color: #ff8a7a; }
+@media (pointer: coarse) { .taxi { bottom: calc(124px + var(--dock, 0px) + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100% - 300px)); } }
+@media (max-width: 480px) { .taxi { top: 54px; bottom: auto; width: calc(100% - 20px); gap: 10px; padding: 8px 12px 8px 8px; } .taxi-arrow { width: 44px; height: 44px; font-size: 28px; } .taxi-txt b { font-size: 15px; } .taxi-txt span { font-size: 12px; } }
 .svc-h { display: grid; gap: 2px; }
+.clip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .svc-h b { font: 400 19px var(--font-display); }
 .svc-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
 .svc-row[hidden] { display: none; }
@@ -597,6 +609,11 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       <button class="apb" id="apApp" type="button" aria-pressed="false">APP</button>
     </div>
     <button class="pushbtn" id="pushBtn" type="button" hidden><span>Push back</span></button>
+    <div class="taxi" id="taxiCard" hidden aria-live="polite">
+      <div class="taxi-arrow" id="taxiArrow" aria-hidden="true">↑</div>
+      <div class="taxi-txt"><b id="taxiMain">Straight ahead</b><span id="taxiSub"></span></div>
+      <div class="taxi-meta"><span id="taxiStep">1/4</span><span id="taxiSpd">0 kt</span></div>
+    </div>
     <div class="svc" id="svc" hidden role="group" aria-label="Ground services">
       <div class="svc-h"><span class="eyebrow" id="svcEyebrow">GROUND SERVICES</span><b id="svcTitle">Before departure</b></div>
       <div class="svc-row" id="svcFuel"><div class="svc-l"><span>Fuel</span><small id="svcFuelTxt">0 kg</small></div><div class="svc-bar"><i></i></div><button class="chip" type="button" id="svcFuelBtn">Refuel</button></div>
@@ -3167,7 +3184,9 @@ vec3 liveryAt(vec3 p, out float fus) {
   function box(grp, w, h, d, mat, x, y, z) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y + h / 2, z); grp.add(m); return m; }
   function textTex(text, bg, fg, w = 512, h = 96) {
     const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d");
-    g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = fg; g.font = `bold ${Math.round(h * 0.58)}px sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, w / 2, h / 2 + 2);
+    g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = fg; let fsz = Math.round(h * 0.58); g.font = `bold ${fsz}px sans-serif`;
+    const tw = g.measureText(text).width; if (tw > w * 0.92) { fsz = Math.floor(fsz * w * 0.92 / tw); g.font = `bold ${fsz}px sans-serif`; }   // long names shrink to fit, never cut off
+    g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(text, w / 2, h / 2 + 2);
     const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
   }
   function instanced(grp, geo, mat, list) {
@@ -3377,8 +3396,10 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     boxT(grp, 10, 0.7, a.apL * 0.7, MAT.roof, a.termX1 + 5, Math.min(tH - 1, 7), 0, 4);
     for (let z = -a.apL * 0.34; z <= a.apL * 0.34; z += 18) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, Math.min(tH - 1, 7), 8), MAT.wall2); c.position.set(a.termX1 + 9, Math.min(tH - 1, 7) / 2, z); grp.add(c); }
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(hallL * 0.55, 110), intl ? 10 : 6), new THREE.MeshBasicMaterial({ map: textTex(a.name.toUpperCase(), "#14385e", "#ffffff") }));
-    sign.rotation.y = -Math.PI / 2; sign.position.set(a.termX0 - 1.2, hallH + (intl ? 6 : 4), 0); grp.add(sign);
+    { const nm = a.name.toUpperCase(), sh = intl ? 8 : 5.5, sw = Math.min(hallL * 0.9, Math.max(40, nm.length * sh * 0.62 + sh * 2));
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), new THREE.MeshBasicMaterial({ map: textTex(nm, "#14385e", "#ffffff", 1024, Math.round(1024 * sh / sw)), side: THREE.DoubleSide }));
+      sign.rotation.y = -Math.PI / 2; sign.position.set(a.termX0 - 4, hallH + sh / 2 + 3, 0); grp.add(sign);
+      for (const sz of [-1, 1]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, hallH + 3, 0.5), MAT.wall2); post.position.set(a.termX0 - 4, (hallH + 3) / 2, sz * sw * 0.42); grp.add(post); } }
     // service buildings (offices, stores, a small tower, tanks) along the landside road behind the car park
     { const rs = intl ? 0.62 : a.kind === "regional" ? 0.48 : 0.34; placeBuilding(grp, "apt_row", rs, a.roadX + 12 + 17 * rs, 0, 0, -Math.PI / 2); }
     // parked aircraft with jet bridges
@@ -3504,8 +3525,10 @@ vec3 liveryAt(vec3 p, out float fus) {
       { const bg = new THREE.BoxGeometry(8, 0.5, 1.2); bg.rotateZ(0.28); put(veh.belt, bg, APT.tug, 1.8); }
     }
     // apron floodlight masts
-    for (let fz = -a.apL / 2 + 30; fz <= a.apL / 2 - 30; fz += intl ? 110 : 140) {
-      const fx = a.apX0 - 12, ph = intl ? 28 : 20;
+    // between neighbouring stands, close to the terminal: never on a lead-in line or in the taxi lane
+    const mastZ = stands.slice(0, -1).map((st, i) => (st.z + stands[i + 1].z) / 2).filter((_, i) => i % 2 === 0);
+    for (const fz of mastZ) {
+      const fx = a.termX0 - 24, ph = intl ? 28 : 20;
       const pl = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, ph, 6), APT.pole); pl.position.set(fx, ph / 2, fz); grp.add(pl);
       const hd = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 4), APT.floodHead); hd.position.set(fx + 0.4, ph, fz); grp.add(hd);
     }
@@ -3595,7 +3618,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (typeof AP !== "undefined") { AP.on = false; AP.athr = false; AP.app = false; AP.lat = "HDG"; AP.flare = false; apSync(); pushBtn.hidden = true; }
     boom.visible = false; model.visible = true; flyby.set = false;
     S.guide = null; S.svc = null; S.arrPending = null; S.gateFlow = false; S.parked = false;
-    { const se = document.getElementById("svc"); if (se) se.hidden = true; } if (S.guideMesh) S.guideMesh.visible = false; if (S.truck) S.truck.visible = false;
+    { const se = document.getElementById("svc"); if (se) se.hidden = true; } if (S.guideMesh) S.guideMesh.visible = false; if (S.truck) S.truck.visible = false; if (S.beacon) S.beacon.visible = false;
+    { const tc = document.getElementById("taxiCard"); if (tc) tc.hidden = true; } S.bounceFpm = 0; S.clipTO = null; S.clipLD = null; S.liftT = null; S.tdT = null;
   }
   // smooth pseudo-random wave in -1..1 (sum of incommensurate sines; seed picks the phases)
   const wave = (t, seed) => Math.sin(t * 0.73 + seed * 1.9) * 0.5 + Math.sin(t * 1.41 + seed * 4.3) * 0.32 + Math.sin(t * 2.63 + seed * 7.1) * 0.18;
@@ -4275,7 +4299,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     renderBoard(); updateSummary(); if (briefTab === "missions") renderMissions(); renderFeatured();
     brief.scrollTop = 0;   // a result or the pause screen always opens at the top
   }
-  function pause() { S.mode = "paused"; if (S.mission) { selMission = S.mission; setTab("missions"); } showBrief("PAUSED", "Flight paused", null, "Resume where you left off, or change the aircraft or route and start again.", true); }
+  function pause() { document.getElementById("taxiCard").hidden = true; S.mode = "paused"; if (S.mission) { selMission = S.mission; setTab("missions"); } showBrief("PAUSED", "Flight paused", null, "Resume where you left off, or change the aircraft or route and start again.", true); }
   function resume() { S.mode = "fly"; brief.hidden = true; }
   resumeBtn.addEventListener("click", resume);
   // flight log panel (opened from the ⋯ menu)
@@ -4510,6 +4534,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (liftG > 1.02 && S.groundPitch > 0.03) {
         S.grounded = false; S.sink = 0; S.gammaPrev = undefined; S.gammaRate = 0;
         S.vel.set(fwd.x / hl * S.gs, 0.6, fwd.z / hl * S.gs);
+        if (S.liftT == null) S.liftT = REC.t;
         flash(ENV.model === "real" && !spec.fbw && !AP.on ? `Positive climb. Gear up, trim with ${trimKeys()}` : "Positive climb. Gear up!", 2.6);
       }
       if (S.gs > 8 && !runwayAt(S.pos.x, S.pos.z) && airportMask(S.pos.x, S.pos.z)[0] < 0.97) {
@@ -4517,8 +4542,8 @@ vec3 liveryAt(vec3 p, out float fus) {
         if (sl > 4) { crash("You ran off the runway into rough ground."); return; }
       }
       if (S.landedAt && (S.gs < 1.5 || (S.gateFlow && !S.mission && S.landedAt === S.to && S.gs < 12))) completeLanding();
-      updateGuide();
-      if (S.taxiOut && runwayAt(S.pos.x, S.pos.z) === S.from) { S.taxiOut = false; if (S.guide && S.guide.kind === "dep") { S.guide = null; if (S.guideMesh) S.guideMesh.visible = false; } RADIO.push({ text: `${S.from.name} Tower: runway ${S.from.label}, wind ${windText()}, cleared for takeoff.`, t: 10 }); flash("Lined up. Full throttle and go!", 3); }
+      updateGuide(); syncTaxiCard();
+      if (S.taxiOut && runwayAt(S.pos.x, S.pos.z) === S.from) { S.taxiOut = false; if (S.guide && S.guide.kind === "dep") { S.guide = null; if (S.guideMesh) S.guideMesh.visible = false; syncTaxiCard(); } RADIO.push({ text: `${S.from.name} Tower: runway ${S.from.label}, wind ${windText()}, cleared for takeoff.`, t: 10 }); flash("Lined up. Full throttle and go!", 3); }
     } else {
       const va = V.air.copy(S.vel).sub(wind), sp = Math.max(va.length(), 0.5);   // airspeed = ground velocity minus wind
       const vf = va.dot(fwd), vu = va.dot(up), vr = va.dot(right);
@@ -4596,18 +4621,28 @@ vec3 liveryAt(vec3 p, out float fus) {
         if (spec.retract && S.gearPos < 0.9) { crash("Belly landing! Press G to lower the gear before you land."); return; }
         if (!rw && am < 0.97) { crash("That wasn't a runway. Land on an airport runway."); return; }
         sfx("touch", Math.round(-S.vs * M2FT * 60));
+        // a firm arrival with flying speed left bounces back into the air: the oleos and tyres throw it up again
+        if (S.vs < -2.1 && S.speed > spec.stall * 0.85 && !S.bounced3) {
+          const up2 = (-S.vs - 1.7) * 0.5, fpmB = Math.round(-S.vs * M2FT * 60);
+          S.bounceFpm = Math.max(S.bounceFpm || 0, fpmB); S.bounces = (S.bounces || 0) + 1; if (S.bounces >= 3) S.bounced3 = true;
+          S.pos.y = gy + spec.gearH + 0.05; S.vel.y = up2; S.vs = up2; buzz(160);
+          if (!S.tdT) S.tdT = REC.t;
+          flash(S.bounces === 1 ? `Bounced! ${fpmB} ft/min was too hard. Hold the nose up gently, a little power, let it settle` : "Bounced again: keep the attitude, don't push the nose down", 3);
+          return;
+        }
         S.grounded = true; S.sink = 0; S.pos.y = gy + spec.gearH; S.gs = Math.hypot(S.vel.x, S.vel.z); S.groundPitch = clamp(Math.asin(clamp(fwd.y, -1, 1)), 0, 0.2);
         { // the main wheels roll where the aircraft is actually going: a small crab angle is straightened out on touchdown
           const hNow = Math.atan2(-fwd.x, -fwd.z), hTrk = Math.atan2(-S.vel.x, -S.vel.z);
           if (S.gs > 5 && Math.abs(wrapA(hTrk - hNow)) < 0.35) S.q.setFromEuler(V.eul.set(S.groundPitch, hTrk, 0, "YXZ"));
         }
-        S.touchFpm = Math.round(-S.vs * M2FT * 60); S.landedAt = rw || airportMask(S.pos.x, S.pos.z)[1];
+        S.touchFpm = Math.max(Math.round(-S.vs * M2FT * 60), S.bounceFpm || 0); S.landedAt = rw || airportMask(S.pos.x, S.pos.z)[1];
+        S.tdT = S.tdT || REC.t; S.wasBounce = (S.bounces || 0) > 0; S.bounces = 0; S.bounceFpm = 0; S.bounced3 = false;
         { const la = S.landedAt, r0 = la.rwys[0], [al, ac] = local(la, S.pos.x, S.pos.z); S.touchOff = ac - r0.off; S.touchDist = al + r0.len / 2; S.touchKt = Math.round(S.speed * MS2KT); }
         if (spec.big && !brake) S.autobrake = true;
         S.calls = {};
         if (spec.big && S.spoiler < 1) { S.spoiler = 1; S.autoSpoiler = true; syncTouchKeys(); }
         if (AP.on) { const auto = AP.lat === "LOC"; AP.on = false; AP.athr = false; AP.app = false; AP.lat = "HDG"; apSync(); if (auto) RADIO.push({ text: "Autoland complete. Hold Space to brake.", t: 8 }); }
-        const feel = S.touchFpm < 240 ? "Butter" : S.touchFpm < 480 ? "Smooth" : S.touchFpm < 700 ? "Firm" : "Hard";
+        const feel = S.wasBounce ? "Bounced" : S.touchFpm < 240 ? "Butter" : S.touchFpm < 480 ? "Smooth" : S.touchFpm < 700 ? "Firm" : "Hard";
         flash(`${feel} touchdown at ${S.landedAt.code}: ${S.touchFpm} ft/min${S.autobrake ? " · autobrake" : ". Hold Space to brake"}`, 3.5); chime(520);
         if (S.touchFpm > 420) buzz(110);   // firm landing
       }
@@ -4630,7 +4665,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (!S.to || a !== S.to) { logFlight({ to: a.code, fpm: S.touchFpm, res: S.to ? `Landed at ${a.code} instead of ${S.to.code}` : `Landed at ${a.code}`, ok: null }); flash(`Stopped at ${a.name}. Throttle up to take off again.`, 4); S.touchFpm = null; return; }
     const fpm = S.touchFpm, off = Math.abs(S.touchOff || 0), tdz = S.touchDist || 0;
     let stars = fpm < 240 ? 3 : fpm < 480 ? 2 : 1;
-    if (off > 8 || tdz > 900 || tdz < 0) stars = Math.max(1, stars - 1);
+    if (off > 8 || tdz > 900 || tdz < 0 || S.wasBounce) stars = Math.max(1, stars - 1);
     if (S.gateFlow && !S.mission && !S.arrPending) {
       S.arrPending = { a, stars, fpm, off, tdz, t: S.flightT };
       if (arrivalGuide(a)) { flash(`Landed: ${"★".repeat(stars)}${"☆".repeat(3 - stars)}. Now taxi to the gate.`, 3.5); return; }
@@ -4651,6 +4686,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const pb = document.createElement("p"); pb.className = "result";
     pb.textContent = !saved ? "Best results can't be saved: this browser blocks local storage" : better ? (old ? `New personal best on this route (was ${starStr(old.stars)} ${old.fpm} ft/min)` : "First landing on this route: saved as your best") : `Your best here: ${starStr(old.stars)} ${old.fpm} ft/min`;
     wrap.append(pb);
+    { const cb = clipButtons(); if (cb) wrap.append(cb); }
     const others = AIRPORTS.filter((x) => x !== a), next = others[Math.floor(Math.random() * others.length)];
     fromSel.value = String(AIRPORTS.indexOf(a)); toSel.value = String(AIRPORTS.indexOf(next)); S.from = a;
     showBrief("ARRIVED", `Welcome to ${a.name}`, wrap, `Next leg is set up: ${a.code} → ${next.code}. Pick a different plane or route if you like.`, false);
@@ -4878,7 +4914,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       const G = S.guide, [gx, gz] = G.pts[G.i], ga = G.kind === "arr" ? S.parked.a : S.from; proj.set(gx, ga.elev + 3, gz).project(camera);
       const dist = Math.hypot(gx - S.pos.x, gz - S.pos.z);
       hud.fillStyle = HC.nav; hud.font = `${Math.round(fs * 0.85)}px ${MONO}`; hud.textAlign = "center";
-      hud.fillText(`${G.labels[G.i]} · ${Math.round(dist)} m`, cx, ty + 24 + fs * 3.2, w - 24);
+      void dist;
       if (proj.z < 1 && Math.abs(proj.x) < 1 && Math.abs(proj.y) < 1) {
         const sx = (proj.x + 1) / 2 * w, sy = (1 - proj.y) / 2 * (h - dashH);
         hud.strokeStyle = HC.nav; hud.lineWidth = 2; hud.beginPath(); hud.moveTo(sx, sy - 14); hud.lineTo(sx + 10, sy); hud.lineTo(sx, sy + 14); hud.lineTo(sx - 10, sy); hud.closePath(); hud.stroke();
@@ -5043,7 +5079,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       hud.strokeStyle = col; hud.fillStyle = col; hud.lineWidth = 1.5;
       hud.beginPath(); hud.moveTo(sx, sy - 8); hud.lineTo(sx + 8, sy); hud.lineTo(sx, sy + 8); hud.lineTo(sx - 8, sy); hud.closePath(); hud.stroke();
       hud.font = `${Math.round(fs * 0.7)}px ${MONO}`; hud.textAlign = "left"; hud.textBaseline = "middle";
-      hud.fillText(`${ai.cs}`, sx + 12, sy - 6); hud.fillText(`${(d / 1000).toFixed(1)} km ${dy >= 0 ? "+" : ""}${dy}`, sx + 12, sy + 8);
+      hud.fillText(`${PLANES[ai.kind].name}`, sx + 12, sy - 7); hud.fillText(`${ai.air || "Skyways"} · ${(d / 1000).toFixed(1)} km ${dy >= 0 ? "+" : ""}${dy}`, sx + 12, sy + 8);
     }
     if (threat && blink) { hud.font = `bold ${Math.round(fs * 1.25)}px ${MONO}`; hud.textAlign = "center"; warnTxt(`TRAFFIC · ${threat.cs}`, HC.warn, warnLow ? cy + 135 * sc : warnY + fs * 1.8); }
     if (RADIO.length) {
@@ -5180,7 +5216,10 @@ vec3 liveryAt(vec3 p, out float fus) {
       ai.pos.set(lerp(ai.at.x, fx.x, t), ai.cruiseAlt, lerp(ai.at.z, fx.z, t));
       ai.hdg = Math.atan2(fx.x - ai.pos.x, -(fx.z - ai.pos.z)); ai.v = ai.cruiseV; ai.gear = 0; ai.phase = "cruise";
     } else placeAtHold(ai, false);
-    makeAIModel(ai); AI.push(ai);
+    makeAIModel(ai);
+    ai.air = ai.liv && LIV[ai.liv] ? LIV[ai.liv].name : null;   // the airline it flies for; the callsign uses it
+    ai.cs = `${ai.air || "Skyways"} ${(cs.match(/\d+/) || [i + 1])[0]}`;
+    AI.push(ai);
   });
   const playerOnRunway = (a) => S.mode === "fly" && !S.crashed && S.grounded && runwayAt(S.pos.x, S.pos.z) === a;
   // the player on a short final to this runway also keeps the AI from lining up in front of them
@@ -5584,11 +5623,11 @@ vec3 liveryAt(vec3 p, out float fus) {
   // ---------- taxi guidance: a lit path along the taxiways, the next turn marked, a hint at every turn ----------
   function guideMesh() {
     if (S.guideMesh) return S.guideMesh;
-    const m = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xffc94d, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }));
+    const m = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xffd25e, transparent: true, opacity: 0.95, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }));
     m.frustumCulled = false; m.renderOrder = 2; scene.add(m); S.guideMesh = m; return m;
   }
   function buildGuidePath(pts) {
-    const pos = [], idx = [], w = 0.9;
+    const pos = [], idx = [], w = 1.3;
     const path = [[S.pos.x, S.pos.z], ...pts];
     for (let i = 0; i < path.length - 1; i++) {
       const [x0, z0] = path[i], [x1, z1] = path[i + 1], L = Math.hypot(x1 - x0, z1 - z0); if (L < 0.5) continue;
@@ -5603,18 +5642,53 @@ vec3 liveryAt(vec3 p, out float fus) {
     m.geometry.dispose(); m.geometry = g; m.visible = true;
   }
   // pts: world [x, z]; labels: what the HUD says while heading to each point; hints: said on arriving at each point
-  function setGuide(kind, pts, labels, hints, onDone) { S.guide = { kind, pts, labels, hints, i: 0, onDone, warnT: 0 }; buildGuidePath(pts); }
+  // acts[i]: what happens at point i ("onto taxiway A"); the turn there (left/right/stop) is worked out from the path
+  function setGuide(kind, pts, labels, hints, onDone, acts) {
+    const start = [S.pos.x, S.pos.z], turns = pts.map((p, i) => (i === pts.length - 1 ? (kind === "arr" ? "stop" : "lineup") : turnWord(i ? pts[i - 1] : start, p, pts[i + 1])));
+    S.guide = { kind, pts, labels, hints, i: 0, onDone, warnT: 0, acts: acts || labels, turns }; buildGuidePath(pts); taxiCard.hidden = false;
+  }
+  const taxiCard = $("taxiCard");
+  function beaconMesh() {
+    if (S.beacon) return S.beacon;
+    const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: 0xffc94d, transparent: true, opacity: 0.55, depthWrite: false });
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 14, 10, 1, true), m); pole.position.y = 7; g.add(pole);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(4, 0.35, 6, 32), m); ring.rotation.x = Math.PI / 2; ring.position.y = 0.4; g.add(ring);
+    scene.add(g); S.beacon = g; return g;
+  }
+  // the instruction card: arrow, distance, what to do next, step, taxi speed
+  function syncTaxiCard() {
+    const G = S.guide;
+    if (!G || !S.grounded || S.mode !== "fly") { if (!taxiCard.hidden) taxiCard.hidden = true; if (S.beacon) S.beacon.visible = false; return; }
+    taxiCard.hidden = false;
+    const [x, z] = G.pts[G.i], d = Math.hypot(x - S.pos.x, z - S.pos.z), fwd = V.fwd.set(0, 0, -1).applyQuaternion(S.q);
+    const err = wrapA(Math.atan2(x - S.pos.x, -(z - S.pos.z)) - Math.atan2(fwd.x, -fwd.z)), turn = G.turns[G.i], act = G.acts[G.i];
+    let arrow = "↑", main, sub; const dm = `${Math.round(d / 10) * 10} m`;
+    if (Math.abs(err) > 0.6 && d > 25) { arrow = err > 0 ? "↱" : "↰"; main = `Turn ${err > 0 ? "right" : "left"} to the yellow line`; sub = `Then follow it: ${act}`; }
+    else if (turn === "stop") { arrow = "STOP"; main = d > 30 ? `Stop at the end · ${dm}` : "Slow… stop here"; sub = `${act}`; }
+    else if (turn === "lineup") { arrow = d > 60 ? "↑" : "↻"; main = d > 60 ? `Straight · ${dm}` : "Line up on the runway"; sub = d > 60 ? `Then ${act}` : "Turn onto the centreline, then full throttle"; }
+    else if (turn === "straight") { main = d > 30 ? `Straight · ${dm}` : "Keep straight"; sub = `Then ${act.replace(/^and /, "")}`; }
+    else if (d > 60) { main = `Straight · ${dm}`; sub = `Then turn ${turn} ${act}`; }
+    else { arrow = turn === "left" ? "↰" : "↱"; main = `Turn ${turn} now`; sub = act; }
+    $("taxiArrow").textContent = arrow; $("taxiArrow").classList.toggle("stop", arrow === "STOP");
+    $("taxiMain").textContent = main; $("taxiSub").textContent = sub;
+    $("taxiStep").textContent = `Step ${G.i + 1}/${G.pts.length}`;
+    const kt = Math.round(S.gs * MS2KT), sp = $("taxiSpd"); sp.textContent = `${kt} kt${kt > 20 ? " · slow down" : ""}`; sp.classList.toggle("fast", kt > 20);
+    const b = beaconMesh(); b.visible = true; b.position.set(x, groundY(x, z), z);
+  }
   // "left" or "right": the turn at p1 going from p0 to p2 (x east, z south)
-  const turnWord = (p0, p1, p2) => ((p1[0] - p0[0]) * (p2[1] - p1[1]) - (p1[1] - p0[1]) * (p2[0] - p1[0]) > 0 ? "right" : "left");
+  const turnWord = (p0, p1, p2) => {
+    const ax = p1[0] - p0[0], az = p1[1] - p0[1], bx = p2[0] - p1[0], bz = p2[1] - p1[1], cr = (ax * bz - az * bx) / ((Math.hypot(ax, az) * Math.hypot(bx, bz)) || 1);
+    return Math.abs(cr) < 0.26 ? "straight" : cr > 0 ? "right" : "left";
+  };
   function departureGuide() {
     const a = S.from, r = a.rwys[0], tl = r.len * 0.92, alHold = -(tl / 2 - 12), [alNow] = local(a, S.pos.x, S.pos.z), rw = a.label;
     const P = (al, ac) => toWorld(a, al, ac), here = [S.pos.x, S.pos.z];
     const pts = [P(alNow, a.tx), P(alHold, a.tx), P(alHold, r.off + r.w / 2 + 48), P(alHold, r.off)], lineup = P(alHold + 100, r.off);
     setGuide("dep", pts,
       ["TAXI TO TAXIWAY A", `TAXIWAY A · TO RWY ${rw}`, `HOLD SHORT RWY ${rw}`, `LINE UP RWY ${rw}`],
-      [`On taxiway A: turn ${turnWord(here, pts[0], pts[1])} and follow the yellow line, under 20 knots.`, `Turn ${turnWord(pts[0], pts[1], pts[2])} onto the link to runway ${rw}, stop at the hold line.`,
-        `${a.name} Tower: line up runway ${rw}.`, `Turn ${turnWord(pts[2], pts[3], lineup)} onto the runway centreline.`]);
-    flash("Taxi: follow the yellow dashes to taxiway A", 3.5);
+      [null, null, `${a.name} Tower: line up runway ${rw}.`, null], null,
+      ["onto taxiway A (the yellow line)", `onto the link to runway ${rw}`, `and stop at the red hold line, runway ${rw} ahead`, `onto runway ${rw} and line up`]);
+    flash(`Taxi to runway ${rw}: follow the yellow dashes and the card at the top`, 3.5);
   }
   function arrivalGuide(a) {
     const r = a.rwys[0], tl = r.len * 0.92, [alNow] = local(a, S.pos.x, S.pos.z);
@@ -5629,8 +5703,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     const n = a.gates.indexOf(g) + 1, alGate = -g.z, len = DIMS[spec.kind][1], P = (al, ac) => toWorld(a, al, ac);
     setGuide("arr", [P(alExit, r.off), P(alExit, a.tx), P(alGate, a.tx), P(alGate, a.apX0 + 14), P(alGate, a.termX0 - 9 - len / 2)],
       ["EXIT RUNWAY", "VACATE TO TAXIWAY A", `TAXIWAY A · GATE ${n}`, `TURN IN · GATE ${n}`, `PARK · GATE ${n}`],
-      [`Turn ${turnWord([S.pos.x, S.pos.z], ...[[P(alExit, r.off), P(alExit, a.tx)]].flat())} off the runway here, onto the yellow line.`, `Runway vacated. Turn ${turnWord(P(alExit, r.off), P(alExit, a.tx), P(alGate, a.tx))} onto taxiway A towards gate ${n}.`,
-        `Turn ${turnWord(P(alExit, a.tx), P(alGate, a.tx), P(alGate, a.apX0 + 14))} towards the terminal at gate ${n}.`, "Follow the stand line slowly and stop at the end.", null]);
+      [null, "Runway vacated.", null, null, null], null,
+      ["off the runway onto the exit", `onto taxiway A towards gate ${n}`, `towards the terminal at gate ${n}`, `onto the stand line of gate ${n}`, `on the stand at gate ${n} (end of the yellow line)`]);
     S.parked = { a, g, n };
     RADIO.push({ text: `${a.name} Ground: welcome. Vacate the runway ahead, taxi via A to gate ${n}.`, t: 12 });
     return true;
@@ -5643,14 +5717,14 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (last && G.kind === "arr") {
       if (d < 6 && S.gs < 1.2) {   // on the stand: park, set the brakes, open up
         const a = S.parked.a; S.q.setFromAxisAngle(AY, -(a.hdg + 90) * Math.PI / 180); S.throttle = 0; S.speed = 0; S.gs = 0; S.vel.set(0, 0, 0);
-        S.guide = null; S.guideMesh.visible = false; chime(660, 0.25);
+        S.guide = null; S.guideMesh.visible = false; syncTaxiCard(); chime(660, 0.25);
         flash(`Parked at gate ${S.parked.n}. Engines off.`, 3); startServices("arr");
       } else if (d < 14 && S.gs > 3) flash("Slow down, stop on the stand", 1);
       return;
     }
     if (d < (last ? 10 : 16)) {
       const h = G.hints[G.i]; if (h) { if (/Tower|Ground/.test(h)) RADIO.push({ text: h, t: 8 }); else flash(h, 3.2); }
-      if (last) { S.guide = null; S.guideMesh.visible = false; if (G.onDone) G.onDone(); return; }
+      if (last) { S.guide = null; S.guideMesh.visible = false; syncTaxiCard(); if (G.onDone) G.onDone(); return; }
       G.i++;
     }
   }
@@ -5909,6 +5983,16 @@ vec3 liveryAt(vec3 p, out float fus) {
   function recTick(dt) {
     REC.t += dt; REC.acc += dt;
     if (REC.n === 0 || REC.acc >= 1 / REC_HZ) { REC.acc = Math.min(REC.acc % (1 / REC_HZ), 1 / REC_HZ); recSample(); }
+    // keep the takeoff and the landing as clips of their own: the 90 s buffer has long moved on by the end of a flight
+    if (S.liftT != null && !S.clipTO && REC.t - S.liftT > 30) S.clipTO = captureClip(85);
+    if (S.tdT != null && !S.clipLD && REC.t - S.tdT > 20) S.clipLD = captureClip(85);
+  }
+  function captureClip(sec) {
+    const n = REC.n; if (n < 15) return null;
+    const tEnd = recT(n - 1); let i0 = 0; while (i0 < n - 1 && recT(i0) < tEnd - sec) i0++;
+    const m = n - i0, buf = new Float32Array(REC_MAX * REC_W);
+    for (let i = 0; i < m; i++) buf.set(REC.buf.subarray(recPhys(i0 + i) * REC_W, recPhys(i0 + i) * REC_W + REC_W), i * REC_W);
+    return { buf, n: m, head: m % REC_MAX, kind: REC.kind };
   }
   const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion();
   function poseAI(ai) {
@@ -5956,8 +6040,13 @@ vec3 liveryAt(vec3 p, out float fus) {
     const camLbl = `View: ${CAMS.find((c) => c[0] === S.cam)[1]}`; if (rpCam.textContent !== camLbl) rpCam.textContent = camLbl;
     $("rpSpeed").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.s === RP.speed)));
   }
-  function openReplay() {
-    if (!canReplay() || S.mode === "replay") return;
+  let recMain = null;
+  function openReplay(clip) {
+    if (clip && clip.buf) {   // play a saved clip: swap it in for the live buffer until the replay closes
+      if (S.mode === "replay" || !model || clip.kind !== model.userData.kind) return;
+      recMain = { buf: REC.buf, n: REC.n, head: REC.head }; REC.buf = clip.buf; REC.n = clip.n; REC.head = clip.head;
+    } else clip = null;
+    if (!canReplay() || S.mode === "replay") { if (recMain) { REC.buf = recMain.buf; REC.n = recMain.n; REC.head = recMain.head; recMain = null; } return; }
     if (S.mode === "fly") pause();
     RP.snap = snapState(); RP.prevMode = S.mode; RP.t0 = recT(0); RP.t1 = recT(REC.n - 1); RP.t = RP.t0; RP.playing = true; RP.speed = 1;
     S.mode = "replay"; brief.hidden = true; logPanel.hidden = true; helpEl.hidden = true; $("moreMenu").hidden = true; keys.clear(); flyby.set = false;
@@ -5967,6 +6056,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   function closeReplay() {
     if (S.mode !== "replay") return;
     restoreState(RP.snap); S.mode = RP.prevMode; S.cam = RP.snap.cam; setCam(S.cam); flyby.set = false;
+    if (recMain) { REC.buf = recMain.buf; REC.n = recMain.n; REC.head = recMain.head; recMain = null; }
     replayBar.hidden = true; stage.classList.remove("replaying"); brief.hidden = false; keys.clear();
     replayBtn.hidden = !canReplay(); replayBtn.focus();
   }
@@ -5981,7 +6071,16 @@ vec3 liveryAt(vec3 p, out float fus) {
   $("rpSpeed").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { RP.speed = +b.dataset.s; rpSync(); }));
   rpCam.addEventListener("click", () => { cycleCam(); rpSync(); });
   $("rpExit").addEventListener("click", closeReplay);
-  replayBtn.addEventListener("click", openReplay);
+  replayBtn.addEventListener("click", () => openReplay());
+  // buttons for the arrival / result report: watch the takeoff, watch the landing
+  function clipButtons() {
+    if (!S.clipLD && S.tdT != null) S.clipLD = captureClip(85);
+    const row = document.createElement("div"); row.className = "clip-row";
+    for (const [lbl, c] of [["▶ Watch the takeoff", S.clipTO], ["▶ Watch the landing", S.clipLD]]) {
+      if (!c) continue; const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = lbl; b.addEventListener("click", () => openReplay(c)); row.append(b);
+    }
+    return row.childElementCount ? row : null;
+  }
   function drawReplayHud(w, h) {
     const fs = Math.max(12, Math.round(Math.min(w, h) / 46)), y = (phoneMQ.matches ? 76 : 70) + fs;
     const kt = Math.round((S.ias || 0) * MS2KT), ft = Math.round(Math.max(0, S.pos.y - spec.gearH) * M2FT), vs = Math.round((S.vs || 0) * M2FT * 60 / 10) * 10;
