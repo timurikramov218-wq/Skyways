@@ -719,13 +719,13 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
             <div class="seg" data-for="startSel" role="group" aria-label="Start position"><span>Start</span><button type="button" class="seg-btn" data-v="runway">Runway</button><button type="button" class="seg-btn" data-v="gate">Gate</button></div>
             <div class="seg" data-for="timeSel" role="group" aria-label="Time of day"><span>Time</span><button type="button" class="seg-btn" data-v="day">Day</button><button type="button" class="seg-btn" data-v="sunset">Sunset</button><button type="button" class="seg-btn" data-v="night">Night</button></div>
             <div class="seg" data-for="modelSel" role="group" aria-label="Flight model"><span>Flight model</span><button type="button" class="seg-btn" data-v="easy">Assisted</button><button type="button" class="seg-btn" data-v="real">Realistic</button></div>
-            <div class="seg" data-for="wxSel" role="group" aria-label="Weather"><span>Weather</span><button type="button" class="seg-btn" data-v="clear">Clear</button><button type="button" class="seg-btn" data-v="cloudy">Cloudy</button><button type="button" class="seg-btn" data-v="rain">Rain</button><button type="button" class="seg-btn" data-v="fog">Fog</button></div>
+            <div class="seg" data-for="wxSel" role="group" aria-label="Weather"><span>Weather</span><button type="button" class="seg-btn" data-v="clear">Clear</button><button type="button" class="seg-btn" data-v="cloudy">Cloudy</button><button type="button" class="seg-btn" data-v="rain">Rain</button><button type="button" class="seg-btn" data-v="fog">Fog</button><button type="button" class="seg-btn" data-v="overcast">Overcast</button><button type="button" class="seg-btn" data-v="windy">Windy</button><button type="button" class="seg-btn" data-v="storm">Storm</button><button type="button" class="seg-btn" data-v="snow">Snow</button><button type="button" class="seg-btn" data-v="haze">Haze</button></div>
           </div>
           <div hidden>
             <select id="startSel" aria-label="Start at"><option value="runway">Runway</option><option value="gate">Gate</option></select>
             <select id="timeSel" aria-label="Time of day"><option value="day">Day</option><option value="sunset">Sunset</option><option value="night">Night</option></select>
             <select id="modelSel" aria-label="Flight model"><option value="easy">Assisted</option><option value="real">Realistic</option></select>
-            <select id="wxSel" aria-label="Weather"><option value="clear">Clear</option><option value="cloudy">Cloudy</option><option value="rain">Rain</option><option value="fog">Fog</option></select>
+            <select id="wxSel" aria-label="Weather"><option value="clear">Clear</option><option value="cloudy">Cloudy</option><option value="rain">Rain</option><option value="fog">Fog</option><option value="overcast">Overcast</option><option value="windy">Windy</option><option value="storm">Storm</option><option value="snow">Snow</option><option value="haze">Haze</option></select>
           </div>
         </section>
         <div class="brief-foot">
@@ -1478,8 +1478,9 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     return {
       update(q) { puffs.forEach((pf, i) => { m4.compose(pf.p, q, pf.s); im.setMatrixAt(i, m4); }); im.instanceMatrix.needsUpdate = true; },
       setWeather(w, night, dusk) {
+        const look = w; w = w === "storm" || w === "overcast" ? "rain" : w === "snow" ? "cloudy" : w;   // storm/overcast: the low layer; snow: the mid layer
         const n = w === "clear" ? Math.round(puffs.length * 0.35) : puffs.length; im.count = Math.round(n * QS.clouds);
-        const base = w === "rain" ? 0x8c949c : w === "cloudy" || w === "fog" ? 0xe9edf1 : 0xffffff;
+        const base = look === "storm" ? 0x5a6169 : look === "overcast" ? 0xaeb6be : look === "snow" ? 0xdde2e7 : w === "rain" ? 0x8c949c : w === "cloudy" || w === "fog" ? 0xe9edf1 : 0xffffff;
         const c = new THREE.Color(base); if (night) c.multiplyScalar(0.18); else if (dusk) c.lerp(new THREE.Color(0xffb489), 0.35);
         im.material.color.copy(c); im.material.opacity = w === "rain" ? 0.95 : 0.86;
         const yOff = w === "rain" ? -650 : w === "cloudy" || w === "fog" ? -250 : 0;
@@ -2237,7 +2238,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       nose: { z: -24.3, len: 5.5, cy: 0.2, k: 0.86, ext: 0.9 } },
     b744: { from: "b747", s: 1, fx: 4, plugs: [] },   // passenger 747-400: the freighter's airframe with windows painted on
     b763: { from: "b767", s: 1, fx: 3.4, plugs: [[-12.25, 6 * 0.557], [4.85, 6 * 0.557]] },
-    a321: { from: "b737", s: 1, fx: 2.7, plugs: [[-9.7, 7 * 0.4855], [1.49, 7 * 0.4855]] },
+    a321: { from: "b737", s: 1, fx: 2.7, plugs: [[-9.7, 7 * 0.4855], [1.49, 7 * 0.4855]], sharklet: 2.3 },   // the A321neo's 2.4 m sharklets
     b739: { from: "mh", s: 1, fx: 2.6, plugs: [[-9.67, 6 * 0.58], [1.67, 7 * 0.58]] },
   };
   // where a source-model point ends up in a derived model
@@ -2285,6 +2286,18 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     return [sg * x, y];
   }
   function deriveX(d, x) { let a = Math.abs(x); if (d.span && a > d.span[0]) a = d.span[0] + (a - d.span[0]) * d.span[1]; return Math.sign(x) * a * d.s; }
+  // taller wingtip devices: everything at the very tip that stands above the wing's top surface is stretched upward k times
+  function stretchSharklet(parts, k) {
+    let tip = 0; for (const pt of parts) if (!pt.gear) { const P = pt.g.attributes.position.array; for (let i = 0; i < P.length; i += 3) tip = Math.max(tip, Math.abs(P[i])); }
+    // the wing's own thickness at the tip: its lowest point there plus ~0.35 m; above that is the sharklet
+    let y0 = 1e9; for (const pt of parts) if (!pt.gear) { const P = pt.g.attributes.position.array; for (let i = 0; i < P.length; i += 3) if (Math.abs(P[i]) > tip - 0.9) y0 = Math.min(y0, P[i + 1]); }
+    if (y0 > 1e8) return; y0 += 0.35;
+    for (const pt of parts) {
+      if (pt.gear) continue; const a = pt.g.attributes.position, P = a.array; let hit = false;
+      for (let i = 0; i < P.length; i += 3) { const ax = Math.abs(P[i]); if (ax > tip - 0.9 && P[i + 1] > y0) { const h = P[i + 1] - y0; P[i + 1] = y0 + h * k; P[i] += Math.sign(P[i]) * h * (k - 1) * 0.1; hit = true; } }
+      if (hit) { a.needsUpdate = true; pt.g.computeBoundingSphere(); pt.g.computeBoundingBox && pt.g.computeBoundingBox(); }
+    }
+  }
   function derivePart(d, pt) {
     const src = pt.g, P0 = src.attributes.position.array, N0 = src.attributes.normal.array, I0 = src.index.array, C0 = src.attributes.color ? src.attributes.color.array : null;
     const n0 = P0.length / 3, isDark = (v) => { const r = pt.base[0] * (pt.vc ? pt.vc[v * 3] : 1), g = pt.base[1] * (pt.vc ? pt.vc[v * 3 + 1] : 1), b = pt.base[2] * (pt.vc ? pt.vc[v * 3 + 2] : 1); return Math.max(r, g, b) < 0.3; };
@@ -2405,6 +2418,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     if (DERIVED[key]) {
       const d = DERIVED[key], src = decodePack(d.from);
       const parts = src.parts.map((pt) => derivePart(d, pt));
+      if (d.sharklet) stretchSharklet(parts, d.sharklet);
       return (PACK_CACHE[key] = { tip: [deriveX(d, src.tip[0]), (src.tip[1] + deriveCurl(d, src.tip[0])) * d.s, src.tip[2] * d.s], parts });
     }
     const D = window.SKY_PACKS[key], raw = atob(D.data), bin = new Uint8Array(raw.length);
@@ -3520,18 +3534,15 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     // car park with cars, landside road kerb
     flat(grp, a.lotX1 - a.lotX0, a.apL * 0.7, MAT.lot, (a.lotX0 + a.lotX1) / 2, 0.04, 0);
-    const carCols = [0xd23b2f, 0x2f5fd2, 0xeeeeee, 0x222222, 0x8a8f96, 0x2f8a4f, 0xe0b830].map((c) => new THREE.Color(c));
-    const cars = []; for (let x = a.lotX0 + 6; x < a.lotX1 - 4; x += 12) for (let zz = -a.apL * 0.33; zz < a.apL * 0.33; zz += 3.2) if (hash(x, zz) < 0.7) cars.push([x, 0.75, zz]);
-    const carM = new THREE.InstancedMesh(carGeometry(4.4, 1.85, true).rotateY(Math.PI / 2).translate(0, -0.75, 0), new THREE.MeshLambertMaterial(), cars.length), m4 = new THREE.Matrix4();
-    cars.forEach(([x, y, zz], i) => { m4.makeTranslation(x, y, zz); carM.setMatrixAt(i, m4); carM.setColorAt(i, carCols[Math.floor(hash(i, x) * carCols.length)]); }); grp.add(carM);
+    // the car park stays empty: no private cars at the airports, only the service vehicles on the apron
     // ground service vehicles round the parked aircraft: tug at the nose, baggage carts and a belt loader, a fuel truck at the wing
     { const veh = { tug: [], cart: [], fuel: [], belt: [] };
-      for (const st of stands) { if (!PLANES[st.kind].big) continue;
+      stands.forEach((st, si) => { if (!PLANES[st.kind].big || si % 2) return;   // a crew at every other wide-body stand
         const nx = a.termX0 - 9, x = (f) => nx - st.len * f;
         veh.tug.push([nx - 4, st.z + 2]); veh.belt.push([x(0.72), st.z - 4.5]);
-        for (let c = 0; c < 3; c++) veh.cart.push([x(0.72) - 6 - c * 3.4, st.z - 7]);
-        if (hash(st.z, a.x) > 0.4) veh.fuel.push([x(0.45), st.z + 9]);
-      }
+        for (let c = 0; c < 2; c++) veh.cart.push([x(0.72) - 6 - c * 3.4, st.z - 7]);
+        if (hash(st.z, a.x) > 0.6) veh.fuel.push([x(0.45), st.z + 9]);
+      });
       const put = (list, geo, mat, h) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, mat, list.length), m4b = new THREE.Matrix4(); list.forEach(([vx, vz], i) => { m4b.makeTranslation(vx, h, vz); im.setMatrixAt(i, m4b); }); grp.add(im); };
       put(veh.tug, roundedBox(4.2, 1.5, 2.3, 0.35), APT.tug, 0.75);
       put(veh.cart, roundedBox(2.8, 1.4, 1.6, 0.2), APT.cart, 0.9);
@@ -3691,10 +3702,11 @@ vec3 liveryAt(vec3 p, out float fus) {
         apOff() { [0, 0.24, 0.48].forEach((at) => { ding(988, at); ding(1318, at + 0.1); }); },                               // the autopilot-disconnect "cavalry charge"
         horn() { const t0 = ac.currentTime; for (let k = 0; k < 3; k++) { const o = ac.createOscillator(), g = ac.createGain(); o.type = "square"; o.frequency.value = 440; g.gain.setValueAtTime(0.0001, t0 + k * 0.3); g.gain.linearRampToValueAtTime(0.04, t0 + k * 0.3 + 0.01); g.gain.setValueAtTime(0.04, t0 + k * 0.3 + 0.18); g.gain.linearRampToValueAtTime(0.0001, t0 + k * 0.3 + 0.2); o.connect(g).connect(master); o.start(t0 + k * 0.3); o.stop(t0 + k * 0.3 + 0.22); } },
         clacker() { for (let k = 0; k < 8; k++) burst("highpass", 3000, 2800, 0.04, 0.07, 1, k * 0.08); },                // overspeed
+        thunder(at) { burst("lowpass", 900, 60, 2.8, 0.22, 0.8, at); burst("lowpass", 300, 40, 3.6, 0.25, 0.7, at + 0.15); thump(38, 1.4, 0.3, at); },
       };
       const rain = loop("highpass", 1800, 0.4);
       const upd0 = SFX.update;
-      SFX.update = (dt) => { upd0(dt); rain.g.gain.setTargetAtTime(soundOn && S.mode === "fly" && ENV.weather === "rain" ? 0.09 : 0, ac.currentTime, 0.6); };
+      SFX.update = (dt) => { upd0(dt); rain.g.gain.setTargetAtTime(soundOn && S.mode === "fly" && (ENV.weather === "rain" ? 0.09 : ENV.weather === "storm" ? 0.14 : 0), ac.currentTime, 0.6); };
     } catch { ac = null; SFX = null; }
   }
   const sfx = (name, ...args) => { if (SFX && soundOn) try { SFX[name](...args); } catch {} };
@@ -4379,7 +4391,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     applyEnv($("timeSel").value, $("wxSel").value);
     S.lights = ENV.time !== "day"; syncTouchKeys();
     ENV.model = $("modelSel").value;
-    { const ws = ENV.weather === "rain" ? 11 : ENV.weather === "cloudy" ? 7 : ENV.weather === "fog" ? 1.5 : 3.5, dir = Math.random() * Math.PI * 2; S.wind.set(Math.sin(dir) * ws, 0, Math.cos(dir) * ws); S.gustV.set(0, 0, 0); }
+    { const ws = wxP().wind, dir = Math.random() * Math.PI * 2; S.wind.set(Math.sin(dir) * ws, 0, Math.cos(dir) * ws); S.gustV.set(0, 0, 0); }
     if ($("startSel").value === "gate") spawnAtGate(S.from); else if (hiddenParked) { hiddenParked.visible = true; hiddenParked = null; }
     S.wantGate = !!S.to;   // free flight: after landing at the destination, taxi to a gate and let the passengers off
     S.mode = "fly"; brief.hidden = true;
@@ -4510,7 +4522,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const thrustAcc = (S.reverse ? -0.5 : 1) * S.n1 * thrMax * Math.pow(sigma, 0.7) * (1 - 0.3 * Math.min(mach, 0.9)) * (S.engOut ? 0.5 : 1);
     const machDrag = mach > 0.78 ? 1 + 30 * (mach - 0.78) * (mach - 0.78) : 1;
     // wind with gusts (stronger in cloud and rain)
-    const gustAmp = ENV.weather === "rain" ? 1 : ENV.weather === "cloudy" ? 0.45 : 0.12;
+    const gustAmp = wxP().gust;
     // gusts follow smooth noise (a few slow waves), not a new random number every frame, so the aircraft sways instead of shaking
     { const t = S.flightT; S.gustV.lerp(V.tmp.set(wave(t, 3) * 4.5 * gustAmp, wave(t, 4) * 2.5 * gustAmp * (agl > 8 ? 1 : 0.1), wave(t, 5) * 4.5 * gustAmp), Math.min(1, dt * 2)); }
     dragMult *= machDrag;
@@ -4617,7 +4629,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         rollRate += beta * 1.1 * Math.min(qr, 1.5);             // dihedral: sideslip rolls the wings level-ward
       } else if (Math.abs(roll) < 0.05 && up.y > 0.25) rollRate += -right.y * 0.6;
       if (alpha > aCrit && Math.abs(S.inputs.roll) < 0.05) rollRate += Math.sin(S.flightT * 1.7) * 0.25 * (alpha - aCrit) * 10;  // wing drop in a deep stall
-      const turb = ENV.weather === "rain" ? 1 : ENV.weather === "cloudy" ? 0.4 : 0;
+      const turb = wxP().turb;
       if (turb) { rollRate += wave(S.flightT * 1.6, 1) * 0.09 * turb; pitchRate += wave(S.flightT * 1.6, 2) * 0.03 * turb; }
       if (!realistic && !AP.on) {   // bank protection (assisted): back to 33° when the stick is let go, never past 67°
         const ab = Math.abs(bankNow), sb = Math.sign(bankNow);
@@ -5357,7 +5369,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
       return { pts, cum, len: cum[cum.length - 1] };
     }).filter((r) => r.len > 150);
-    const total = runs.reduce((s, r) => s + r.len, 0), N = Math.min(220, Math.round(total / 120));
+    const total = runs.reduce((s, r) => s + r.len, 0), N = 0;   // no private cars any more: only the airports' service vehicles move about
     const cols = [0xd23b2f, 0x2f5fd2, 0xeeeeee, 0x222222, 0x8a8f96, 0x2f8a4f, 0xe0b830, 0xf0f0f0].map((c) => new THREE.Color(c).convertSRGBToLinear());
     const g = carGeometry(4.4, 1.85);   // rounded body and cabin
     const im = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial(), Math.max(1, N));
@@ -5402,17 +5414,27 @@ vec3 liveryAt(vec3 p, out float fus) {
     const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xaab8c6, transparent: true, opacity: 0.55 }));
     l.frustumCulled = false; l.visible = false; scene.add(l);
     const drops = []; for (let i = 0; i < n; i++) drops.push([(hash(i, 3) - 0.5) * 160, hash(i, 4) * 120 - 40, (hash(5, i) - 0.5) * 160]);
-    return { l, drops, update(dt, cam) {
+    let mode = "rain", tt = 0;
+    return { l, drops, setMode(m) { mode = m || "rain"; l.material.color.set(mode === "snow" ? 0xffffff : 0xaab8c6); l.material.opacity = mode === "snow" ? 0.9 : 0.55; }, update(dt, cam) {
       if (!l.visible) return;
-      const a = g.attributes.position;
+      const a = g.attributes.position, sn = mode === "snow"; tt += dt;
       drops.forEach((d, i) => {
-        d[1] -= dt * 38; if (d[1] < -50) d[1] += 120;
-        const x = cam.x + d[0], y = cam.y + d[1], z = cam.z + d[2];
-        a.setXYZ(i * 2, x, y, z); a.setXYZ(i * 2 + 1, x + 0.3, y - 2.2, z);
+        d[1] -= dt * (sn ? 3.2 : ENV.weather === "storm" ? 52 : 38); if (d[1] < -50) d[1] += 120;
+        const sx = sn ? Math.sin(tt * 0.9 + i) * 1.2 : 0, x = cam.x + d[0] + sx, y = cam.y + d[1], z = cam.z + d[2];
+        if (sn) { a.setXYZ(i * 2, x, y, z); a.setXYZ(i * 2 + 1, x + 0.12, y - 0.12, z + 0.08); }   // flakes: tiny drifting dashes
+        else { a.setXYZ(i * 2, x, y, z); a.setXYZ(i * 2 + 1, x + (ENV.weather === "storm" ? 0.9 : 0.3), y - 2.2, z); }
       });
       a.needsUpdate = true;
     } };
   })();
+  // thunderstorm: lightning lights up the sky every 5-15 s, the thunder follows 1-3 s later
+  const LT = { t: 6, flash: 0 };
+  function lightning(dt) {
+    if (ENV.weather !== "storm" || !(S.mode === "fly" || S.mode === "brief" || S.mode === "paused")) { if (LT.flash > 0) { LT.flash = 0; hemi.intensity = ENV.hemi0 ?? hemi.intensity; } return; }
+    LT.t -= dt;
+    if (LT.t <= 0) { LT.t = 5 + Math.random() * 10; LT.flash = 0.22; if (S.mode === "fly") sfx("thunder", 1 + Math.random() * 2); }
+    if (LT.flash > 0) { LT.flash -= dt; hemi.intensity = (ENV.hemi0 ?? 0.45) + (LT.flash > 0.12 || (LT.flash > 0.04 && LT.flash < 0.08) ? 2.2 : 0.3); if (LT.flash <= 0) hemi.intensity = ENV.hemi0 ?? 0.45; }
+  }
   function recolorSky(top, horizon, below) {
     for (const m of [scene.userData.sky]) {
       const g = m.geometry, p = g.attributes.position, col = g.attributes.color, r = 16000, c = new THREE.Color();
@@ -5424,29 +5446,47 @@ vec3 liveryAt(vec3 p, out float fus) {
       col.needsUpdate = true;
     }
   }
+  // every weather in one table: wind (m/s), gusts and turbulence (relative), extra approach speed (kt), precipitation, how the clouds look
+  const WX = {
+    clear:    { wind: 3.5, gust: 0.12, turb: 0,    spd: 5,  precip: null,   clouds: "clear" },
+    cloudy:   { wind: 7,   gust: 0.45, turb: 0.4,  spd: 9,  precip: null,   clouds: "cloudy" },
+    overcast: { wind: 8,   gust: 0.5,  turb: 0.45, spd: 9,  precip: null,   clouds: "overcast" },
+    windy:    { wind: 15,  gust: 1.3,  turb: 0.9,  spd: 15, precip: null,   clouds: "cloudy" },
+    rain:     { wind: 11,  gust: 1,    turb: 1,    spd: 15, precip: "rain", clouds: "rain" },
+    storm:    { wind: 16,  gust: 1.6,  turb: 1.8,  spd: 20, precip: "rain", clouds: "storm" },
+    snow:     { wind: 6,   gust: 0.5,  turb: 0.5,  spd: 10, precip: "snow", clouds: "snow" },
+    fog:      { wind: 1.5, gust: 0.12, turb: 0,    spd: 5,  precip: null,   clouds: "cloudy" },
+    haze:     { wind: 4,   gust: 0.2,  turb: 0.1,  spd: 5,  precip: null,   clouds: "clear" },
+  };
+  const wxP = () => WX[ENV.weather] || WX.clear;
   function applyEnv(time, weather) {
     ENV.time = time; ENV.weather = weather;
-    const night = time === "night", dusk = time === "sunset", wet = weather === "rain", cloudy = weather !== "clear", fog = weather === "fog";
+    const night = time === "night", dusk = time === "sunset", P = WX[weather] || WX.clear, storm = weather === "storm", snow = weather === "snow", haze = weather === "haze", over = weather === "overcast";
+    const wet = P.precip === "rain", cloudy = weather !== "clear" && weather !== "windy" && !haze, fog = weather === "fog";
     const top = new THREE.Color(night ? 0x050b1a : dusk ? 0x2f4f8f : 0x2c6fc6);
     const hor = new THREE.Color(night ? 0x16223a : dusk ? 0xf0a26a : 0xd3e6f3);
-    if (wet) { top.lerp(new THREE.Color(0x6b7681), 0.75); hor.lerp(new THREE.Color(0x9aa3ab), 0.7); if (night) { top.multiplyScalar(0.25); hor.multiplyScalar(0.3); } }
+    if (wet) { top.lerp(new THREE.Color(storm ? 0x3e454e : 0x6b7681), storm ? 0.85 : 0.75); hor.lerp(new THREE.Color(storm ? 0x6c747c : 0x9aa3ab), 0.7); if (night) { top.multiplyScalar(0.25); hor.multiplyScalar(0.3); } }
     else if (weather === "cloudy") { top.lerp(new THREE.Color(0x8fa3b8), 0.35); hor.lerp(new THREE.Color(0xc5ced6), 0.3); }
+    else if (over) { top.lerp(new THREE.Color(0x8a96a2), 0.7); hor.lerp(new THREE.Color(0xb3bcc4), 0.6); if (night) { top.multiplyScalar(0.3); hor.multiplyScalar(0.35); } }
+    else if (snow) { top.lerp(new THREE.Color(0xc3cbd3), 0.8); hor.lerp(new THREE.Color(0xe4e8ec), 0.85); if (night) { top.multiplyScalar(0.25); hor.multiplyScalar(0.3); } }
+    else if (haze) { top.lerp(new THREE.Color(0xb8a98c), 0.45); hor.lerp(new THREE.Color(0xdcc8a0), 0.65); if (night) { top.multiplyScalar(0.35); hor.multiplyScalar(0.4); } }
     else if (fog) { top.lerp(new THREE.Color(0xaab4bd), 0.8); hor.lerp(new THREE.Color(0xc4c9cd), 0.92); if (night) { top.multiplyScalar(0.22); hor.multiplyScalar(0.26); } else if (dusk) hor.lerp(new THREE.Color(0xd9b49a), 0.25); }
     recolorSky(top, hor, new THREE.Color(night ? 0x0a0f18 : 0x6f7f8c));
     scene.fog.color.copy(hor);
-    scene.fog.near = fog ? 40 : wet ? 400 : cloudy ? 2500 : 3000; scene.fog.far = fog ? 1500 : wet ? 4500 : cloudy ? 11000 : 14000;
+    scene.fog.near = fog ? 40 : storm ? 250 : wet ? 400 : snow ? 150 : haze ? 300 : over ? 1500 : cloudy ? 2500 : 3000;
+    scene.fog.far = fog ? 1500 : storm ? 3200 : wet ? 4500 : snow ? 2600 : haze ? 5500 : over ? 8000 : cloudy ? 11000 : 14000;
     if (ENV.vis) { scene.fog.far = Math.min(scene.fog.far, ENV.vis); scene.fog.near = Math.min(scene.fog.near, ENV.vis * 0.04); }   // a mission can set its own visibility
-    hemi.intensity = night ? 0.16 : dusk ? 0.55 : wet || fog ? 0.6 : 0.8;
+    hemi.intensity = night ? 0.16 : dusk ? 0.55 : storm ? 0.45 : snow ? 0.8 : wet || fog || over ? 0.6 : haze ? 0.7 : 0.8; ENV.hemi0 = hemi.intensity;
     hemi.color.set(night ? 0x6f86b3 : dusk ? 0xffd2b0 : 0xe4f3ff);
-    sun.intensity = night ? 0.08 : dusk ? 0.75 : wet || fog ? 0.35 : cloudy ? 0.8 : 1.05;
+    sun.intensity = night ? 0.08 : dusk ? 0.75 : storm ? 0.2 : wet || fog || snow ? 0.35 : over ? 0.45 : haze ? 0.7 : cloudy ? 0.8 : 1.05;
     sun.color.set(night ? 0x8ea6d6 : dusk ? 0xffa060 : 0xfff0d8);
     SUN_DIR.set(-0.6, night ? 0.8 : dusk ? 0.12 : 1, 0.45).normalize();
     sun.target.position.set(0, 0, 0); sun.position.copy(SUN_DIR).multiplyScalar(1000);
-    sunDisc.visible = !night && !wet && !fog; sunDisc.material.color.set(dusk ? 0xffb070 : 0xfff6dc);
+    sunDisc.visible = !night && !wet && !fog && !snow && !over; sunDisc.material.color.set(dusk ? 0xffb070 : 0xfff6dc);
     sunDisc.position.copy(SUN_DIR).multiplyScalar(15000); sunDisc.lookAt(0, 0, 0);
-    stars.visible = night && !wet;
-    rain.l.visible = wet;
-    clouds.setWeather(weather, night, dusk);
+    stars.visible = night && !wet && !snow && !over && !haze;
+    rain.setMode(P.precip); rain.l.visible = !!P.precip;
+    clouds.setWeather(P.clouds, night, dusk);
     waterMat.color.set(night ? 0x0b2233 : wet || fog ? 0x2b5470 : 0x1d6c9c);
     if (waterMat.userData.w) { waterMat.userData.w.uDay.value = night ? 0.22 : dusk ? 0.75 : wet || fog ? 0.8 : 1; waterMat.userData.w.uSky.value.set(night ? 0x0a1626 : dusk ? 0xd29a74 : wet || fog ? 0x9aa5ae : 0xa9cde8).convertSRGBToLinear(); }
     CITY_NIGHT.value.x = night ? 1 : dusk ? 0.35 : 0;
@@ -5541,7 +5581,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         if (!AP.flare && al > -r.len / 2 - 450 && hR < clamp(sinkNow * 3, 4.5, 10)) { AP.flare = true; AP.flareH = Math.max(1, hR); AP.flareV = sinkNow; }
         if (AP.flare) { vsT = -(0.7 + Math.max(0, AP.flareV - 0.7) * clamp(hR / AP.flareH, 0, 1)); S.throttle = Math.max(0, S.throttle - dt * 0.35); }   // and retard
         // approach speed: Vref + 5 kt, plus a gust margin in cloud and rain (the stall warning stays quiet in turbulence)
-        if (AP.athr) AP.spd = Math.round(spec.stall * (1 - 0.28 * S.flapPos) * 1.3 * MS2KT) + (ENV.weather === "rain" ? 15 : ENV.weather === "cloudy" ? 9 : 5);
+        if (AP.athr) AP.spd = Math.round(spec.stall * (1 - 0.28 * S.flapPos) * 1.3 * MS2KT) + wxP().spd;
       }
     }
     // terrain protection: if the target altitude is less than 500 ft above the ground along the next 45 s of track, climb over it
@@ -5879,7 +5919,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   const fpsMeter = { n: 0, t0: performance.now() };
 
   // ================= MISSIONS =================
-  const START_LBL = { runway: "Runway start", approach: "On final", gate: "Gate start" }, TIME_LBL = { day: "Day", sunset: "Sunset", night: "Night" }, WX_LBL = { clear: "Clear", cloudy: "Cloudy", rain: "Rain", fog: "Fog" };
+  const START_LBL = { runway: "Runway start", approach: "On final", gate: "Gate start" }, TIME_LBL = { day: "Day", sunset: "Sunset", night: "Night" }, WX_LBL = { clear: "Clear", cloudy: "Cloudy", rain: "Rain", fog: "Fog", overcast: "Overcast", windy: "Windy", storm: "Thunderstorm", snow: "Snow", haze: "Haze" };
   const misProg = () => readJSON("sw-missions", {});
   const misStars = (m) => { const v = misProg()[m.id]; return Number.isFinite(v) ? clamp(Math.round(v), 0, 3) : 0; };
   const misOpen = (i) => i === 0 || misStars(MISSIONS[i - 1]) > 0;
@@ -6204,7 +6244,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (S.mode !== "paused") updateCamera(dt, now);
     updateAlerts(now); updateSunShadow();
     scene.userData.sky.position.copy(camera.position);
-    updateTiles(camera.position); clouds.update(camera.quaternion); rain.update(dt, camera.position); updateLightPool();
+    updateTiles(camera.position); clouds.update(camera.quaternion); rain.update(dt, camera.position); lightning(dt); updateLightPool();
     waterNormal.offset.x += dt * 0.0025; waterNormal.offset.y += dt * 0.0012; WATER_T.value += dt;
     if (SFX && ac) SFX.update(dt);
     renderer.render(scene, camera); drawHud(now); autoQuality(now);
