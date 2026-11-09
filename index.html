@@ -1031,9 +1031,9 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   catch { $("briefTip").textContent = "This device can't run 3D graphics (WebGL is off)."; return; }
   // graphics quality: render resolution, how far detailed terrain and forests reach, cloud count, real-time shadow of your aircraft
   const QUALITY = {
-    low: { label: "Low", pr: 1, hi: 5500, vis: 10000, trees: 3500, clouds: 0.5, shadows: false },
-    medium: { label: "Medium", pr: 2, hi: 9500, vis: 15000, trees: 7500, clouds: 1, shadows: true },   // full Retina sharpness and your aircraft's shadow by default
-    high: { label: "High", pr: 2, hi: 12500, vis: 16000, trees: 10000, clouds: 1, shadows: true },
+    low: { label: "Low", pr: 1, hi: 5500, vis: 10000, trees: 3500, clouds: 0.5, shadows: false, seg: 64, bump: 0.5 },
+    medium: { label: "Medium", pr: 2, hi: 9500, vis: 15000, trees: 7500, clouds: 1, shadows: true, seg: 80, bump: 1 },   // full Retina sharpness and your aircraft's shadow by default
+    high: { label: "High", pr: 2, hi: 12500, vis: 16000, trees: 10000, clouds: 1, shadows: true, seg: 120, bump: 1.3 },
   };
   let qualName = load("sw-quality"); if (!QUALITY[qualName]) qualName = "medium";
   if (load("sw-quality-auto") === "1") { qualName = "medium"; save("sw-quality-auto", "0"); }   // an automatic step-down only lasts for that session
@@ -1126,8 +1126,9 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   })();
   // k: strength; s: sizes in metres of the fine, medium and coarse layers; tint: dry/lush colour variation (terrain)
   const APT_CIRCLES = Array.from({ length: 24 }, (_, i) => { const a = AIRPORTS[i]; return a ? new THREE.Vector3(a.x, a.z, a.reach + 700) : new THREE.Vector3(0, 0, 0); });
+  const TERRAIN_BUMP = { value: 1 };
   function addDetail(mat, k, s1, s2, s3, tint = 0) {
-    mat.userData.det = { uDetail: { value: DETAIL }, uDk: { value: new THREE.Vector4(k, 1 / s1, 1 / s2, 1 / s3) }, uTint: { value: tint }, uApt: { value: APT_CIRCLES } };
+    mat.userData.det = { uDetail: { value: DETAIL }, uDk: { value: new THREE.Vector4(k, 1 / s1, 1 / s2, 1 / s3) }, uTint: { value: tint }, uApt: { value: APT_CIRCLES }, uBump: TERRAIN_BUMP };
     mat.onBeforeCompile = detailCompile;
     return mat;
   }
@@ -1162,12 +1163,34 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   }
   function detailCompile(sh) {
     Object.assign(sh.uniforms, this.userData.det);
-    sh.vertexShader = "varying vec3 vWp;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\n  vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;");
-    sh.fragmentShader = "uniform sampler2D uDetail; uniform vec4 uDk; uniform float uTint; uniform vec3 uApt[24]; varying vec3 vWp;\n" + sh.fragmentShader.replace("#include <color_fragment>", `#include <color_fragment>
+    sh.vertexShader = "varying vec3 vWp; varying vec3 vWn;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\n  vWp = (modelMatrix * vec4(transformed, 1.0)).xyz; vWn = normalize(mat3(modelMatrix) * objectNormal);");
+    const bump = !!this.userData.bump;
+    sh.fragmentShader = "uniform sampler2D uDetail; uniform vec4 uDk; uniform float uTint; uniform vec3 uApt[24]; uniform float uBump; varying vec3 vWp; varying vec3 vWn; float gH = 0.0;\n" + sh.fragmentShader.replace("#include <color_fragment>", `#include <color_fragment>
   { vec2 w = vWp.xz; float a = texture2D(uDetail, w * uDk.y).r, b = texture2D(uDetail, w * uDk.z).g, c = texture2D(uDetail, w * uDk.w).b;
     float dist = length(vWp - cameraPosition), nearF = 1.0 - smoothstep(60.0 / uDk.y * 0.12, 60.0 / uDk.y * 0.5, dist), midF = 1.0 - smoothstep(30.0 / uDk.z * 0.5, 30.0 / uDk.z * 2.0, dist);
     float det = (a - 0.5) * 0.55 * nearF + (b - 0.5) * 0.75 * midF + (c - 0.5) * 0.6;   // fine layers fade out with distance, so no shimmer or rings
     diffuseColor.rgb *= max(0.0, 1.0 + det * uDk.x);
+    gH = det * 1.4;
+    if (uTint > 0.0) {
+      // mountains: bare rock on the steep faces with layered strata and cracks, snow that only settles on the gentler slopes up high
+      float slope = 1.0 - clamp(normalize(vWn).y, 0.0, 1.0);
+      float m1 = texture2D(uDetail, w / 1700.0).r, m2 = texture2D(uDetail, w / 640.0).g;
+      // airports keep their mown grass: no rock or snow inside their circles
+      float aptK = 0.0; for (int i = 0; i < 24; i++) { vec3 ap = uApt[i]; if (ap.z > 0.0) aptK = max(aptK, 1.0 - smoothstep(ap.z * 0.8, ap.z + 300.0, length(w - ap.xy))); }
+      float rockF = smoothstep(0.2, 0.42, slope + (m2 - 0.5) * 0.12) * (1.0 - aptK);
+      // strata: soft, irregular bands broken up by noise (not stripes)
+      float strata = 0.5 + 0.5 * sin(vWp.y * 0.16 + m2 * 14.0 + b * 5.0 + c * 3.0), crack = smoothstep(0.66, 0.72, a) * nearF;
+      vec3 rock = mix(vec3(0.33, 0.31, 0.28), vec3(0.47, 0.44, 0.40), 0.35 + 0.3 * strata) * (0.8 + 0.4 * c) * (0.9 + 0.2 * b) * (1.0 - crack * 0.25);
+      rock = mix(rock, rock * vec3(1.08, 0.96, 0.84), smoothstep(0.4, 0.7, m1));                       // warmer, iron-stained bands
+      diffuseColor.rgb = mix(diffuseColor.rgb, rock, rockF * smoothstep(20.0, 60.0, vWp.y) * 0.9);
+      float snowLine = 690.0 + (m1 - 0.5) * 180.0 + (c - 0.5) * 40.0;
+      float snowF = smoothstep(snowLine, snowLine + 45.0, vWp.y) * (1.0 - smoothstep(0.3, 0.5, slope + (a - 0.5) * 0.15)) * (1.0 - aptK);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.93, 0.97) * (0.92 + 0.08 * b), snowF);
+      gH = det * (1.2 + rockF * 1.3 * (1.0 - snowF)) + rockF * (strata - 0.5) * 0.45 * (1.0 - snowF);
+      // lowland: large-scale patches of drier and lusher grass so the ground never looks tiled
+      float g0 = diffuseColor.g - max(diffuseColor.r, diffuseColor.b);
+      if (g0 > 0.0) diffuseColor.rgb *= mix(vec3(0.9, 0.97, 0.86), vec3(1.08, 1.04, 0.92), m1) * (0.94 + 0.12 * m2);
+    }
     float g = diffuseColor.g - max(diffuseColor.r, diffuseColor.b);        // only green ground gets the dry/lush tint
     if (uTint > 0.0 && g > 0.0) diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.25, 1.06, 0.72), smoothstep(0.45, 0.85, c) * uTint * clamp(g * 12.0, 0.0, 1.0));
     if (uTint > 0.0 && g > 0.0) {
@@ -1191,8 +1214,15 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       }
     }
   }`);
+    if (bump) sh.fragmentShader = sh.fragmentShader.replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+  { // relief from the detail height: rocks, gullies and ridges catch the light per pixel
+    vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition); float hx = dFdx(gH * uBump), hy = dFdy(gH * uBump);
+    vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx); float dt = dot(dpx, r1);
+    vec3 gr = sign(dt) * (hx * r1 + hy * r2); normal = normalize(abs(dt) * normal - gr); }`);
   }
-  const terrainMat = addDetail(new THREE.MeshLambertMaterial({ vertexColors: true }), 0.45, 7, 53, 410, 0.3);
+  // per-pixel lit (Phong without shine) so the relief from the detail height shows; Lambert would light only the vertices 50 m apart
+  const terrainMat = addDetail(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x000000, shininess: 1 }), 0.45, 7, 53, 410, 0.3);
+  terrainMat.userData.bump = true;
   terrainMat.extensions = { derivatives: true };   // dFdx/dFdy find flat ground for the fields (WebGL 1 needs the extension)
   function terrainGeo(x0, z0, size, seg, skirt) {
     const N = seg + 1, st = size / seg, W2 = N + 2, H = new Float32Array(W2 * W2);
@@ -1232,7 +1262,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     tiles.push({ x0, z0, cx: x0 + TILE / 2, cz: z0 + TILE / 2, lo, hi: null, trees: null });
   }
   function buildHiTile(t) {
-    const { g, H, N, st } = terrainGeo(t.x0, t.z0, TILE, 80, true);
+    const { g, H, N, st } = terrainGeo(t.x0, t.z0, TILE, QS.seg || 80, true);
     t.hi = new THREE.Mesh(g, terrainMat); t.hi.receiveShadow = true; scene.add(t.hi);
     // forests
     const cones = [], balls = [], m = new THREE.Matrix4(), col = new THREE.Color();
@@ -1277,7 +1307,10 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     const hgt = new Float32Array(S * S);
     for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
       const u = i / S * Math.PI * 2, v = j / S * Math.PI * 2;
-      hgt[j * S + i] = Math.sin(u * 3 + v * 2) * 0.5 + Math.sin(u * 7 - v * 5) * 0.25 + Math.sin(u * 13 + v * 11) * 0.12 + Math.sin(u * 2 - v * 9) * 0.3;
+      // a dozen wave trains from different directions (all whole wave numbers so the tile still wraps): no visible pattern
+      hgt[j * S + i] = Math.sin(u * 3 + v * 2) * 0.5 + Math.sin(u * 7 - v * 5) * 0.25 + Math.sin(u * 13 + v * 11) * 0.12 + Math.sin(u * 2 - v * 9) * 0.3
+        + Math.sin(u * 5 + v * 8 + 1.3) * 0.22 + Math.sin(u * 11 - v * 3 + 2.1) * 0.14 + Math.sin(u * 17 + v * 6 + 0.4) * 0.07 + Math.sin(u * 4 - v * 15 + 2.7) * 0.09
+        + Math.sin(u * 23 - v * 19 + 1.1) * 0.04 + Math.sin(u * 29 + v * 7 + 0.6) * 0.035 + Math.sin(u * 9 + v * 27 + 2.2) * 0.04 + Math.sin(u * 1 + v * 4 + 0.9) * 0.35;
     }
     for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
       const hx = hgt[j * S + (i + 1) % S] - hgt[j * S + (i + S - 1) % S], hz = hgt[((j + 1) % S) * S + i] - hgt[((j + S - 1) % S) * S + i];
@@ -1289,7 +1322,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   })();
   (function () {
     const water = new THREE.Mesh(new THREE.PlaneGeometry(90000, 90000), waterMat = new THREE.MeshPhongMaterial({
-      color: 0x1d6c9c, specular: 0xcfeaff, shininess: 120, normalMap: waterNormal, normalScale: new THREE.Vector2(0.5, 0.5), transparent: true, opacity: 0.84,
+      color: 0x1d6c9c, specular: 0xffffff, shininess: 160, normalMap: waterNormal, normalScale: new THREE.Vector2(0.55, 0.55), transparent: true, opacity: 0.84,
     }));
     water.rotation.x = -Math.PI / 2; scene.add(water);
     // depth map of the whole world (computed once): shallow turquoise water and surf along the coasts, dark blue offshore
@@ -1307,7 +1340,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
         .replace("#include <color_fragment>", `#include <color_fragment>
   { vec2 uv = vWp.xz / (2.0 * uWorld) + 0.5; float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
     float d = mix(60.0, texture2D(uDepth, uv).r * 60.0, inside);
-    vec3 shallow = vec3(0.06, 0.36, 0.36), mid = vec3(0.02, 0.17, 0.24), deep = vec3(0.008, 0.06, 0.13);
+    vec3 shallow = vec3(0.05, 0.38, 0.38), mid = vec3(0.015, 0.16, 0.24), deep = vec3(0.004, 0.045, 0.11);
     vec3 col = mix(shallow, mid, smoothstep(0.5, 9.0, d)); col = mix(col, deep, smoothstep(9.0, 45.0, d));
     float n1 = texture2D(uDetail, vWp.xz / 23.0 + vec2(uTime * 0.012, uTime * 0.007)).r, n2 = texture2D(uDetail, vWp.xz / 61.0 - vec2(uTime * 0.006, -uTime * 0.01)).g;
     float shore = 1.0 - smoothstep(0.15, 2.6, d), surf = 0.5 + 0.5 * sin(uTime * 1.3 - d * 2.6 + n2 * 6.0);
@@ -1315,8 +1348,16 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     col *= uDay;
     diffuseColor.rgb = mix(col, vec3(0.92, 0.95, 0.96) * uDay, clamp(gFoam, 0.0, 1.0));
     diffuseColor.a = clamp(mix(0.5, 0.94, smoothstep(0.4, 14.0, d)) + gFoam, 0.0, 1.0); }`)
+        .replace("#include <normal_fragment_maps>", THREE.ShaderChunk.normal_fragment_maps.replace("vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;", `
+    // three wave layers drifting in different directions; the fine one fades with distance (no glitter or tiling far off)
+    float wFar = smoothstep(250.0, 5000.0, length(vWp - cameraPosition));
+    vec3 n1 = texture2D(normalMap, vUv).xyz * 2.0 - 1.0, n2 = texture2D(normalMap, vUv * 0.27 + vec2(-uTime * 0.0021, uTime * 0.0016)).xyz * 2.0 - 1.0;
+    vec3 n3 = texture2D(normalMap, vUv * 2.6 + vec2(uTime * 0.0071, uTime * 0.0043)).xyz * 2.0 - 1.0;
+    vec3 mapN = vec3((n1.xy * 0.8 + n2.xy * 0.9 + n3.xy * 0.55 * (1.0 - wFar)) * (1.0 - wFar * 0.6), 1.0);`))
         .replace("#include <emissivemap_fragment>", `#include <emissivemap_fragment>
-  { float fr = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), 4.0); totalEmissiveRadiance += uSky * fr * 0.55 * (1.0 - gFoam); }`);
+  { // the sky in the water: little straight down, nearly all of it towards the horizon (Fresnel), and a hint of light through the wave crests
+    float fr = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.0); totalEmissiveRadiance += uSky * fr * 0.85 * (1.0 - gFoam);
+    totalEmissiveRadiance += vec3(0.0, 0.05, 0.05) * uDay * clamp(normal.y * 0.0 + (1.0 - fr) * 0.5, 0.0, 1.0) * (1.0 - gFoam); }`);
     };
   })();
 
@@ -1483,28 +1524,71 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
 
   // clouds: soft billboard puffs in a single instanced mesh that turns to face the camera
   const clouds = (function () {
-    const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d");
-    const grd = g.createRadialGradient(64, 64, 4, 64, 64, 62); grd.addColorStop(0, "rgba(255,255,255,1)"); grd.addColorStop(0.5, "rgba(255,255,255,0.72)"); grd.addColorStop(1, "rgba(255,255,255,0)");
-    g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
-    const puffs = [];
-    for (let i = 0; i < 190; i++) {
-      const cx = (hash(i, 4.4) - 0.5) * WORLD * 2, cz = (hash(6.6, i) - 0.5) * WORLD * 2, cy = 1100 + hash(i, 5.5) * 600, n = 6 + Math.floor(hash(i, 9) * 7);
-      for (let k = 0; k < n; k++) { const sz = 150 + hash(i, k) * 220; puffs.push({ p: new THREE.Vector3(cx + (hash(k, i) - 0.5) * 560, cy + (hash(i + k, 2) - 0.3) * 70 - (k % 3) * 25, cz + (hash(i, k + 7) - 0.5) * 380), s: new THREE.Vector3(sz * 1.6, sz, 1), shade: k % 3 }); }
+    // a 2 x 2 atlas of cumulus puffs drawn once: billowy cauliflower rims, a flat base, sunlit tops and grey-blue undersides baked in
+    const S2 = 256, c = document.createElement("canvas"); c.width = c.height = S2 * 2; const g = c.getContext("2d");
+    for (let v = 0; v < 4; v++) {
+      const ox = (v % 2) * S2, oy = Math.floor(v / 2) * S2, base = oy + S2 * (0.66 + (v % 2) * 0.04);
+      g.save(); g.beginPath(); g.rect(ox, oy, S2, S2); g.clip();
+      for (let k = 0; k < 34 + v * 5; k++) {
+        const ang = hash(v * 31 + k, 3) * Math.PI, rr = Math.sqrt(hash(k, v + 5));
+        const bx = ox + S2 / 2 + Math.cos(ang) * rr * S2 * 0.3, by = base - Math.sin(ang) * rr * S2 * 0.36 - S2 * 0.05;
+        const br = S2 * (0.06 + hash(v, k + 9) * 0.1) * (1.25 - rr * 0.55);
+        const grd = g.createRadialGradient(bx - br * 0.2, by - br * 0.25, br * 0.15, bx, by, br);
+        grd.addColorStop(0, "rgba(255,255,255,0.98)"); grd.addColorStop(0.7, "rgba(250,251,253,0.85)"); grd.addColorStop(1, "rgba(255,255,255,0)");
+        g.fillStyle = grd; g.beginPath(); g.arc(bx, by, br, 0, Math.PI * 2); g.fill();
+      }
+      g.globalCompositeOperation = "destination-out";   // the flat base
+      const cut = g.createLinearGradient(0, base - S2 * 0.02, 0, base + S2 * 0.06); cut.addColorStop(0, "rgba(0,0,0,0)"); cut.addColorStop(1, "rgba(0,0,0,1)"); g.fillStyle = cut; g.fillRect(ox, base - S2 * 0.02, S2, oy + S2 - base + S2 * 0.02);
+      g.globalCompositeOperation = "source-atop";       // light from above, shadowed underside
+      const sh = g.createLinearGradient(0, oy + S2 * 0.15, 0, base); sh.addColorStop(0, "rgba(255,255,255,0)"); sh.addColorStop(0.5, "rgba(214,222,233,0.3)"); sh.addColorStop(1, "rgba(140,152,170,0.9)");
+      g.fillStyle = sh; g.fillRect(ox, oy, S2, S2);
+      g.restore(); g.globalCompositeOperation = "source-over";
     }
-    const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, opacity: 0.86 }), puffs.length);
-    const shades = [0xffffff, 0xf1f4f8, 0xdfe5ec].map((x) => new THREE.Color(x));
-    puffs.forEach((pf, i) => im.setColorAt(i, shades[pf.shade]));
+    const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding;
+    // cumulus clusters: a flat base at one height, puffs piled into a dome (big ones low in the middle, small turrets on top)
+    const puffs = [];
+    for (let i = 0; i < 170; i++) {
+      const cx = (hash(i, 4.4) - 0.5) * WORLD * 2, cz = (hash(6.6, i) - 0.5) * WORLD * 2, cb = 1150 + hash(i, 5.5) * 420, R = 280 + hash(i, 8.1) * 520, H = R * (0.45 + hash(i, 3.3) * 0.5);
+      const n = 9 + Math.floor(hash(i, 9) * 9);
+      for (let k = 0; k < n; k++) {
+        const a = hash(k, i + 1) * Math.PI * 2, rr = Math.sqrt(hash(i + k, 7)), dome = Math.sqrt(Math.max(0, 1 - rr * rr));
+        const sz = (170 + hash(i, k) * 200) * (0.65 + 0.5 * dome), hy = dome * H * (0.35 + hash(k, i + 3) * 0.65);
+        puffs.push({ p: new THREE.Vector3(cx + Math.cos(a) * rr * R, cb + hy + sz * 0.22, cz + Math.sin(a) * rr * R * 0.8), s: new THREE.Vector3(sz * 1.5, sz, 1), hf: hy / Math.max(1, H), cell: Math.floor(hash(k, i + 11) * 4) });
+      }
+    }
+    const geo = new THREE.PlaneGeometry(1, 1), cellA = new Float32Array(puffs.length * 2);
+    geo.setAttribute("aCell", new THREE.InstancedBufferAttribute(cellA, 2));
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.92 });
+    mat.onBeforeCompile = (sh) => { sh.vertexShader = "attribute vec2 aCell;\n" + sh.vertexShader.replace("#include <uv_vertex>", "#include <uv_vertex>\n  vUv = vUv * 0.5 + aCell;"); };
+    const im = new THREE.InstancedMesh(geo, mat, puffs.length);
+    const shadeOf = (pf) => new THREE.Color(0xd3dae3).lerp(new THREE.Color(0xffffff), Math.min(1, pf.hf * 1.4));   // lower puffs a little greyer
     im.frustumCulled = false; scene.add(im);
-    const m4 = new THREE.Matrix4();
-    const order = puffs.map((_, i) => i);
+    const m4 = new THREE.Matrix4(), order = puffs.map((_, i) => i), qB = new THREE.Quaternion(), eB = new THREE.Euler(0, 0, 0, "YXZ"), fB = new THREE.Vector3(), camP = new THREE.Vector3();
+    let sortT = 0;
+    const writeAttrs = () => { order.forEach((pi, i) => { const pf = puffs[pi]; im.setColorAt(i, shadeOf(pf)); cellA[i * 2] = (pf.cell % 2) * 0.5; cellA[i * 2 + 1] = (pf.cell >> 1) * 0.5; }); im.instanceColor.needsUpdate = true; geo.attributes.aCell.needsUpdate = true; };
+    writeAttrs();
+    // a thin veil of cirrus high above, following the camera
+    const ci = document.createElement("canvas"); ci.width = ci.height = 512; const cg = ci.getContext("2d");
+    cg.filter = "blur(6px)"; cg.strokeStyle = "rgba(255,255,255,0.12)"; cg.lineCap = "round";
+    for (let k = 0; k < 140; k++) { const x = hash(k, 1) * 512, y = hash(2, k) * 512, l = 60 + hash(k, 3) * 160; cg.lineWidth = 8 + hash(k, 4) * 18; cg.beginPath(); cg.moveTo(x, y); cg.quadraticCurveTo(x + l * 0.5, y - 6 + hash(k, 5) * 12, x + l, y + (hash(k, 6) - 0.5) * 20); cg.stroke(); }
+    const ctex = new THREE.CanvasTexture(ci); ctex.wrapS = ctex.wrapT = THREE.RepeatWrapping; ctex.repeat.set(6, 6);
+    const cirrus = new THREE.Mesh(new THREE.PlaneGeometry(70000, 70000), new THREE.MeshBasicMaterial({ map: ctex, transparent: true, depthWrite: false, opacity: 0.4, fog: false }));
+    cirrus.rotation.x = Math.PI / 2; cirrus.position.y = 5200; cirrus.renderOrder = -1; scene.add(cirrus);
     return {
-      update(q) { puffs.forEach((pf, i) => { m4.compose(pf.p, q, pf.s); im.setMatrixAt(i, m4); }); im.instanceMatrix.needsUpdate = true; },
+      update(q) {
+        // billboards face the camera but stay upright, so the lit tops are always on top even when the aircraft banks
+        fB.set(0, 0, -1).applyQuaternion(q); eB.set(Math.asin(Math.max(-1, Math.min(1, fB.y))), Math.atan2(-fB.x, -fB.z), 0); qB.setFromEuler(eB);
+        camP.copy(camera.position); cirrus.position.x = camP.x; cirrus.position.z = camP.z; ctex.offset.set(camP.x / 70000 * 6, -camP.z / 70000 * 6);
+        if (--sortT <= 0) { sortT = 20; order.sort((p1, p2) => puffs[p2].p.distanceToSquared(camP) - puffs[p1].p.distanceToSquared(camP)); writeAttrs(); }   // far to near
+        order.forEach((pi, i) => { const pf = puffs[pi]; m4.compose(pf.p, qB, pf.s); im.setMatrixAt(i, m4); }); im.instanceMatrix.needsUpdate = true;
+      },
       setWeather(w, night, dusk) {
         const look = w; w = w === "storm" || w === "overcast" ? "rain" : w === "snow" ? "cloudy" : w;   // storm/overcast: the low layer; snow: the mid layer
         const n = w === "clear" ? Math.round(puffs.length * 0.35) : puffs.length; im.count = Math.round(n * QS.clouds);
         const base = look === "storm" ? 0x5a6169 : look === "overcast" ? 0xaeb6be : look === "snow" ? 0xdde2e7 : w === "rain" ? 0x8c949c : w === "cloudy" || w === "fog" ? 0xe9edf1 : 0xffffff;
         const c = new THREE.Color(base); if (night) c.multiplyScalar(0.18); else if (dusk) c.lerp(new THREE.Color(0xffb489), 0.35);
-        im.material.color.copy(c); im.material.opacity = w === "rain" ? 0.95 : 0.86;
+        im.material.color.copy(c); im.material.opacity = w === "rain" ? 0.95 : 0.92;
+        cirrus.visible = look === "clear" || look === "cloudy"; cirrus.material.color.copy(c);
         const yOff = w === "rain" ? -650 : w === "cloudy" || w === "fog" ? -250 : 0;
         puffs.forEach((pf) => { if (pf.y0 === undefined) pf.y0 = pf.p.y; pf.p.y = pf.y0 + yOff; if (w === "rain") pf.s.set(pf.s.x, pf.s.y, 1); });
       },
@@ -3871,6 +3955,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (model) model.traverse((o) => { if (o.isMesh) o.castShadow = QS.shadows; });
       if (!QS.shadows) { sun.target.position.set(0, 0, 0); sun.position.copy(SUN_DIR).multiplyScalar(1000); }
     }
+    TERRAIN_BUMP.value = QS.bump ?? 1;
     applyEnv(ENV.time, ENV.weather);
     if (announce && S.mode === "fly") flash(`Graphics: ${QS.label}`, 1.4);
   }
