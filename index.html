@@ -2992,7 +2992,9 @@ vec3 liveryAt(vec3 p, out float fus) {
   function loadCockpit() {
     if (COCKPIT.status !== "idle" || !THREE.GLTFLoader) return;
     COCKPIT.status = "loading"; flash("Loading the flight deck…", 2);
-    fetch("cockpit.glb").then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    const b64 = () => fetch("cockpit.b64.txt").then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then((t) => { const bin = atob(t.trim()), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; });
+    fetch("cockpit.glb").then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).catch(b64)   // some hosts only serve text: then the base64 copy
       .then((buf) => new Promise((res, rej) => new THREE.GLTFLoader().parse(buf, "", res, rej)))
       .then((g) => {
         g.scene.traverse((o) => { if (o.isMesh) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m) => { if (m.map) m.map.encoding = THREE.sRGBEncoding; m.envMapIntensity = 0.6; }); o.frustumCulled = false; } });
