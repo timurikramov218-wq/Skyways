@@ -3533,7 +3533,39 @@ vec3 liveryAt(vec3 p, out float fus) {
   // a parked aircraft never moves: its dozens of parts (gear legs, wheels, fans, glass) are baked into one mesh per material,
   // which cuts the draw calls at a busy airport several times over
   function bakeParked(mdl) { try { mergeStatic(mdl); } catch {} }
+  // each airport's own character: terminal form and colours, where the hangars, the tower, the fire station and the fuel farm go
+  // term: linear (one long building) | units (separate terminals, gaps between) | hub (tall central hall, low wings) | stepped (high middle)
+  // hang: side (+1 / -1 end of the apron), n hangars, face "apron" (in a row along the end, doors to the apron) or "end" (side by side, doors to the apron's end)
+  // tower: apron (by the apron's end) | land (behind the car park) | field (across the main runway)
+  const LOOK = {
+    LHR: { term: "units", apron: 0x636466, units: 3, glass: 0x7f97a8, wall: 0x9aa0a6, band: 0xcfd4d8, hang: { side: -1, n: 3, face: "apron" }, tower: "land", twH: 87 },
+    AMS: { term: "hub", apron: 0x434649, glass: 0x6f9dc9, wall: 0x8e9aa6, band: 0x2f4f8f, hang: { side: 1, n: 2, face: "end" }, tower: "field", twH: 101 },
+    CDG: { term: "stepped", apron: 0x6e6c66, glass: 0x9ab0bd, wall: 0xb5b2ab, band: 0xe4e1d8, hang: { side: -1, n: 2, face: "end" }, tower: "apron", twH: 80 },
+    FRA: { term: "hub", apron: 0x545658, glass: 0x7a8fa3, wall: 0x6d7782, band: 0xf2c230, hang: { side: 1, n: 4, face: "apron" }, tower: "land", twH: 70 },
+    INN: { term: "linear", apron: 0x4c4d4b, glass: 0x8fb0c4, wall: 0x8b6b4a, band: 0xd9d2c4, hang: { side: -1, n: 2, face: "apron" }, tower: "apron", twH: 40 },
+    SVO: { term: "units", apron: 0x5f5d5a, units: 2, glass: 0x6c8796, wall: 0x8c4b3a, band: 0xe7e2d7, hang: { side: 1, n: 3, face: "end" }, tower: "apron", twH: 65 },
+    IST: { term: "stepped", apron: 0x717375, glass: 0x5f97c4, wall: 0xd8dde2, band: 0xffffff, hang: { side: -1, n: 4, face: "end" }, tower: "land", twH: 90 },
+    DXB: { term: "linear", apron: 0x7e7359, glass: 0xb89a5c, wall: 0xc9b48a, band: 0xf1e6c8, hang: { side: 1, n: 4, face: "apron" }, tower: "field", twH: 92 },
+    SIN: { term: "units", apron: 0x5f6462, units: 3, glass: 0x5d9c86, wall: 0x9fb3ad, band: 0xe8efe9, hang: { side: -1, n: 2, face: "apron" }, tower: "field", twH: 78 },
+    JFK: { term: "units", apron: 0x393c3f, units: 4, glass: 0x557aa8, wall: 0x7e8792, band: 0xd6dbe0, hang: { side: 1, n: 2, face: "end" }, tower: "land", twH: 98 },
+  };
+  var TERM_GLASS = [];   // tinted terminal glass, lit at night with the rest
+  function termMats(LK) {
+    const map = new Map();
+    for (const pt of decodePack("apt_term").parts) {
+      const c = pt.base; let col = null, glass = false;
+      if (c[2] > 0.7 && c[0] < 0.1) { col = LK.glass; glass = true; } else if (Math.abs(c[0] - 0.88) < 0.05 && Math.abs(c[2] - 0.46) < 0.06) col = LK.band; else if (Math.abs(c[0] - 0.516) < 0.02) col = LK.wall;
+      if (col === undefined || col === null) continue;
+      const m = pt.mat.clone(); m.color.set(col).convertSRGBToLinear(); map.set(pt, m); if (glass) TERM_GLASS.push(m);
+    }
+    return map;
+  }
+  function placeTerm(grp, mats, x, z) {
+    const g = new THREE.Group(); for (const pt of decodePack("apt_term").parts) { const m = new THREE.Mesh(pt.g, mats.get(pt) || pt.mat); m.userData.keepAlone = true; g.add(m); }
+    g.position.set(x, 0, z); grp.add(g); return g;
+  }
   function buildAirport(a) {
+    const apronM = (LOOK[a.code] && LOOK[a.code].apron) ? addDetail(lam(LOOK[a.code].apron, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }), 0.22, 1.1, 7, 60) : MAT.apron;   // the apron's own concrete or asphalt
     const grp = new THREE.Group(); grp.position.set(a.x, a.elev, a.z); grp.rotation.y = -a.hdg * Math.PI / 180; scene.add(grp);
     const lg = (lx, lz) => { const [wx, wz] = toWorld(a, -lz, lx); return Math.max(0, heightAt(wx, wz)) - a.elev; };   // over the sea the approach lights stand on piers at the waterline
     const intl = a.kind === "intl", ga = a.kind === "ga";
@@ -3643,7 +3675,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     instanced(grp, lightG, MAT.blue, blueL);
     // apron with stand markings
-    flat(grp, a.apD, a.apL, MAT.apron, a.apX0 + a.apD / 2, 0.04, 0);
+    flat(grp, a.apD, a.apL, apronM, a.apX0 + a.apD / 2, 0.04, 0);
     flat(grp, 20, a.apL * 0.9, MAT.taxi, a.apX0 - 4, 0.05, 0);
     flat(grp, 0.3, a.apL, MAT.yellow, a.apX0 + 3.2, 0.085, 0);                                                     // apron taxilane edge
     for (let z = -a.apL / 2 + 4; z < a.apL / 2 - 4; z += 8) for (const dx of [-4.5, 4.5]) flat(grp, 0.25, 4, MAT.white, a.termX0 - 15 + dx, 0.085, z);   // service road beside the terminal
@@ -3662,8 +3694,16 @@ vec3 liveryAt(vec3 p, out float fus) {
     const tH = intl ? 20 : a.kind === "regional" ? 12 : 7, tCx = a.termX0 + a.termD / 2;
     // the pier terminal ("Low Poly Airport" model: glass front, columns, a raised central hall), stretched along the apron.
     // Packed 100 long (z) x 14.5 deep (x) x 4 tall, its airside front at -x: it faces the apron as it is.
-    const hallL = a.apL * 0.9, hallH = tH * 1.65;
-    { const t = placeBuilding(grp, "apt_term", 1, tCx, 0, 0, 0); t.scale.set(a.termD / 14.47, hallH / 4.04, hallL / 100); }
+    const LK = LOOK[a.code] || { term: "linear", hang: { side: 1, n: intl ? 4 : 2, face: "apron" }, tower: "apron" }, tmats = termMats(LK);
+    const hallL = a.apL * 0.9, hallH = tH * 1.65, pieces = [];   // [z centre, length, height factor, depth factor]
+    if (LK.term === "units" && stands.length >= 4) {
+      const n = LK.units || 3, per = Math.ceil(stands.length / n);
+      for (let k = 0; k < n; k++) { const g = stands.slice(k * per, (k + 1) * per); if (!g.length) continue;
+        const z0 = g[0].z - DIMS[g[0].kind][0] / 2 - 6, z1 = g[g.length - 1].z + DIMS[g[g.length - 1].kind][0] / 2 + 6; pieces.push([(z0 + z1) / 2, z1 - z0, 0.9 + (k % 2) * 0.25, 1]); }
+    } else if (LK.term === "hub") { pieces.push([0, hallL, 0.72, 1], [0, hallL * 0.28, 1.6, 1.7]); }
+    else if (LK.term === "stepped") { const L3 = hallL / 3; pieces.push([-L3, L3, 0.75, 1], [0, L3, 1.4, 1.2], [L3, L3, 0.75, 1]); }
+    else pieces.push([0, hallL, 1, 1]);
+    for (const [zc, L, hm, dm] of pieces) { const t = placeTerm(grp, tmats, a.termX0 + a.termD * dm / 2, zc); t.scale.set(a.termD * dm / 14.47, hallH * hm / 4.04, L / 100); }
     boxT(grp, 10, 0.7, a.apL * 0.7, MAT.roof, a.termX1 + 5, Math.min(tH - 1, 7), 0, 4);
     for (let z = -a.apL * 0.34; z <= a.apL * 0.34; z += 18) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, Math.min(tH - 1, 7), 8), MAT.wall2); c.position.set(a.termX1 + 9, Math.min(tH - 1, 7) / 2, z); grp.add(c); }
     { const nm = a.name.toUpperCase(), sh = intl ? 8 : 5.5, sw = Math.min(hallL * 0.9, Math.max(40, nm.length * sh * 0.62 + sh * 2));
@@ -3712,7 +3752,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const satModels = [];
     if (a.satX0) {
       const x0 = a.satX0, x1 = a.satX1, cxs = (x0 + x1) / 2, L = a.satL;
-      flat(grp, x1 - x0 + 12, L + 90, MAT.apron, cxs + 6, 0.04, 0);
+      flat(grp, x1 - x0 + 12, L + 90, apronM, cxs + 6, 0.04, 0);
       { const t = placeBuilding(grp, "apt_term", 1, cxs, 0, 0, 0); t.scale.set(26 / 14.47, 15 / 4.04, L / 100); }
       const sg = new THREE.Mesh(new THREE.PlaneGeometry(60, 7), new THREE.MeshBasicMaterial({ map: textTex("SATELLITE B", "#14385e", "#ffffff") }));
       sg.rotation.y = -Math.PI / 2; sg.position.set(cxs - 13.8, 16, 0); grp.add(sg);
@@ -3747,37 +3787,43 @@ vec3 liveryAt(vec3 p, out float fus) {
       im.frustumCulled = false; im.userData.keepAlone = true; grp.add(im); a.veh = { im, veh };
     }
     // control tower
-    const twZ = -a.apL / 2 - 70, twX = a.apX0 + a.apD * 0.6, twH = intl ? 55 : a.kind === "regional" ? 32 : 18;
+    const hs = LK.hang, hSide = hs.side;
+    const twPos = LK.tower === "land" ? [a.roadX + 45, -a.apL * 0.2] : LK.tower === "field" ? [r0.off - r0.w / 2 - 105, -r0.len * 0.12] : [a.apX0 + a.apD * 0.6, -hSide * (a.apL / 2 + 70)];
+    const twX = twPos[0], twZ = twPos[1], twH = intl ? 55 : a.kind === "regional" ? 32 : 18;
     // control tower model: the concrete tower at the bigger airports, the small tower at airfields (model heights 392 and 411 per 100 m of footprint)
-    const twKey = ga ? "apt_tower1" : "apt_tower2", twModelH = ga ? 411.4 : 392, twTotal = intl ? 72 : ga ? 26 : 46;
+    const twKey = ga ? "apt_tower1" : "apt_tower2", twModelH = ga ? 411.4 : 392, twTotal = LK.twH || (intl ? 72 : ga ? 26 : 46);
     placeBuilding(grp, twKey, twTotal / twModelH, twX, 0, twZ, -Math.PI / 2);
     const cab = new THREE.Object3D(); cab.position.set(twX, twTotal * (ga ? 0.78 : 0.86), twZ); grp.add(cab);   // where the tower camera sits
     const bc = new THREE.Group(); bc.position.set(twX, twTotal + 0.6, twZ);
     const bw = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 1.6), new THREE.MeshBasicMaterial({ color: 0x9cffc6 })); bw.position.z = 0.7; bc.add(bw);
     const bwh = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 1.6), M.white); bwh.position.z = -0.7; bc.add(bwh); grp.add(bc); beacons.push(bc);
-    // fire station, hangars, cargo, fuel farm
-    box(grp, 26, 9, 34, MAT.red, a.tx + 45, 0, twZ - 30);
-    const hz0 = a.apL / 2 + 70, hW = intl ? 80 : ga ? 26 : 52, hD = intl ? 70 : ga ? 22 : 46, hH = intl ? 24 : ga ? 9 : 17;
-    const hN = intl ? 4 : ga ? 4 : 3, hSpan = intl ? 80 * 3 + 95 + 80 : hN * (hW + 20);
-    const names = intl ? ["SKYWAYS TECHNIK", "HANGAR 2", "WIDEBODY MRO", "HANGAR 4"] : ga ? ["AERO CLUB", "FLIGHT SCHOOL", "HANGAR 3", "HANGAR 4"] : ["LINE MAINTENANCE", "HANGAR 2", "HANGAR 3"];
-    const hNum = intl ? 4 : ga ? 4 : 3, hWk = (k) => (intl && k === 2 ? 95 : hW), hDk = (k) => (intl && k === 2 ? 80 : hD), hHk = (k) => (intl && k === 2 ? 30 : hH);
-    let hzCur = hz0;
+    // fire station at the other end from the hangars, beside the taxiway; hangars; fuel farm behind the hangars
+    { const fz = -hSide * (a.apL / 2 + 45); box(grp, 26, 9, 34, MAT.red, a.tx + 45, 0, fz); box(grp, 14, 4, 34, MAT.wall2, a.tx + 64, 0, fz); }
+    const hW = intl ? 80 : ga ? 26 : 52, hD = intl ? 70 : ga ? 22 : 46, hH = intl ? 24 : ga ? 9 : 17;
+    const names = intl ? ["LINE MAINTENANCE", "HANGAR 2", "WIDEBODY MRO", "HANGAR 4"] : ga ? ["AERO CLUB", "FLIGHT SCHOOL", "HANGAR 3", "HANGAR 4"] : ["LINE MAINTENANCE", "HANGAR 2", "HANGAR 3"];
+    const hNum = hs.n, hWk = (k) => (intl && k === 2 ? 95 : hW);
+    let hCur = 0, hFar = 0;
     for (let k = 0; k < hNum; k++) {
-      // hangar model: open end towards the apron (the model's doors face +x, the apron is at −x: turned round), 100 model units wide
-      const w = hWk(k), sc = w / 100, dd = 135 * sc, hh = 49 * sc, hz = hzCur + w / 2, hx = a.apX0 + dd / 2 + 30; hzCur += w + 20;
-      placeBuilding(grp, "apt_hangar", sc, hx, 0, hz, Math.PI);
-      { const sg = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(w * 0.5, 40), Math.max(2.5, hh * 0.1)), new THREE.MeshBasicMaterial({ map: textTex(names[k], "#1b2c40", "#ffffff", 512, 64) }));
-        sg.rotation.y = -Math.PI / 2; sg.position.set(hx - dd / 2 - 0.6, hh * 0.78, hz); grp.add(sg); }
-      { const xa = a.tx, xb = hx - dd / 2 - 2; flat(grp, xb - xa, 0.4, MAT.yellow, (xa + xb) / 2, 0.09, hz); }   // taxi line from the taxiway into the hangar
-      flat(grp, 44, w + 10, MAT.apron, hx - dd / 2 - 22, 0.04, hz);
+      // hangar model: 100 model units wide, its doors face +x; turned so the doors face the apron (or the apron's end)
+      const w = hWk(k), sc = w / 100, dd = 135 * sc, hh = 49 * sc;
+      let hx, hz, rot, sgx, sgz, sgr;
+      if (hs.face === "end") {   // side by side across the end of the apron, doors towards it
+        hx = a.apX0 + 10 + hCur + w / 2; hz = hSide * (a.apL / 2 + 60 + dd / 2); rot = hSide > 0 ? Math.PI / 2 : -Math.PI / 2; hCur += w + 18;
+        sgx = hx; sgz = hz - hSide * (dd / 2 + 0.6); sgr = hSide > 0 ? Math.PI : 0;
+        flat(grp, w + 10, 44, apronM, hx, 0.04, hz - hSide * (dd / 2 + 22)); hFar = Math.max(hFar, a.apL / 2 + 60 + dd);
+      } else {                   // in a row along the end of the apron, doors towards the taxiway
+        hz = hSide * (a.apL / 2 + 70 + hCur + w / 2); hx = a.apX0 + dd / 2 + 30; rot = Math.PI; hCur += w + 20;
+        sgx = hx - dd / 2 - 0.6; sgz = hz; sgr = -Math.PI / 2;
+        flat(grp, 44, w + 10, apronM, hx - dd / 2 - 22, 0.04, hz); { const xa = a.tx, xb = hx - dd / 2 - 2; flat(grp, xb - xa, 0.4, MAT.yellow, (xa + xb) / 2, 0.09, hz); }
+        hFar = Math.max(hFar, a.apL / 2 + 70 + hCur);
+      }
+      placeBuilding(grp, "apt_hangar", sc, hx, 0, hz, rot);
+      const sg = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(w * 0.5, 40), Math.max(2.5, hh * 0.1)), new THREE.MeshBasicMaterial({ map: textTex(names[k % names.length], "#1b2c40", "#ffffff", 512, 64) }));
+      sg.rotation.y = sgr; sg.position.set(sgx, hh * 0.78, sgz); grp.add(sg);
     }
-    if (intl) {
-      const cz = twZ - 170; box(grp, 60, 16, 130, MAT.wall2, a.apX0 + 80, 0, cz); flat(grp, 70, 140, MAT.apron, a.apX0 + 25, 0.04, cz);
-      const cs = new THREE.Mesh(new THREE.PlaneGeometry(50, 9), new THREE.MeshBasicMaterial({ map: textTex("CARGO", "#e86a1a", "#fff") })); cs.rotation.y = -Math.PI / 2; cs.position.set(a.apX0 + 49.7, 11, cz); grp.add(cs);
-    }
-    for (let k = 0; k < (intl ? 4 : 2); k++) {
+    for (let k = 0; k < (intl ? 4 : 2); k++) {   // fuel farm, landside of the hangars
       const t = new THREE.Mesh(new THREE.CylinderGeometry(intl ? 11 : 6, intl ? 11 : 6, intl ? 13 : 8, 20), MAT.tank);
-      t.position.set(a.roadX - 30 - (k % 2) * 28, (intl ? 13 : 8) / 2, hz0 + hSpan + 40 + Math.floor(k / 2) * 28); grp.add(t);
+      t.position.set(a.roadX - 30 - (k % 2) * 28, (intl ? 13 : 8) / 2, hSide * (hFar + 40 + Math.floor(k / 2) * 28)); grp.add(t);
     }
     // car park with cars, landside road kerb
     // a multi-storey car park on the landside instead of an empty open lot: concrete decks with dark open bays
@@ -5824,6 +5870,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     for (const k of ["apt_term", "mono_train"]) { const pk = PACK_CACHE[k]; if (!pk) continue;
       for (const pt of pk.parts) { const c = pt.base, glass = c[2] > 0.7 && c[0] < 0.1, lamp = k === "apt_term" ? (c[0] < 0.15 && c[1] < 0.15) : (c[0] > 0.6 && c[2] < 0.2);
         if (pt.mat.emissive) pt.mat.emissive.set(night && (glass || lamp) ? (glass ? 0x5a4a2c : 0xffe2a8) : 0x000000); } }
+    if (typeof TERM_GLASS !== "undefined") for (const m of TERM_GLASS) if (m.emissive) m.emissive.set(night ? 0x5a4a2c : 0x000000);
   }
   function lightning(dt) {
     if (ENV.weather !== "storm" || !(S.mode === "fly" || S.mode === "brief" || S.mode === "paused")) { if (LT.flash > 0) { LT.flash = 0; hemi.intensity = ENV.hemi0 ?? hemi.intensity; } return; }
