@@ -564,7 +564,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
   <header class="masthead">
     <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" fill="currentColor"/></svg></span>
       <h1>Skyways <span>Flight Sim</span></h1></div>
-    <p class="tagline">8 aircraft · 10 real airports · 10 missions · replays · 32 km world · day, sunset and night</p>
+    <p class="tagline">8 aircraft · 10 real airports · 17 missions · replays · 32 km world · day, sunset and night</p>
   </header>
 
   <div class="stage" id="stage">
@@ -3885,7 +3885,11 @@ vec3 liveryAt(vec3 p, out float fus) {
   function toggleGear() {
     if (!spec.retract) { flash("The Cessna 172 has fixed landing gear", 1.6); return; }
     if (S.grounded && S.gearDown) { flash("Can't raise the gear on the ground", 1.6); return; }
-    S.gearDown = !S.gearDown; flash(S.gearDown ? "Gear down" : "Gear up", 1.4); sfx("gear", S.gearDown);
+    if (S.mission && S.mission.gearJam && !S.gearDown && (S.gearTries || 0) < 2) {   // the fault: the first tries don't unlock it
+      S.gearTries = (S.gearTries || 0) + 1; sfx("gear", false); buzz(120);
+      flash(S.gearTries === 1 ? "GEAR UNSAFE: nothing happened. Try the alternate extension: press G again" : "Still locked up... once more (G)", 2.6); return;
+    }
+    S.gearDown = !S.gearDown; flash(S.gearDown ? (S.mission && S.mission.gearJam ? "Alternate extension: the gear is falling free… wait for it" : "Gear down") : "Gear up", 1.4); sfx("gear", S.gearDown);
   }
   function trimStep(noseUp) {
     if (S.mode !== "fly") return;
@@ -4136,23 +4140,39 @@ vec3 liveryAt(vec3 p, out float fus) {
     { id: "m1", title: "Short final", plane: "b737", from: "LHR", to: "LHR", start: "approach", dist: 6000, time: "day", wx: "clear", wind: [5, 0], goals: [],
       desc: "You're lined up on a 6 km final to Heathrow's runway 27L in perfect weather, gear and flaps already down. Keep the ILS diamonds centred, close the throttle near the ground and flare gently." },
     { id: "m2", title: "London to Paris", plane: "b737", from: "LHR", to: "CDG", start: "runway", time: "day", wx: "clear", wind: [6, 10], goals: [],
-      desc: "A whole flight: take off from Heathrow, climb out, turn towards Paris Charles de Gaulle and land on runway 27R, between its two pairs of runways. Follow the amber arrow and the magenta line on the map." },
+      desc: "A whole flight: take off from Heathrow, climb out, turn towards Paris Charles de Gaulle and land on runway 27R. Follow the amber arrow and the magenta line on the map." },
+    { id: "n1", title: "Gate to gate", plane: "a321", from: "AMS", to: "LHR", start: "gate", time: "day", wx: "cloudy", wind: [8, 20], gate: true, goals: [["gate"]],
+      desc: "A whole airline day in one go: refuel and board 200 passengers at Schiphol, push back, follow the taxi card to the runway, fly to Heathrow, then taxi to your gate (look for the green sign) and let everyone off." },
+    { id: "n2", title: "Heathrow ring run", plane: "a321", from: "LHR", to: "LHR", start: "runway", time: "day", wx: "clear", wind: [5, 0], goals: [["rings"]],
+      rings: { at: "LHR", pts: [[3900, 0, 600], [5600, 1300, 1000], [4600, 3200, 1300], [1200, 3900, 1300], [-2200, 3600, 1200], [-4600, 2300, 1000], [-5200, 600, 800]] },
+      desc: "Take off west, then fly a full circuit round Heathrow through 7 rings in order (the green one is next), and land back on 27L. Smooth, coordinated turns: roll in gently, keep the height." },
     { id: "m3", title: "Schiphol crosswind", plane: "mh", from: "AMS", to: "AMS", start: "approach", dist: 8000, time: "day", wx: "cloudy", wind: [20, 80], goals: [["centre", 8]],
       desc: "Schiphol lies on flat land by the North Sea and the wind blows straight across runway 36C. Point the nose into the wind to track the centreline, then straighten up with the rudder (Q / E) just before touchdown." },
-    { id: "m4", title: "Stop on the runway", plane: "b737", from: "JFK", to: "JFK", start: "approach", dist: 6000, time: "day", wx: "clear", wind: [8, -20], goals: [["stop"]],
-      desc: "A visual final into New York JFK over the water. Fly the final slow and on the glide path, touch down early, then brake hard (Space), with spoilers (X) and reverse thrust (T)." },
+    { id: "n3", title: "VIP on board", plane: "b77w", from: "SIN", to: "SIN", start: "approach", dist: 9000, time: "sunset", wx: "clear", wind: [6, 15], goals: [["fpm", 180], ["centre", 4]],
+      desc: "A head of state is asleep in the first-class cabin. Put the 777 on Changi's runway so gently that nobody wakes up: under 180 ft/min, right on the centreline. Hold a little power into the flare." },
     { id: "m5", title: "Night ILS", plane: "a321", from: "SVO", to: "SVO", start: "approach", dist: 15000, time: "night", wx: "cloudy", wind: [10, 30], goals: [],
       desc: "A dark, overcast night into Moscow Sheremetyevo. The runway lights are all you'll see, so fly the ILS and keep both diamonds centred. The autopilot's APP mode is allowed." },
     { id: "m6", title: "Fog at Istanbul", plane: "b763", from: "IST", to: "IST", start: "approach", dist: 12000, time: "day", wx: "fog", vis: 900, wind: [4, 0], goals: [],
       desc: "Fog rolls in from the Black Sea and visibility is under a kilometre. You won't see the runway until the last seconds, so trust the instruments: the ILS diamonds, the 3° path and the radio-altitude callouts." },
     { id: "m7", title: "Engine failure", plane: "b737", from: "SIN", to: "SIN", start: "runway", time: "day", wx: "clear", wind: [6, 0], engFail: 400, goals: [],
       desc: "A normal departure from Singapore Changi, until the right engine quits at 400 ft. Keep flying: left rudder, wings level, speed up. Then turn back and land on the runway you just left." },
+    { id: "n4", title: "Flaps jammed", plane: "a330", from: "IST", to: "IST", start: "approach", dist: 12000, time: "day", wx: "cloudy", wind: [8, -10], flapsJam: 0, goals: [["stop"]],
+      desc: "The flaps are stuck fully up, so the A330 has to land some 30 knots faster than usual. Fly a long, flat final, touch down early and use everything to stop: brakes (Space), spoilers (X) and full reverse (T)." },
+    { id: "n5", title: "Go around!", plane: "b763", from: "JFK", to: "JFK", start: "approach", dist: 9000, time: "day", wx: "cloudy", wind: [10, 20], blocked: true, goals: [["goaround"]],
+      desc: "A 767 into JFK... but another aircraft hasn't cleared the runway. When the tower calls GO AROUND: full power, pitch up, gear up, climb above 1000 ft, fly a circuit and come back to land." },
+    { id: "n6", title: "Gear won't come down", plane: "b744", from: "DXB", to: "DXB", start: "approach", dist: 15000, time: "sunset", wx: "clear", wind: [8, 10], gearJam: true, goals: [["stop"]],
+      desc: "A 747 into Dubai with a hydraulic fault: the gear stays up. Keep pressing G: the alternate gravity extension needs several tries and drops the gear slowly. Don't land until it's down and locked." },
+    { id: "n7", title: "Snow at Innsbruck", plane: "b737", from: "INN", to: "INN", start: "approach", dist: 9000, time: "day", wx: "snow", wind: [9, 30], brake: 0.45, goals: [["stop"], ["fpm", 500]],
+      desc: "Snow on Innsbruck's 2400 m mountain runway, 760 m up, and the braking is poor. Touch down firmly in the first third, spoilers and full reverse at once, and brake gently: wheels on snow slide." },
+    { id: "n8", title: "Fuel emergency", plane: "a321", from: "AMS", to: "AMS", start: "air", dist: 14000, angle: 75, alt: 1100, fuel: 200, time: "day", wx: "overcast", wind: [12, 40], goals: [],
+      desc: "A fuel leak: 3 minutes and 20 seconds of fuel left and you are 14 km from Schiphol at 3600 ft, off to the side. Turn for the airport, get down and land. If the engines flame out, glide: keep the speed up." },
+    { id: "m9", title: "Alpine slalom", plane: "b737", from: "FRA", to: "INN", start: "runway", time: "sunset", wx: "cloudy", wind: [9, 0], goals: [["rings"], ["stop"]],
+      rings: { line: ["FRA", "INN"], n: 7, zig: 650, agl: 260 },
+      desc: "From Frankfurt into the mountains: weave through 7 rings low over the ridges, then land at Innsbruck, 760 m up on a 2400 m runway. Thin air means a faster touchdown, so brake firmly." },
     { id: "m8", title: "Against the clock", plane: "mh", from: "LHR", to: "SVO", start: "runway", time: "sunset", wx: "clear", wind: [8, 200], noAP: true, limit: 450, goals: [["time"]],
       desc: "The autopilot is broken and Moscow is waiting. Fly the whole trip from Heathrow by hand and come to a stop on Sheremetyevo's runway within 7:30. Turn onto the final early, a tight last turn costs more time than it saves." },
-    { id: "m9", title: "Into the Alps", plane: "b737", from: "FRA", to: "INN", start: "runway", time: "sunset", wx: "cloudy", wind: [9, 0], goals: [["stop"]],
-      desc: "Innsbruck sits 760 m up among the mountains, on a 2400 m runway. Climb early, clear the ridges, then find the field on its plateau. Thin air means a faster touchdown, so brake firmly." },
-    { id: "m10", title: "Heavy into Dubai", plane: "b77w", from: "DXB", to: "DXB", start: "approach", dist: 11000, time: "day", wx: "cloudy", wind: [14, -60], goals: [["fpm", 600], ["stop"]],
-      desc: "A fully loaded 777 into Dubai with a gusty desert crosswind. The big jet is slow to respond: get it stable early, keep the sink rate low and stop before the end." },
+    { id: "m10", title: "Thunderstorm into Dubai", plane: "b77w", from: "DXB", to: "DXB", start: "approach", dist: 11000, time: "night", wx: "storm", wind: [24, -55], goals: [["fpm", 600], ["stop"]],
+      desc: "The hardest one: a fully loaded 777 at night through a thunderstorm, lightning all around and a gusty 24-knot crosswind. Get it stable early, ride the bumps, keep the sink rate low and stop before the end." },
   ];
   let briefTab = "free", selMission = MISSIONS[0], briefCanResume = false;
   // hand-picked routes for the free-flight briefing
@@ -4489,7 +4509,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     if ($("modelSel").value === "real") briefTip.textContent = PLANES[chosen].fbw ? `${PLANES[chosen].name} is fly-by-wire: it keeps its protections even in Realistic.` : `Realistic: no stall protection and the trim holds the angle of attack. Full power pitches the nose up, so trim nose down with ${trimKeys(true)} after liftoff and watch your speed.`;
   });
   function startFlight() {
-    goBtn.textContent = "Take off"; S.mission = null; ENV.vis = null; recClear();
+    goBtn.textContent = "Take off"; S.mission = null; clearMissionExtras(); ENV.vis = null; recClear();
     S.from = AIRPORTS[+fromSel.value]; S.to = toSel.value === "-1" ? null : AIRPORTS[+toSel.value];
     if (!model || model.userData.kind !== chosen) {
       if (!setPlane(chosen)) { briefTip.textContent = `${PLANES[chosen].name} isn't ready yet. Pick another aircraft or try again.`; return; }
@@ -4591,11 +4611,11 @@ vec3 liveryAt(vec3 p, out float fus) {
     S.brake = brake;
     if (S.throttle > 0.05) S.started = true;
     if (stepPushback(dt)) return;
-    atcTick(dt); if (!atcEl.hidden && (S.atcSyncT = (S.atcSyncT || 0) + dt) > 0.5) { S.atcSyncT = 0; syncAtc(); }
+    stepMission(dt); atcTick(dt); if (!atcEl.hidden && (S.atcSyncT = (S.atcSyncT || 0) + dt) > 0.5) { S.atcSyncT = 0; syncAtc(); }
     if (stepDock(dt)) return;
     if (stepServices(dt)) return;
 
-    S.gearPos = clamp(S.gearPos + (S.gearDown ? 1 : -1) * dt * 0.5, 0, 1);
+    S.gearPos = clamp(S.gearPos + (S.gearDown ? 1 : -1) * dt * (S.mission && S.mission.gearJam ? 0.12 : 0.5), 0, 1);
     S.flapPos = lerp(S.flapPos, S.flaps / 2, Math.min(1, dt * 1.2));
     if (S.reverse && (!S.grounded || S.gs < 2.5)) { S.reverse = false; syncTouchKeys(); if (S.grounded) flash("Reverse thrust off", 1.2); }
     if (S.autoSpoiler && S.throttle > 0.5) { S.spoiler = 0; S.autoSpoiler = false; syncTouchKeys(); }
@@ -4628,7 +4648,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     // Mach number: jet thrust falls off as speed rises, and drag climbs steeply past ~0.8 (the airliners' practical limit)
     const mach = Math.hypot(S.vel.x, S.vel.y, S.vel.z) / (340 - 0.0039 * clamp(S.pos.y, 0, 11000)); S.mach = mach;
-    const thrustAcc = (S.reverse ? -0.5 : 1) * S.n1 * thrMax * Math.pow(sigma, 0.7) * (1 - 0.3 * Math.min(mach, 0.9)) * (S.engOut ? 0.5 : 1);
+    const thrustAcc = (S.reverse ? -0.5 : 1) * S.n1 * thrMax * Math.pow(sigma, 0.7) * (1 - 0.3 * Math.min(mach, 0.9)) * (S.engOut ? 0.5 : 1) * (S.fuelOut ? 0 : 1);
     const machDrag = mach > 0.78 ? 1 + 30 * (mach - 0.78) * (mach - 0.78) : 1;
     // wind with gusts (stronger in cloud and rain)
     const gustAmp = wxP().gust;
@@ -4649,7 +4669,8 @@ vec3 liveryAt(vec3 p, out float fus) {
       // (which kill lift) make the brakes bite, and braking at high speed with full lift is weak, as on a real airliner
       const wheelLoad = clamp(1 - q * Aw * clOf(S.groundPitch || 0) * ge / G, 0.08, 1);
       if (S.autobrake && (S.throttle > 0.3 || S.gs < 12)) S.autobrake = false;
-      const brakeDecel = brake ? spec.brake * 0.72 * wheelLoad : S.autobrake ? Math.min(2.4, spec.brake * 0.72 * wheelLoad) : 0;   // max braking ≈ 0.33 g
+      const bMul = (S.mission && S.mission.brake) || 1;
+      const brakeDecel = bMul * (brake ? spec.brake * 0.72 * wheelLoad : S.autobrake ? Math.min(2.4, spec.brake * 0.72 * wheelLoad) : 0);   // max braking ≈ 0.33 g (less on snow)
       S.gs -= (brakeDecel + 0.2 * wheelLoad + (S.throttle < 0.02 ? 0.1 : 0) + S.spoiler * 0.35) * dt;
       if (S.park) S.gs = Math.max(0, S.gs - 12 * dt);
       S.gs = Math.max(0, S.gs);
@@ -4698,7 +4719,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         const sl = Math.abs(heightAt(S.pos.x + 5, S.pos.z) - heightAt(S.pos.x - 5, S.pos.z)) + Math.abs(heightAt(S.pos.x, S.pos.z + 5) - heightAt(S.pos.x, S.pos.z - 5));
         if (sl > 4) { crash("You ran off the runway into rough ground."); return; }
       }
-      if (S.landedAt && (S.gs < 1.5 || (S.wantGate && !S.mission && S.landedAt === S.to && S.gs < 12))) completeLanding();
+      if (S.landedAt && (S.gs < 1.5 || (S.wantGate && (!S.mission || S.mission.gate) && S.landedAt === S.to && S.gs < 12))) completeLanding();
       updateGuide(); syncTaxiCard(); syncPerfCard();
       if (S.taxiOut && runwayAt(S.pos.x, S.pos.z) === S.from) { S.taxiOut = false; if (S.guide && S.guide.kind === "dep") { S.guide = null; if (S.guideMesh) S.guideMesh.visible = false; syncTaxiCard(); } RADIO.push({ text: `${S.from.name} Tower: runway ${S.from.label}, wind ${windText()}, cleared for takeoff.`, t: 10 }); flash(`Lined up. Full throttle, rotate at ${refSpeeds(spec).vr} knots`, 3.5); }
     } else {
@@ -4778,6 +4799,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         const gentle = S.vs > -6.5 && Math.abs(right.y) < 0.31 && fwd.y > -0.14 && fwd.y < 0.3 && S.speed < spec.stall * 1.9;
         if (!gentle) { crash(S.vs <= -6.5 ? `Hard landing at ${Math.round(-S.vs * M2FT * 60)} ft/min: the gear collapsed. Aim for under 600.` : Math.abs(right.y) >= 0.31 ? "Wingtip strike: level the wings before touchdown." : "You flew into the ground."); return; }
         if (spec.retract && S.gearPos < 0.9) { crash("Belly landing! Press G to lower the gear before you land."); return; }
+        if (S.blocker && rw === S.to) { crash("You landed on an occupied runway. When the tower says GO AROUND, climb away."); return; }
         if (!rw && am < 0.97) { crash("That wasn't a runway. Land on an airport runway."); return; }
         sfx("touch", Math.round(-S.vs * M2FT * 60));
         if (spec.big && Math.asin(clamp(fwd.y, -1, 1)) > 0.2 && !S.tailStrikeLdg) { S.tailStrikeLdg = true; buzz(220); flash("TAIL STRIKE on landing: too much flare, keep the nose lower", 3); }
@@ -4826,7 +4848,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const fpm = S.touchFpm, off = Math.abs(S.touchOff || 0), tdz = S.touchDist || 0;
     let stars = fpm < 240 ? 3 : fpm < 480 ? 2 : 1;
     if (off > 8 || tdz > 900 || tdz < 0 || S.wasBounce || S.tailStrikeLdg) stars = Math.max(1, stars - 1);
-    if (S.wantGate && !S.mission && !S.arrPending) {
+    if (S.wantGate && (!S.mission || S.mission.gate) && !S.arrPending) {
       S.arrPending = { a, stars, fpm, off, tdz, t: S.flightT };
       if (arrivalGuide(a)) { flash(`Landed: ${"★".repeat(stars)}${"☆".repeat(3 - stars)}. Now taxi to the gate.`, 3.5); return; }
       S.arrPending = null;
@@ -5083,6 +5105,15 @@ vec3 liveryAt(vec3 p, out float fus) {
     // wind and ground speed
     hud.font = `${Math.round(fs * 0.78)}px ${MONO}`; hud.textAlign = "left"; hud.fillStyle = HC.hud;
     { const wy0 = cy + bh / 2 + fs * 3.2, wx = phoneMQ.matches ? rx + bw : lx; hud.textAlign = phoneMQ.matches ? "right" : "left"; hud.fillText(`WIND ${windText()}`, wx, wy0); hud.fillText(`GS ${Math.round(S.gs * MS2KT)}`, wx, wy0 + fs * 1.05); hud.textAlign = "left"; }
+    // next ring: a green diamond on it (or at the screen edge pointing to it) with its distance
+    if (S.rings && S.rings.i < S.rings.list.length) {
+      const rc = S.rings.list[S.rings.i].c, dd = rc.distanceTo(S.pos); proj.copy(rc).project(camera);
+      let x = proj.x, y = proj.y; const behind = proj.z > 1; if (behind) { x = -x; y = -y; }
+      const on = !behind && Math.abs(x) < 0.9 && Math.abs(y) < 0.9, mm = Math.max(Math.abs(x), Math.abs(y), 0.001); if (!on) { x = x / mm * 0.85; y = y / mm * 0.85; }
+      const sx = (x + 1) / 2 * w, sy = (1 - y) / 2 * (h - dashH);
+      hud.save(); hud.strokeStyle = "#3dff8a"; hud.fillStyle = "#3dff8a"; hud.lineWidth = 2.5; hud.beginPath(); hud.moveTo(sx, sy - 14); hud.lineTo(sx + 14, sy); hud.lineTo(sx, sy + 14); hud.lineTo(sx - 14, sy); hud.closePath(); hud.stroke();
+      hud.font = `${Math.round(fs * 0.75)}px ${MONO}`; hud.textAlign = "center"; hud.fillText(`RING ${S.rings.i + 1} · ${(dd / 1000).toFixed(1)} km`, sx, sy + 28); hud.restore();
+    }
     // destination
     if (S.to) {
       const [tx, tz] = toWorld(S.to, -S.to.len / 2, 0);
@@ -5159,6 +5190,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (Math.abs(S.n1 - S.throttle) > 0.08) items.push([`ENG ${Math.round(S.n1 * 100)}%`, HC.caution]);
     if (S.engOut) items.push(["ENG 2 FAIL", HC.warn]);
     if (S.mission && S.mission.noAP) items.push(["AP INOP", HC.caution]);
+    if (S.mission && S.mission.fuel) { const left = S.mission.fuel - S.flightT; items.push([left > 0 ? `FUEL ${fmtTime(left)}` : "NO FUEL", left < 45 ? HC.warn : HC.hud]); }
+    if (S.rings && S.rings.i < S.rings.list.length) items.push([`RING ${S.rings.i + 1}/${S.rings.list.length}`, HC.nav]);
     if (S.mission && S.mission.limit) { const left = S.mission.limit - S.flightT; items.push([left >= 0 ? `TIME ${fmtTime(left)}` : `OVER TIME +${fmtTime(-left)}`, left < 60 ? HC.warn : HC.hud]); }
     {
       const iasKt = (S.ias || 0) * MS2KT, vmaxKt = spec.vmax * MS2KT;
@@ -6133,7 +6166,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   const fpsMeter = { n: 0, t0: performance.now() };
 
   // ================= MISSIONS =================
-  const START_LBL = { runway: "Runway start", approach: "On final", gate: "Gate start" }, TIME_LBL = { day: "Day", sunset: "Sunset", night: "Night" }, WX_LBL = { clear: "Clear", cloudy: "Cloudy", rain: "Rain", fog: "Fog", overcast: "Overcast", windy: "Windy", storm: "Thunderstorm", snow: "Snow", haze: "Haze" };
+  const START_LBL = { runway: "Runway start", approach: "On final", gate: "Gate start", air: "In the air" }, TIME_LBL = { day: "Day", sunset: "Sunset", night: "Night" }, WX_LBL = { clear: "Clear", cloudy: "Cloudy", rain: "Rain", fog: "Fog", overcast: "Overcast", windy: "Windy", storm: "Thunderstorm", snow: "Snow", haze: "Haze" };
   const misProg = () => readJSON("sw-missions", {});
   const misStars = (m) => { const v = misProg()[m.id]; return Number.isFinite(v) ? clamp(Math.round(v), 0, 3) : 0; };
   const misOpen = (i) => i === 0 || misStars(MISSIONS[i - 1]) > 0;
@@ -6146,6 +6179,9 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (g[0] === "stop") return "Stop on the runway (no overrun)";
     if (g[0] === "time") return `Stop at ${m.to} within ${fmtTime(m.limit)}`;
     if (g[0] === "fpm") return `Touch down softer than ${g[1]} ft/min`;
+    if (g[0] === "rings") return `Fly through all the rings in order`;
+    if (g[0] === "gate") return "Taxi to a gate and let the passengers off";
+    if (g[0] === "goaround") return "Go around when told, then land";
     return String(g[0]);
   }
   function goalMet(m, g, d) {
@@ -6153,9 +6189,12 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (g[0] === "stop") return !!d.onRwy;
     if (g[0] === "time") return S.flightT <= m.limit;
     if (g[0] === "fpm") return d.fpm < g[1];
+    if (g[0] === "rings") return !!S.rings && S.rings.i >= S.rings.list.length;
+    if (g[0] === "gate") return !!S.parkedDone;
+    if (g[0] === "goaround") return !!S.gaDone;
     return true;
   }
-  const missionGoals = (m) => [`Land at ${AP_BY[m.to].name}`].concat(m.goals.map((g) => goalText(m, g)), m.noAP ? ["No autopilot (inoperative)"] : [], m.engFail ? [`Engine failure at ${m.engFail} ft`] : []);
+  const missionGoals = (m) => [`Land at ${AP_BY[m.to].name}`].concat(m.goals.map((g) => goalText(m, g)), m.noAP ? ["No autopilot (inoperative)"] : [], m.engFail ? [`Engine failure at ${m.engFail} ft`] : [], m.flapsJam !== undefined ? ["Flaps jammed up"] : [], m.gearJam ? ["Landing gear fault"] : [], m.fuel ? [`Fuel for ${fmtTime(m.fuel)}`] : [], m.brake ? ["Poor braking (snow)"] : []);
   function syncGoLabel() { goBtn.textContent = briefTab === "missions" ? (briefCanResume ? "Restart mission" : "Start mission") : (briefCanResume ? "Restart flight" : "Take off"); }
   function setTab(t) {
     briefTab = t === "missions" ? "missions" : "free";
@@ -6204,6 +6243,58 @@ vec3 liveryAt(vec3 p, out float fus) {
     const thr = approachThrottle(v, S.pos.y);
     Object.assign(S, { grounded: false, flaps: 2, flapPos: 1, gearDown: true, gearPos: 1, throttle: thr, n1: thr, speed: v, ias: v, gs: Math.hypot(S.vel.x, S.vel.z), started: true, groundPitch: 0, alpha: TAN3, sink: 0 });
   }
+  // start already flying: dist metres from the runway, angle degrees off the approach, at alt metres, clean and at cruise speed
+  function spawnAir(a, dist, angle, alt) {
+    const r = a.rwys[0], t = (a.hdg + 180 + angle) * Math.PI / 180, [tx, tz] = toWorld(a, -r.len / 2, r.off);
+    const x = tx + Math.sin(t) * dist, z = tz - Math.cos(t) * dist, v = spec.stall * 1.6;
+    S.pos.set(x, a.elev + alt, z); S.q.setFromAxisAngle(AY, -Math.atan2(tx - x, -(tz - z)) - 0.9);
+    const fwd = V.fwd.set(0, 0, -1).applyQuaternion(S.q); S.vel.copy(fwd).multiplyScalar(v);
+    Object.assign(S, { grounded: false, flaps: 0, flapPos: 0, gearDown: false, gearPos: 0, throttle: 0.55, n1: 0.55, speed: v, ias: v, gs: v, started: true, groundPitch: 0, alpha: 0.05, sink: 0 });
+  }
+  // rings to fly through: points in an airport's frame (along, across, feet above it) or a zig-zag along a line between two airports
+  function buildRings(spec2) {
+    let pts = [];
+    if (spec2.at) { const a = AP_BY[spec2.at]; pts = spec2.pts.map(([al, ac, ft]) => { const [x, z] = toWorld(a, al, ac); return new THREE.Vector3(x, Math.max(a.elev, heightAt(x, z)) + ft / M2FT, z); }); }
+    else { const f = AP_BY[spec2.line[0]], t = AP_BY[spec2.line[1]], dx = t.x - f.x, dz = t.z - f.z, L = Math.hypot(dx, dz), nx = -dz / L, nz = dx / L;
+      for (let k = 0; k < spec2.n; k++) { const u = 0.22 + 0.6 * k / (spec2.n - 1), side = (k % 2 ? 1 : -1) * spec2.zig, x = f.x + dx * u + nx * side, z = f.z + dz * u + nz * side;
+        let top = 0; for (let q = -3; q <= 3; q++) top = Math.max(top, heightAt(x + dx / L * q * 120, z + dz / L * q * 120)); pts.push(new THREE.Vector3(x, top + spec2.agl, z)); } }
+    const list = pts.map((c, k) => {
+      const nb = pts[k + 1] || c.clone().add(c.clone().sub(pts[k - 1] || c)), n = nb.clone().sub(c).setY(0); if (n.lengthSq() < 1) n.set(0, 0, -1); n.normalize();
+      const mesh = new THREE.Mesh(new THREE.TorusGeometry(42, 2.6, 10, 48), new THREE.MeshBasicMaterial({ color: 0xffa23d, transparent: true, opacity: 0.75 }));
+      mesh.position.copy(c); mesh.lookAt(c.clone().add(n)); scene.add(mesh);
+      return { c, n, R: 42, mesh, prev: null };
+    });
+    S.rings = { list, i: 0 }; syncRings();
+  }
+  function syncRings() { const R = S.rings; if (!R) return; R.list.forEach((r, k) => { r.mesh.visible = k >= R.i; r.mesh.material.color.set(k === R.i ? 0x3dff8a : 0xffa23d); r.mesh.material.opacity = k === R.i ? 0.95 : 0.6; r.mesh.scale.setScalar(k === R.i ? 1.12 : 1); }); }
+  function clearMissionExtras() {
+    if (S.rings) { S.rings.list.forEach((r) => { scene.remove(r.mesh); r.mesh.geometry.dispose(); }); S.rings = null; }
+    if (S.blocker) { scene.remove(S.blocker.mdl); S.blocker = null; }
+    S.gaCalled = false; S.gaDone = false; S.gearTries = 0; S.fuelOut = false;
+  }
+  // per step: rings, the go-around call, fuel, jammed flaps
+  function stepMission(dt) {
+    const m = S.mission; if (!m || S.mode !== "fly") return;
+    if (m.flapsJam !== undefined) S.flaps = m.flapsJam;
+    if (m.fuel && !S.fuelOut && S.flightT > m.fuel) { S.fuelOut = true; flash("Both engines have flamed out: no fuel. Glide! Keep the nose down for speed.", 5); sfx("apOff"); buzz([200, 80, 200]); }
+    const R = S.rings;
+    if (R && R.i < R.list.length) {
+      const r = R.list[R.i], d = V.tmp.copy(S.pos).sub(r.c), sd = d.dot(r.n), rad = d.addScaledVector(r.n, -sd).length();
+      if (r.prev !== null && r.prev < 0 && sd >= 0) {
+        if (rad < r.R * 1.2) { R.i++; chime(R.i === R.list.length ? 880 : 740, 0.12); flash(R.i === R.list.length ? "All rings! Now land." : `Ring ${R.i}/${R.list.length}`, 1.6); syncRings(); }
+        else if (rad < r.R * 4) flash(`Missed ring ${R.i + 1}: turn round and fly through it`, 2);
+      }
+      r.prev = sd;
+    }
+    if (m.blocked && !S.gaCalled && !S.grounded) {
+      const agl = (S.pos.y - spec.gearH - S.to.elev) * M2FT;
+      if (agl < 650) { S.gaCalled = true; RADIO.push({ text: `${S.to.name} Tower: GO AROUND, GO AROUND! Aircraft on the runway.`, t: 10 }); flash("GO AROUND! Full power, pitch up, gear up, climb above 1000 ft", 4.5); sfx("apOff"); buzz([200, 80, 200]); }
+    }
+    if (m.blocked && S.gaCalled && !S.gaDone && !S.grounded && (S.pos.y - spec.gearH - S.to.elev) * M2FT > 1000) {
+      S.gaDone = true; S.gaDoneT = S.flightT; RADIO.push({ text: `${S.to.name} Tower: going around. Runway will be clear in a minute: fly a circuit and come back for runway ${S.to.label}.`, t: 12 });
+    }
+    if (S.blocker && S.gaDone && S.flightT - S.gaDoneT > 25) { scene.remove(S.blocker.mdl); S.blocker = null; RADIO.push({ text: `${S.to.name} Tower: runway ${S.to.label} is clear now.`, t: 8 }); }
+  }
   function startMission(m) {
     const i = MISSIONS.indexOf(m), from = AP_BY[m.from], to = AP_BY[m.to];
     if (i < 0 || !misOpen(i)) { briefTip.textContent = "That mission is still locked: pass the one before it first."; return; }
@@ -6215,8 +6306,15 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (hiddenParked) { hiddenParked.visible = true; hiddenParked = null; }
     { const ref = m.start === "approach" ? to : from, f = (ref.hdg + m.wind[1]) * Math.PI / 180, ws = m.wind[0] / MS2KT; S.wind.set(-Math.sin(f) * ws, 0, Math.cos(f) * ws); S.gustV.set(0, 0, 0); }
     S.lights = ENV.time !== "day";
-    if (m.start === "approach") spawnApproach(to, m.dist); else if (m.start === "gate") spawnAtGate(from);
-    S.mission = m; S.engOut = false; syncTouchKeys();
+    clearMissionExtras();
+    if (m.start === "approach") spawnApproach(to, m.dist); else if (m.start === "gate") spawnAtGate(from); else if (m.start === "air") spawnAir(to, m.dist, m.angle || 60, m.alt || 1000);
+    S.mission = m; S.engOut = false; S.wantGate = !!m.gate; syncTouchKeys();
+    if (m.gearJam) { S.gearDown = false; S.gearPos = 0; }
+    if (m.flapsJam !== undefined) { S.flaps = m.flapsJam; S.flapPos = m.flapsJam / 2; }
+    if (m.rings) buildRings(m.rings);
+    if (m.blocked) {   // an aircraft stuck on the runway, 700 m in
+      const b = buildPlane("b737", "dal"); if (b) { const r = to.rwys[0], [x, z] = toWorld(to, -r.len / 2 + 700, r.off); b.position.set(x, groundY(x, z) + PLANES.b737.gearH, z); b.rotation.y = -to.hdg * Math.PI / 180; (b.userData.strobes || []).forEach((st) => (st.visible = false)); scene.add(b); S.blocker = { mdl: b }; }
+    }
     // AI traffic heading for the mission airport goes elsewhere, so nobody lands on top of you
     for (const ai of AI) {
       if (ai.to !== to || !["cruise", "final"].includes(ai.phase)) continue;
@@ -6224,10 +6322,15 @@ vec3 liveryAt(vec3 p, out float fus) {
       ai.to = alt[Math.floor(Math.random() * alt.length)]; if (ai.phase === "final") { ai.phase = "goaround"; ai.wait = 30; }
     }
     recClear(); RADIO.length = 0; S.msgQ = [];
-    S.mode = "fly"; brief.hidden = true; keys.clear(); camSnap = true;
+    S.mode = "fly"; brief.hidden = true; document.getElementById("welcome").hidden = true; keys.clear(); camSnap = true;
     flash(`Mission ${i + 1}: ${m.title}. ${missionGoals(m).slice(0, 2).join(" · ")}`, 5);
     if (m.start === "approach") S.msgQ.push([`On final to ${to.code} runway ${to.label}: ${Math.round(m.dist / 1000)} km out, gear down, flaps 2. Wind ${windText()}.`, 4.5]);
     if (m.noAP) S.msgQ.push(["Autopilot and autothrottle are inoperative: fly it by hand.", 3.5]);
+    if (m.flapsJam !== undefined) S.msgQ.push(["FLAPS JAMMED fully up: approach about 30 knots faster than normal.", 4]);
+    if (m.gearJam) S.msgQ.push(["Hydraulic fault: the gear may not come down. Press G, and keep trying.", 4]);
+    if (m.fuel) S.msgQ.push([`FUEL LEAK: about ${fmtTime(m.fuel)} of fuel left. Head straight for ${to.code}.`, 4.5]);
+    if (m.rings) S.msgQ.push(["Fly through the green ring, then the next one turns green.", 3.5]);
+    if (m.brake) S.msgQ.push(["Snow on the runway: braking action poor.", 3.5]);
     if (soundOn) initAudio();
   }
   function missionResult(landed, d) {
