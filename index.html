@@ -474,6 +474,11 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .taxi-txt span { font: 400 13px/1.3 var(--font-body); color: #e9d9b0; }
 .taxi-meta { display: grid; gap: 4px; justify-items: end; font: 500 12px var(--font-mono); color: #e9d9b0; }
 .taxi-meta .fast { color: #ff8a7a; }
+.taxi.perf { border-color: rgba(120,190,255,0.6); background: rgba(8,16,28,0.9); color: #e6f2ff; }
+.taxi.perf .taxi-arrow { background: #78beff; color: #06121f; font-size: 17px; letter-spacing: 0.04em; }
+.taxi.perf .taxi-txt span, .taxi.perf .taxi-meta { color: #b9d6f2; }
+.taxi.perf .taxi-txt span b { font: 700 13px var(--font-mono); color: #fff; }
+.taxi-skip { font: 500 11px var(--font-body); color: #1a1406; background: #ffc94d; border: 0; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
 @media (pointer: coarse) { .taxi { bottom: calc(124px + var(--dock, 0px) + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100% - 300px)); } }
 @media (max-width: 480px) { .taxi { top: 54px; bottom: auto; width: calc(100% - 20px); gap: 10px; padding: 8px 12px 8px 8px; } .taxi-arrow { width: 44px; height: 44px; font-size: 28px; } .taxi-txt b { font-size: 15px; } .taxi-txt span { font-size: 12px; } }
 .svc-h { display: grid; gap: 2px; }
@@ -612,7 +617,12 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
     <div class="taxi" id="taxiCard" hidden aria-live="polite">
       <div class="taxi-arrow" id="taxiArrow" aria-hidden="true">↑</div>
       <div class="taxi-txt"><b id="taxiMain">Straight ahead</b><span id="taxiSub"></span></div>
-      <div class="taxi-meta"><span id="taxiStep">1/4</span><span id="taxiSpd">0 kt</span></div>
+      <div class="taxi-meta"><span id="taxiStep">1/4</span><span id="taxiSpd">0 kt</span><button type="button" class="taxi-skip" id="taxiSkip" hidden>Skip taxi</button></div>
+    </div>
+    <div class="taxi perf" id="perfCard" hidden aria-live="polite">
+      <div class="taxi-arrow" id="perfTag" aria-hidden="true">TO</div>
+      <div class="taxi-txt"><b id="perfMain">Takeoff</b><span id="perfSub"></span></div>
+      <div class="taxi-meta"><span id="perfIas">0 kt</span><span id="perfHint"></span></div>
     </div>
     <div class="svc" id="svc" hidden role="group" aria-label="Ground services">
       <div class="svc-h"><span class="eyebrow" id="svcEyebrow">GROUND SERVICES</span><b id="svcTitle">Before departure</b></div>
@@ -2367,9 +2377,10 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     }
     g.computeVertexNormals(); return g;
   }
-  function carGeometry(len, wid) {
-    const body = roundedBox(wid, 0.85, len, 0.3); body.translate(0, 0.55, 0);
-    const cab = roundedBox(wid * 0.9, 0.7, len * 0.52, 0.28); cab.translate(0, 1.25, -len * 0.04);
+  // lite: plain boxes (24 triangles) for the hundreds of cars in the car parks, seen from far off; rounded (~860) for road traffic
+  function carGeometry(len, wid, lite) {
+    const body = lite ? new THREE.BoxGeometry(wid, 0.85, len) : roundedBox(wid, 0.85, len, 0.3); body.translate(0, 0.55, 0);
+    const cab = lite ? new THREE.BoxGeometry(wid * 0.9, 0.7, len * 0.52) : roundedBox(wid * 0.9, 0.7, len * 0.52, 0.28); cab.translate(0, 1.25, -len * 0.04);
     const parts = [body, cab], P = [], N = [], I = []; let o = 0;
     for (const g of parts) { const gi = g.toNonIndexed(); P.push(...gi.attributes.position.array); N.push(...gi.attributes.normal.array); for (let k = 0; k < gi.attributes.position.count; k++) I.push(o + k); o += gi.attributes.position.count; }
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(N, 3)); return g;
@@ -3254,6 +3265,9 @@ vec3 liveryAt(vec3 p, out float fus) {
     const g = new THREE.Group(); for (const pt of decodePack(key).parts) { const m = new THREE.Mesh(pt.g, pt.mat); m.userData.keepAlone = true; g.add(m); }
     g.scale.setScalar(scale); g.rotation.y = rotY; g.position.set(x, y, z); grp.add(g); return g;
   }
+  // a parked aircraft never moves: its dozens of parts (gear legs, wheels, fans, glass) are baked into one mesh per material,
+  // which cuts the draw calls at a busy airport several times over
+  function bakeParked(mdl) { try { mergeStatic(mdl); } catch {} }
   function buildAirport(a) {
     const grp = new THREE.Group(); grp.position.set(a.x, a.elev, a.z); grp.rotation.y = -a.hdg * Math.PI / 180; scene.add(grp);
     const lg = (lx, lz) => { const [wx, wz] = toWorld(a, -lz, lx); return Math.max(0, heightAt(wx, wz)) - a.elev; };   // over the sea the approach lights stand on piers at the waterline
@@ -3411,7 +3425,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         if (mdl.userData.prop) mdl.userData.prop.userData.disc.visible = false;
         (mdl.userData.props || []).forEach((pp) => (pp.userData.disc.visible = false));
         if (mdl.userData.glow) mdl.userData.glow.visible = false;
-        mdl.userData.strobes.forEach((s) => (s.visible = false)); grp.add(mdl);
+        mdl.userData.strobes.forEach((s) => (s.visible = false)); grp.add(mdl); bakeParked(mdl);
       };
       if (sp.glb) parkedQueue.push({ kind: st.kind, place: () => { const m = buildPlane(st.kind); if (m) placeAt(m); } });
       else placeAt(sp.build(livOf(st.kind, randomLiv(st.kind))));
@@ -3458,7 +3472,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         flat(grp, Math.max(10, (x1 - x0) / 2 - 20), 0.45, MAT.yellow, cxs + side * ((x1 - x0) / 4 + 6), 0.09, z);
         const placeS = (mdl) => {
           mdl.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2; mdl.position.set(cxs + side * (13 + 8 + len / 2), sp.gearH + 0.05, z);
-          if (mdl.userData.glow) mdl.userData.glow.visible = false; (mdl.userData.strobes || []).forEach((s) => (s.visible = false)); grp.add(mdl); satModels.push(mdl);
+          if (mdl.userData.glow) mdl.userData.glow.visible = false; (mdl.userData.strobes || []).forEach((s) => (s.visible = false)); grp.add(mdl); bakeParked(mdl); satModels.push(mdl);
         };
         if (sp.glb) parkedQueue.push({ kind, place: () => { const m = buildPlane(kind); if (m) placeS(m); } });
         else placeS(sp.build(livOf(kind, randomLiv(kind))));
@@ -3493,7 +3507,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (!ga && kinds.length && (k === 0 || (intl && k === 2))) {
         const kk = k === 2 ? kinds.filter((q) => DIMS[q][0] > 40)[0] || kinds[0] : kinds[Math.floor(hash(a.x, k) * kinds.length)], sp = PLANES[kk];
         const mdl = sp.build(livOf(kk, randomLiv(kk))); mdl.rotation.y = -Math.PI / 2; mdl.position.set(hx - dd / 2 + DIMS[kk][1] * 0.42, sp.gearH + 0.05 + 0.72 * sc, hz);   // on the hangar model's raised floor (0.72 model units)
-        mdl.userData.strobes.forEach((st) => (st.visible = false)); grp.add(mdl);
+        mdl.userData.strobes.forEach((st) => (st.visible = false)); grp.add(mdl); bakeParked(mdl);
       }
     }
     if (intl) {
@@ -3508,7 +3522,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     flat(grp, a.lotX1 - a.lotX0, a.apL * 0.7, MAT.lot, (a.lotX0 + a.lotX1) / 2, 0.04, 0);
     const carCols = [0xd23b2f, 0x2f5fd2, 0xeeeeee, 0x222222, 0x8a8f96, 0x2f8a4f, 0xe0b830].map((c) => new THREE.Color(c));
     const cars = []; for (let x = a.lotX0 + 6; x < a.lotX1 - 4; x += 12) for (let zz = -a.apL * 0.33; zz < a.apL * 0.33; zz += 3.2) if (hash(x, zz) < 0.7) cars.push([x, 0.75, zz]);
-    const carM = new THREE.InstancedMesh(carGeometry(4.4, 1.85).rotateY(Math.PI / 2).translate(0, -0.75, 0), new THREE.MeshLambertMaterial(), cars.length), m4 = new THREE.Matrix4();
+    const carM = new THREE.InstancedMesh(carGeometry(4.4, 1.85, true).rotateY(Math.PI / 2).translate(0, -0.75, 0), new THREE.MeshLambertMaterial(), cars.length), m4 = new THREE.Matrix4();
     cars.forEach(([x, y, zz], i) => { m4.makeTranslation(x, y, zz); carM.setMatrixAt(i, m4); carM.setColorAt(i, carCols[Math.floor(hash(i, x) * carCols.length)]); }); grp.add(carM);
     // ground service vehicles round the parked aircraft: tug at the nose, baggage carts and a belt loader, a fuel truck at the wing
     { const veh = { tug: [], cart: [], fuel: [], belt: [] };
@@ -3617,9 +3631,10 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (typeof syncTouchKeys === "function") syncTouchKeys();
     if (typeof AP !== "undefined") { AP.on = false; AP.athr = false; AP.app = false; AP.lat = "HDG"; AP.flare = false; apSync(); pushBtn.hidden = true; }
     boom.visible = false; model.visible = true; flyby.set = false;
-    S.guide = null; S.svc = null; S.arrPending = null; S.gateFlow = false; S.parked = false;
+    S.guide = null; S.svc = null; S.arrPending = null; S.gateFlow = false; S.wantGate = false; S.parked = false;
     { const se = document.getElementById("svc"); if (se) se.hidden = true; } if (S.guideMesh) S.guideMesh.visible = false; if (S.truck) S.truck.visible = false; if (S.beacon) S.beacon.visible = false;
-    { const tc = document.getElementById("taxiCard"); if (tc) tc.hidden = true; } S.bounceFpm = 0; S.clipTO = null; S.clipLD = null; S.liftT = null; S.tdT = null;
+    { const tc = document.getElementById("taxiCard"); if (tc) tc.hidden = true; } S.bounceFpm = 0; S.clipTO = null; S.clipLD = null; S.liftT = null; S.tdT = null; S.toCalls = {}; S.tailStrike = false; S.tailStrikeLdg = false;
+    { const pc = document.getElementById("perfCard"); if (pc) pc.hidden = true; }
   }
   // smooth pseudo-random wave in -1..1 (sum of incommensurate sines; seed picks the phases)
   const wave = (t, seed) => Math.sin(t * 0.73 + seed * 1.9) * 0.5 + Math.sin(t * 1.41 + seed * 4.3) * 0.32 + Math.sin(t * 2.63 + seed * 7.1) * 0.18;
@@ -4303,7 +4318,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     renderBoard(); updateSummary(); if (briefTab === "missions") renderMissions(); renderFeatured();
     brief.scrollTop = 0;   // a result or the pause screen always opens at the top
   }
-  function pause() { document.getElementById("taxiCard").hidden = true; S.mode = "paused"; if (S.mission) { selMission = S.mission; setTab("missions"); } showBrief("PAUSED", "Flight paused", null, "Resume where you left off, or change the aircraft or route and start again.", true); }
+  function pause() { document.getElementById("taxiCard").hidden = true; document.getElementById("perfCard").hidden = true; S.mode = "paused"; if (S.mission) { selMission = S.mission; setTab("missions"); } showBrief("PAUSED", "Flight paused", null, "Resume where you left off, or change the aircraft or route and start again.", true); }
   function resume() { S.mode = "fly"; brief.hidden = true; }
   resumeBtn.addEventListener("click", resume);
   // flight log panel (opened from the ⋯ menu)
@@ -4366,6 +4381,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     ENV.model = $("modelSel").value;
     { const ws = ENV.weather === "rain" ? 11 : ENV.weather === "cloudy" ? 7 : ENV.weather === "fog" ? 1.5 : 3.5, dir = Math.random() * Math.PI * 2; S.wind.set(Math.sin(dir) * ws, 0, Math.cos(dir) * ws); S.gustV.set(0, 0, 0); }
     if ($("startSel").value === "gate") spawnAtGate(S.from); else if (hiddenParked) { hiddenParked.visible = true; hiddenParked = null; }
+    S.wantGate = !!S.to;   // free flight: after landing at the destination, taxi to a gate and let the passengers off
     S.mode = "fly"; brief.hidden = true;
     const rot = Math.round(spec.stall * 1.05 * 0.9 * MS2KT);
     if (S.gateFlow) flash("At the gate: refuel and board the passengers first (panel on the left)", 4.5);
@@ -4525,7 +4541,22 @@ vec3 liveryAt(vec3 p, out float fus) {
       // rotation about 3°/s (heavies a little slower); after touchdown the nose comes down at a similar rate, not slapped down
       const gp0 = S.groundPitch || 0, upRate = spec.big ? 0.05 + 0.02 * (1 - spec.stall / 70) : 0.1, downRate = S.gs > 15 ? 0.055 : 0.3;
       S.groundPitch = clamp(gp0 + clamp(gpTarget - gp0, -downRate * dt, upRate * dt), 0, 0.2);
-      if (spec.big && S.groundPitch > 0.17 && S.msgT <= 0) flash("TAIL STRIKE RISK: ease off the pull", 1.2);
+      if (spec.big && S.groundPitch > 0.17 && S.groundPitch < 0.188 && S.msgT <= 0) flash("TAIL STRIKE RISK: ease off the pull", 1.2);
+      // tail strike: long-bodied jets touch the runway with the tail beyond about 11° on the ground
+      if (spec.big && S.groundPitch >= 0.188 && !S.tailStrike) { S.tailStrike = true; buzz(220); sfx("touch", 900); flash("TAIL STRIKE! Rotate slower: about 3° a second, no more than 10°", 3.2); }
+      { // takeoff callouts by the pilot not flying
+        const kt = S.speed * MS2KT, R = refSpeeds(spec), tc = S.toCalls || (S.toCalls = {}), call = (k, txt, say) => { if (tc[k]) return; tc[k] = true; S.callTxt = txt; S.callUntil = performance.now() + 1100; speak(say); };
+        if (!S.landedAt && !S.liftT && S.throttle > 0.5) {
+          if (kt > 80) call("80", "80 KT", "Eighty knots");
+          if (kt > R.v1) call("v1", "V1", "V one");
+          if (kt > R.vr) call("vr", "ROTATE", "Rotate");
+        }
+        if (S.landedAt) {   // landing roll
+          if (S.spoiler > 0.5) call("spl", "SPOILERS", "Spoilers");
+          if (S.reverse) call("rev", "REVERSE GREEN", "Reverse green");
+          if (kt < 60 && S.gs > 3) call("60", "60 KT", "Sixty knots");
+        }
+      }
       S.q.setFromEuler(new THREE.Euler(S.groundPitch, heading, 0, "YXZ"));
       fwd.set(0, 0, -1).applyQuaternion(S.q);
       const hl = Math.hypot(fwd.x, fwd.z) || 1;
@@ -4539,15 +4570,16 @@ vec3 liveryAt(vec3 p, out float fus) {
         S.grounded = false; S.sink = 0; S.gammaPrev = undefined; S.gammaRate = 0;
         S.vel.set(fwd.x / hl * S.gs, 0.6, fwd.z / hl * S.gs);
         if (S.liftT == null) S.liftT = REC.t;
+        S.toCalls = Object.assign(S.toCalls || {}, { v2pending: true });
         flash(ENV.model === "real" && !spec.fbw && !AP.on ? `Positive climb. Gear up, trim with ${trimKeys()}` : "Positive climb. Gear up!", 2.6);
       }
       if (S.gs > 8 && !runwayAt(S.pos.x, S.pos.z) && airportMask(S.pos.x, S.pos.z)[0] < 0.97) {
         const sl = Math.abs(heightAt(S.pos.x + 5, S.pos.z) - heightAt(S.pos.x - 5, S.pos.z)) + Math.abs(heightAt(S.pos.x, S.pos.z + 5) - heightAt(S.pos.x, S.pos.z - 5));
         if (sl > 4) { crash("You ran off the runway into rough ground."); return; }
       }
-      if (S.landedAt && (S.gs < 1.5 || (S.gateFlow && !S.mission && S.landedAt === S.to && S.gs < 12))) completeLanding();
-      updateGuide(); syncTaxiCard();
-      if (S.taxiOut && runwayAt(S.pos.x, S.pos.z) === S.from) { S.taxiOut = false; if (S.guide && S.guide.kind === "dep") { S.guide = null; if (S.guideMesh) S.guideMesh.visible = false; syncTaxiCard(); } RADIO.push({ text: `${S.from.name} Tower: runway ${S.from.label}, wind ${windText()}, cleared for takeoff.`, t: 10 }); flash("Lined up. Full throttle and go!", 3); }
+      if (S.landedAt && (S.gs < 1.5 || (S.wantGate && !S.mission && S.landedAt === S.to && S.gs < 12))) completeLanding();
+      updateGuide(); syncTaxiCard(); syncPerfCard();
+      if (S.taxiOut && runwayAt(S.pos.x, S.pos.z) === S.from) { S.taxiOut = false; if (S.guide && S.guide.kind === "dep") { S.guide = null; if (S.guideMesh) S.guideMesh.visible = false; syncTaxiCard(); } RADIO.push({ text: `${S.from.name} Tower: runway ${S.from.label}, wind ${windText()}, cleared for takeoff.`, t: 10 }); flash(`Lined up. Full throttle, rotate at ${refSpeeds(spec).vr} knots`, 3.5); }
     } else {
       const va = V.air.copy(S.vel).sub(wind), sp = Math.max(va.length(), 0.5);   // airspeed = ground velocity minus wind
       const vf = va.dot(fwd), vu = va.dot(up), vr = va.dot(right);
@@ -4614,6 +4646,8 @@ vec3 liveryAt(vec3 p, out float fus) {
       const prevY = S.pos.y;
       S.pos.addScaledVector(v, dt);
       S.vs = (S.pos.y - prevY) / dt;
+      syncPerfCard();
+      if (S.toCalls && S.toCalls.v2pending && S.vs > 1) { S.toCalls.v2pending = false; S.callTxt = "POSITIVE RATE"; S.callUntil = performance.now() + 1300; speak("Positive rate"); }
       const gy = groundY(S.pos.x, S.pos.z);
       if (S.pos.y - spec.gearH <= gy) {
         right.set(1, 0, 0).applyQuaternion(S.q);
@@ -4625,6 +4659,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         if (spec.retract && S.gearPos < 0.9) { crash("Belly landing! Press G to lower the gear before you land."); return; }
         if (!rw && am < 0.97) { crash("That wasn't a runway. Land on an airport runway."); return; }
         sfx("touch", Math.round(-S.vs * M2FT * 60));
+        if (spec.big && Math.asin(clamp(fwd.y, -1, 1)) > 0.2 && !S.tailStrikeLdg) { S.tailStrikeLdg = true; buzz(220); flash("TAIL STRIKE on landing: too much flare, keep the nose lower", 3); }
         // a firm arrival with flying speed left bounces back into the air: the oleos and tyres throw it up again
         if (S.vs < -2.1 && S.speed > spec.stall * 0.85 && !S.bounced3) {
           const up2 = (-S.vs - 1.7) * 0.5, fpmB = Math.round(-S.vs * M2FT * 60);
@@ -4661,7 +4696,7 @@ vec3 liveryAt(vec3 p, out float fus) {
 
   // after taxiing in and deboarding: the arrival report, with the landing as it was rated at touchdown
   function finishArrival(p) {
-    S.parkedDone = S.parked ? S.parked.n : null; S.touchFpm = p.fpm; S.flightT = p.t; S.landedAt = p.a; S.gateFlow = false;
+    S.parkedDone = S.parked ? S.parked.n : null; S.touchFpm = p.fpm; S.flightT = p.t; S.landedAt = p.a; S.gateFlow = false; S.wantGate = false;
     completeLanding(); S.parkedDone = null;
   }
   function completeLanding() {
@@ -4669,8 +4704,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (!S.to || a !== S.to) { logFlight({ to: a.code, fpm: S.touchFpm, res: S.to ? `Landed at ${a.code} instead of ${S.to.code}` : `Landed at ${a.code}`, ok: null }); flash(`Stopped at ${a.name}. Throttle up to take off again.`, 4); S.touchFpm = null; return; }
     const fpm = S.touchFpm, off = Math.abs(S.touchOff || 0), tdz = S.touchDist || 0;
     let stars = fpm < 240 ? 3 : fpm < 480 ? 2 : 1;
-    if (off > 8 || tdz > 900 || tdz < 0 || S.wasBounce) stars = Math.max(1, stars - 1);
-    if (S.gateFlow && !S.mission && !S.arrPending) {
+    if (off > 8 || tdz > 900 || tdz < 0 || S.wasBounce || S.tailStrikeLdg) stars = Math.max(1, stars - 1);
+    if (S.wantGate && !S.mission && !S.arrPending) {
       S.arrPending = { a, stars, fpm, off, tdz, t: S.flightT };
       if (arrivalGuide(a)) { flash(`Landed: ${"★".repeat(stars)}${"☆".repeat(3 - stars)}. Now taxi to the gate.`, 3.5); return; }
       S.arrPending = null;
@@ -5652,6 +5687,12 @@ vec3 liveryAt(vec3 p, out float fus) {
     S.guide = { kind, pts, labels, hints, i: 0, onDone, warnT: 0, acts: acts || labels, turns }; buildGuidePath(pts); taxiCard.hidden = false;
   }
   const taxiCard = $("taxiCard");
+  // skip the taxi-in: straight to the stand, passengers off, arrival report
+  $("taxiSkip").addEventListener("click", () => {
+    const G = S.guide; if (!G || G.kind !== "arr") return;
+    S.guide = null; if (S.guideMesh) S.guideMesh.visible = false; syncTaxiCard();
+    const pend = S.arrPending; S.arrPending = null; if (pend) finishArrival(pend);
+  });
   function beaconMesh() {
     if (S.beacon) return S.beacon;
     const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: 0xffc94d, transparent: true, opacity: 0.55, depthWrite: false });
@@ -5673,10 +5714,10 @@ vec3 liveryAt(vec3 p, out float fus) {
     else if (turn === "straight") { main = d > 30 ? `Straight · ${dm}` : "Keep straight"; sub = `Then ${act.replace(/^and /, "")}`; }
     else if (d > 60) { main = `Straight · ${dm}`; sub = `Then turn ${turn} ${act}`; }
     else { arrow = turn === "left" ? "↰" : "↱"; main = `Turn ${turn} now`; sub = act; }
-    $("taxiArrow").textContent = arrow; $("taxiArrow").classList.toggle("stop", arrow === "STOP");
-    $("taxiMain").textContent = main; $("taxiSub").textContent = sub;
-    $("taxiStep").textContent = `Step ${G.i + 1}/${G.pts.length}`;
-    const kt = Math.round(S.gs * MS2KT), sp = $("taxiSpd"); sp.textContent = `${kt} kt${kt > 20 ? " · slow down" : ""}`; sp.classList.toggle("fast", kt > 20);
+    setTxt("taxiArrow", arrow); $("taxiArrow").classList.toggle("stop", arrow === "STOP");
+    setTxt("taxiMain", main); setTxt("taxiSub", sub);
+    setTxt("taxiStep", `Step ${G.i + 1}/${G.pts.length}`); $("taxiSkip").hidden = G.kind !== "arr";
+    const kt = Math.round(S.gs * MS2KT), sp = $("taxiSpd"); setTxt("taxiSpd", `${kt} kt${kt > 20 ? " · slow down" : ""}`); sp.classList.toggle("fast", kt > 20);
     const b = beaconMesh(); b.visible = true; b.position.set(x, groundY(x, z), z);
   }
   // "left" or "right": the turn at p1 going from p0 to p2 (x east, z south)
@@ -5684,6 +5725,35 @@ vec3 liveryAt(vec3 p, out float fus) {
     const ax = p1[0] - p0[0], az = p1[1] - p0[1], bx = p2[0] - p1[0], bz = p2[1] - p1[1], cr = (ax * bz - az * bx) / ((Math.hypot(ax, az) * Math.hypot(bx, bz)) || 1);
     return Math.abs(cr) < 0.26 ? "straight" : cr > 0 ? "right" : "left";
   };
+  // reference speeds (knots) from the flight model itself: stall speed for a flap setting, then the usual multiples
+  const setTxt = (id, v, html) => { const e = $(id); if (e._v === v) return; e._v = v; if (html) e.innerHTML = v; else e.textContent = v; };
+  const vsKt = (sp, flapPos) => sp.stall * Math.sqrt(1.45 / (1.45 + 0.55 * flapPos)) * MS2KT;
+  function refSpeeds(sp) {
+    const vsTo = vsKt(sp, 0.5), vsL = vsKt(sp, 1), vsClean = vsKt(sp, 0);
+    const vr = Math.round(vsTo * 1.1), v1 = vr - 3, v2 = Math.round(vsTo * 1.2);
+    return { v1, vr, v2, climb: Math.round(vsClean * 1.45 / 5) * 5, vapp: Math.round(vsL * 1.3), vtd: Math.round(vsL * 1.2), flapsTo: 1, flapsL: 2 };
+  }
+  const perfCard = $("perfCard");
+  function syncPerfCard() {
+    let show = null;
+    if (S.mode === "fly" && !S.crashed && !S.guide && !S.svc && !S.push) {
+      const kt = Math.round(S.ias * MS2KT), R = refSpeeds(spec);
+      if (S.grounded && !S.landedAt && !S.liftT && runwayAt(S.pos.x, S.pos.z)) {
+        show = ["TO", `Takeoff · ${spec.name}`, `Flaps <b>${S.flaps === R.flapsTo ? R.flapsTo : `${R.flapsTo} (now ${S.flaps})`}</b> · V1 <b>${R.v1}</b> · Rotate <b>${R.vr}</b> · V2 <b>${R.v2}</b> kt`,
+          `${kt} kt`, kt < R.v1 - 15 ? "full throttle" : kt < R.vr ? "hold it…" : "pull back gently"];
+      } else if (!S.grounded && S.to && S.liftT != null) {
+        const [tx, tz] = toWorld(S.to, -S.to.len / 2, 0), d = Math.hypot(tx - S.pos.x, tz - S.pos.z), agl = S.pos.y - spec.gearH - S.to.elev;
+        if (d < 16000 && agl < 900 && (S.vs < 1 || d < 6000)) {
+          const fl = S.flaps === R.flapsL ? "full" : `full (now ${S.flaps})`;
+          show = ["LDG", `Landing · runway ${S.to.label}`, `Flaps <b>${fl}</b> · gear <b>${S.gearDown ? "down" : "DOWN!"}</b> · approach <b>${R.vapp}</b> · touchdown <b>${R.vtd}</b> kt`,
+            `${kt} kt`, kt > R.vapp + 15 ? "too fast" : kt < R.vtd - 5 ? "too slow!" : "on speed"];
+        }
+      }
+    }
+    if (!show) { if (!perfCard.hidden) perfCard.hidden = true; return; }
+    perfCard.hidden = false;
+    setTxt("perfTag", show[0]); setTxt("perfMain", show[1]); setTxt("perfSub", show[2], true); setTxt("perfIas", show[3]); setTxt("perfHint", show[4]);
+  }
   function departureGuide() {
     const a = S.from, r = a.rwys[0], tl = r.len * 0.92, alHold = -(tl / 2 - 12), [alNow] = local(a, S.pos.x, S.pos.z), rw = a.label;
     const P = (al, ac) => toWorld(a, al, ac), here = [S.pos.x, S.pos.z];
@@ -6127,9 +6197,9 @@ vec3 liveryAt(vec3 p, out float fus) {
     RADIO.forEach((r) => (r.t -= dt)); while (RADIO.length && RADIO[0].t <= 0) RADIO.shift();
     beacons.forEach((b) => (b.rotation.y += dt * 3));
     for (const a of AIRPORTS) {
-      const v = Math.hypot(camera.position.x - a.x, camera.position.z - a.z) < 7000 + Math.max(0, camera.position.y) * 2; if (a.detail.visible !== v) a.detail.visible = v;
-      // parked aircraft are only drawn within 3.5 km (beyond that they are a few pixels): saves most of their triangles
-      if (v && a.parked) for (const pk of a.parked) { if (pk.m === hiddenParked) continue; const on = camera.position.distanceTo(pk.p) < 3500; if (pk.m.visible !== on) pk.m.visible = on; }
+      const v = Math.hypot(camera.position.x - a.x, camera.position.z - a.z) < 5000 + Math.max(0, camera.position.y) * 2; if (a.detail.visible !== v) a.detail.visible = v;
+      // parked aircraft are only drawn within 2.2 km (beyond that they are a few pixels): saves most of their triangles
+      if (v && a.parked) for (const pk of a.parked) { if (pk.m === hiddenParked) continue; const on = camera.position.distanceTo(pk.p) < 2200; if (pk.m.visible !== on) pk.m.visible = on; }
     }
     if (S.mode !== "paused") updateCamera(dt, now);
     updateAlerts(now); updateSunShadow();
