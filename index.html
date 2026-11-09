@@ -482,6 +482,19 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 @media (pointer: coarse) { .taxi { bottom: calc(124px + var(--dock, 0px) + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100% - 300px)); } }
 @media (max-width: 480px) { .taxi { top: 54px; bottom: auto; width: calc(100% - 20px); gap: 10px; padding: 8px 12px 8px 8px; } .taxi-arrow { width: 44px; height: 44px; font-size: 28px; } .taxi-txt b { font-size: 15px; } .taxi-txt span { font-size: 12px; } }
 .svc-h { display: grid; gap: 2px; }
+/* radio panel: one button to tell the tower you're ready to go, one to ask to land */
+.atc { position: absolute; left: 14px; top: 64px; z-index: 3; width: min(380px, calc(100% - 28px)); display: grid; gap: 7px; padding: 10px 12px; border-radius: 16px;
+  background: rgba(10,22,18,0.9); border: 1px solid rgba(79,227,155,0.45); color: #e8fff3; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: sheet-up 0.2s ease-out; }
+.atc-h { display: flex; align-items: baseline; gap: 10px; } .atc-h .eyebrow { color: #4fe39b; } .atc-h b { font: 400 15px var(--font-display); }
+.atc-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.atc-b { display: grid; text-align: left; gap: 1px; padding: 7px 10px; border-radius: 12px; border: 1px solid rgba(79,227,155,0.35); background: rgba(79,227,155,0.08); color: #e8fff3; cursor: pointer; font: 500 14px var(--font-body); }
+.atc-b small { font: 400 11px var(--font-mono); color: #9fd9bd; }
+.atc-b:hover:not(:disabled) { background: rgba(79,227,155,0.18); }
+.atc-b:disabled { opacity: 0.38; cursor: default; }
+.atc-st { margin: 0; font: 500 12px/1.3 var(--font-body); color: #bdf5d8; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.atc-st.hold { color: #ffcf6b; } .atc-st.go { color: #6dffb0; } .atc-st.warn { color: #ff8a7a; }
+@media (max-width: 480px) { .atc { top: 58px; left: 10px; padding: 10px; } }
+#atcToggle[aria-pressed="true"] { color: #4fe39b; border-color: rgba(79,227,155,0.6); }
 .clip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .svc-h b { font: 400 19px var(--font-display); }
 .svc-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
@@ -562,6 +575,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       <div class="cams" id="cams" role="group" aria-label="Camera view" hidden></div>
       <button class="chip" id="camCycle" type="button" title="Change camera (C, or keys 1–6)"><span class="lbl-sm">View</span> <span id="camName">Chase</span></button>
       <button class="chip" id="apToggle" type="button" aria-pressed="false" title="Autopilot (U)">Autopilot</button>
+      <button class="chip" id="atcToggle" type="button" aria-pressed="false" aria-expanded="false" aria-controls="atcPanel" title="Radio: talk to the tower (key Y)">ATC</button>
       <span class="topbar-gap"></span>
       <output class="fps" id="fpsOut" hidden aria-live="off">— FPS</output>
       <div class="more-wrap">
@@ -623,6 +637,14 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       <div class="taxi-arrow" id="perfTag" aria-hidden="true">TO</div>
       <div class="taxi-txt"><b id="perfMain">Takeoff</b><span id="perfSub"></span></div>
       <div class="taxi-meta"><span id="perfIas">0 kt</span><span id="perfHint"></span></div>
+    </div>
+    <div class="atc" id="atcPanel" hidden role="group" aria-label="Radio to the tower">
+      <div class="atc-h"><span class="eyebrow">RADIO</span><b id="atcFreq">Tower</b></div>
+      <div class="atc-btns">
+        <button class="atc-b" id="atcDep" type="button"><span>Ready for departure</span><small id="atcDepSub">runway</small></button>
+        <button class="atc-b" id="atcArr" type="button"><span>Request landing</span><small id="atcArrSub">runway</small></button>
+      </div>
+      <p class="atc-st" id="atcStatus">No clearance yet.</p>
     </div>
     <div class="svc" id="svc" hidden role="group" aria-label="Ground services">
       <div class="svc-h"><span class="eyebrow" id="svcEyebrow">GROUND SERVICES</span><b id="svcTitle">Before departure</b></div>
@@ -3644,7 +3666,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     boom.visible = false; model.visible = true; flyby.set = false;
     S.guide = null; S.svc = null; S.arrPending = null; S.gateFlow = false; S.wantGate = false; S.parked = false;
     { const se = document.getElementById("svc"); if (se) se.hidden = true; } if (S.guideMesh) S.guideMesh.visible = false; if (S.truck) S.truck.visible = false; if (S.beacon) S.beacon.visible = false;
-    { const tc = document.getElementById("taxiCard"); if (tc) tc.hidden = true; } S.bounceFpm = 0; S.clipTO = null; S.clipLD = null; S.liftT = null; S.tdT = null; S.toCalls = {}; S.tailStrike = false; S.tailStrikeLdg = false; S.dock = null; if (S.gateSign) S.gateSign.visible = false;
+    { const tc = document.getElementById("taxiCard"); if (tc) tc.hidden = true; } S.bounceFpm = 0; S.clipTO = null; S.clipLD = null; S.liftT = null; S.tdT = null; S.toCalls = {}; S.tailStrike = false; S.tailStrikeLdg = false; S.dock = null; if (S.gateSign) S.gateSign.visible = false; S.atc = null;
     { const pc = document.getElementById("perfCard"); if (pc) pc.hidden = true; }
   }
   // smooth pseudo-random wave in -1..1 (sum of incommensurate sines; seed picks the phases)
@@ -4484,6 +4506,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     S.brake = brake;
     if (S.throttle > 0.05) S.started = true;
     if (stepPushback(dt)) return;
+    atcTick(dt); if (!atcEl.hidden && (S.atcSyncT = (S.atcSyncT || 0) + dt) > 0.5) { S.atcSyncT = 0; syncAtc(); }
     if (stepDock(dt)) return;
     if (stepServices(dt)) return;
 
@@ -5282,8 +5305,77 @@ vec3 liveryAt(vec3 p, out float fus) {
   };
   function runwayBusy(a, me) {
     if (playerOnRunway(a) || playerOnFinal(a)) return true;
+    if (S.atc && S.atc.a === a && S.atc.state === "cleared" && S.mode === "fly" && !S.crashed && (S.atc.kind === "dep" ? S.grounded : !S.grounded)) return true;   // you hold a clearance
     return AI.some((o) => o !== me && ((o.at === a && ["roll", "rollout", "taxi"].includes(o.phase)) || (o.to === a && o.phase === "final" && o.pos.distanceTo(me.pos) < 4500)));
   }
+  // ---------- the tower: departure and landing clearances that look at the real traffic ----------
+  const atcEl = $("atcPanel");
+  const thrDist = (a, p) => { const [x, z] = toWorld(a, -a.rwys[0].len / 2, a.rwys[0].off); return Math.hypot(x - p.x, z - p.z); };
+  const tName = (ai) => `${ai.cs}, a ${PLANES[ai.kind].name}`;
+  // what stands between you and runway a: an aircraft on it, landing on it, or about to
+  function traffic(a, kind) {
+    const myD = kind === "arr" ? thrDist(a, S.pos) : 0, out = [];
+    for (const ai of AI) {
+      if (!ai.model.visible && ai.phase !== "hold") continue;
+      if ((ai.at === a && ai.phase === "roll") || ((ai.to === a || ai.at === a) && (ai.phase === "rollout" || ai.phase === "taxi"))) out.push({ ai, why: "on the runway", d: 0 });
+      else if (ai.to === a && ai.phase === "final") { const d = thrDist(a, ai.pos); if (kind === "dep" ? d < 9000 : d < myD) out.push({ ai, why: `on final, ${(d / 1000).toFixed(1)} km`, d }); }
+      else if (ai.to === a && ai.phase === "cruise" && kind === "dep") { const d = thrDist(a, ai.pos); if (d < 6500) out.push({ ai, why: `on approach, ${(d / 1000).toFixed(1)} km`, d }); }
+    }
+    return out.sort((p, q) => p.d - q.d);
+  }
+  function atcSay(text, cls) { RADIO.push({ text, t: 12 }); if (RADIO.length > 4) RADIO.shift(); setTxt("atcStatus", text.replace(/^[^:]+: /, "")); $("atcStatus").className = "atc-st " + (cls || ""); }
+  function atcDeparture() {
+    const a = S.from; if (!a || !S.grounded) return;
+    const t = traffic(a, "dep"), wind = windText();
+    S.atc = { kind: "dep", a, state: t.length ? "hold" : "cleared", t: 0, warned: false };
+    if (t.length) atcSay(`${a.name} Tower: hold short of runway ${a.label}. Traffic ${t[0].why}: ${tName(t[0].ai)}. I'll call you.`, "hold");
+    else atcSay(`${a.name} Tower: runway ${a.label}, wind ${wind}, cleared for takeoff.`, "go");
+    syncAtc();
+  }
+  function atcArrival() {
+    const a = S.to; if (!a || S.grounded) return;
+    const t = traffic(a, "arr");
+    S.atc = { kind: "arr", a, state: t.length ? "hold" : "cleared", t: 0, warned: false };
+    const n = t.filter((q) => q.why.startsWith("on final")).length + 1;
+    if (t.length) atcSay(`${a.name} Tower: number ${n}, ${t[0].why === "on the runway" ? "runway occupied" : `follow ${tName(t[0].ai)} ${t[0].why}`}. Reduce to approach speed, continue, expect late landing clearance.`, "hold");
+    else atcSay(`${a.name} Tower: runway ${a.label}, wind ${windText()}, cleared to land.`, "go");
+    syncAtc();
+  }
+  // once a second: hand out the waiting clearance when the runway frees up; warn if you go without one
+  function atcTick(dt) {
+    const C = S.atc; if (!C || S.mode !== "fly" || S.crashed) return;
+    C.t += dt; if (C.t < 1) return; C.t = 0;
+    const a = C.a;
+    if (C.kind === "dep") {
+      if (!S.grounded) { if (C.state === "hold" && !C.warned) { C.warned = true; atcSay(`${a.name} Tower: you took off without a clearance! Contact departure.`, "warn"); } S.atc = null; syncAtc(); return; }
+      if (C.state === "hold") {
+        const t = traffic(a, "dep");
+        if (!t.length) { C.state = "cleared"; atcSay(`${a.name} Tower: traffic is clear. Line up runway ${a.label}, wind ${windText()}, cleared for takeoff.`, "go"); chime(880, 0.12); }
+        else if (S.gs > 12 && runwayAt(S.pos.x, S.pos.z) === a && !C.warned) { C.warned = true; atcSay(`${a.name} Tower: STOP, STOP! You are not cleared: traffic ${t[0].why}.`, "warn"); buzz(200); }
+      }
+    } else {
+      if (S.grounded) { S.atc = null; syncAtc(); return; }
+      const d = thrDist(a, S.pos);
+      if (C.state === "hold") {
+        const t = traffic(a, "arr");
+        if (!t.length) { C.state = "cleared"; atcSay(`${a.name} Tower: runway ${a.label} is clear, wind ${windText()}, cleared to land.`, "go"); chime(880, 0.12); }
+        else if (d < 1800 && S.pos.y - a.elev < 200 && !C.warned) { C.warned = true; atcSay(`${a.name} Tower: GO AROUND! Runway occupied by ${t[0].ai.cs}. Climb, then request landing again.`, "warn"); buzz(200); S.atc = null; syncAtc(); }
+      }
+    }
+  }
+  function syncAtc() {
+    if (atcEl.hidden) return;
+    const g = S.grounded && S.mode === "fly", a = S.from, b = S.to, C = S.atc;
+    $("atcDep").disabled = !(g && a && !S.liftT); $("atcArr").disabled = !(!S.grounded && b && S.mode === "fly");
+    setTxt("atcDepSub", a ? `${a.code} · runway ${a.label}` : "—"); setTxt("atcArrSub", b ? `${b.code} · runway ${b.label}${b && !S.grounded ? ` · ${(thrDist(b, S.pos) / 1000).toFixed(0)} km` : ""}` : "no destination");
+    setTxt("atcFreq", (!S.grounded && b ? b : a || b) ? `${(!S.grounded && b ? b : a).name} Tower` : "Tower");
+    if (!C) { const st = $("atcStatus"); if (!st.classList.contains("warn")) { setTxt("atcStatus", g ? "Tell the tower when you're ready to go." : b ? "Call the tower before your final approach." : "No clearance yet."); st.className = "atc-st"; } }
+  }
+  $("atcDep").addEventListener("click", atcDeparture);
+  $("atcArr").addEventListener("click", atcArrival);
+  const atcOpen = (on) => { atcEl.hidden = !on; $("atcToggle").setAttribute("aria-pressed", String(on)); $("atcToggle").setAttribute("aria-expanded", String(on)); if (on) syncAtc(); };
+  $("atcToggle").addEventListener("click", () => atcOpen(atcEl.hidden));
+  document.addEventListener("keydown", (e) => { if (e.code === "KeyY" && S.mode === "fly" && !e.repeat && !(e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName))) atcOpen(atcEl.hidden); });
   function steer(ai, tx, tz, dt, maxRate) {
     const want = Math.atan2(tx - ai.pos.x, -(tz - ai.pos.z)), d = wrapA(want - ai.hdg);
     const rate = clamp(d * 0.6, -maxRate, maxRate); ai.hdg = wrapA(ai.hdg + rate * dt);
@@ -5666,7 +5758,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     $("svcPaxBtn").textContent = dep ? "Board" : "Open doors"; $("svcFuelBtn").disabled = false; $("svcPaxBtn").disabled = false;
     $("svcNote").textContent = dep ? "Refuel and board the passengers, then push back." : "Open the doors and let the passengers off.";
     svcEl.querySelectorAll(".svc-row").forEach((r) => r.classList.remove("done"));
-    svcEl.hidden = false; syncSvc();
+    svcEl.hidden = false; syncSvc(); if (!atcEl.hidden) atcOpen(false);
   }
   function syncSvc() {
     const v = S.svc; if (!v) return;
