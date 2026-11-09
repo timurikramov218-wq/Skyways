@@ -2511,10 +2511,14 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
   }
   // engine nacelles: painted cowling, bare metal intake lip
-  { float dx = abs(p.x) - uEng.x, dy = p.y - uEng.y;
-    if (dx * dx + dy * dy < uEng.z * uEng.z && p.z > uEz.x - 0.3 && p.z < uEz.y + 0.3) return (p.z - uEz.x) / (uEz.y - uEz.x) < 0.07 ? uLip : uEngC;
-    float dx2 = abs(p.x) - uEng2.x, dy2 = p.y - uEng2.y;
-    if (uEng2.w > 0.5 && dx2 * dx2 + dy2 * dy2 < uEng2.z * uEng2.z && p.z > uEz2.x - 0.3 && p.z < uEz2.y + 0.3) return (p.z - uEz2.x) / (uEz2.y - uEz2.x) < 0.07 ? uLip : uEngC;
+  // the cowl is up to 40% fatter than the measured fan radius at the front: paint out to 1.42 r, but leave the pylon
+  // (a thin blade on top) and, over the rear of the nacelle, the wing above it unpainted
+  { float dx = abs(p.x) - uEng.x, dy = p.y - uEng.y, r = uEng.z, f = (p.z - uEz.x) / (uEz.y - uEz.x);
+    bool pyl = dy > r * 0.92 && abs(dx) < r * 0.34, top = dy > r * 1.08 && f > 0.55;
+    if (dx * dx + dy * dy < r * r * 2.02 && !pyl && !top && p.z > uEz.x - 0.3 && p.z < uEz.y + 0.3) return f < 0.07 ? uLip : uEngC;
+    float dx2 = abs(p.x) - uEng2.x, dy2 = p.y - uEng2.y, r2 = uEng2.z, f2 = (p.z - uEz2.x) / (uEz2.y - uEz2.x);
+    bool pyl2 = dy2 > r2 * 0.92 && abs(dx2) < r2 * 0.34, top2 = dy2 > r2 * 1.08 && f2 > 0.55;
+    if (uEng2.w > 0.5 && dx2 * dx2 + dy2 * dy2 < r2 * r2 * 2.02 && !pyl2 && !top2 && p.z > uEz2.x - 0.3 && p.z < uEz2.y + 0.3) return f2 < 0.07 ? uLip : uEngC;
   }
   if (abs(p.x) < R * 1.12 && p.y > cy - R * 1.15 && p.y < cy + R * 1.2 + uHump) {
     fus = 1.0;
