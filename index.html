@@ -462,6 +462,26 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .show-open { margin-left: auto; padding: 8px 16px; font-size: 12px; letter-spacing: 0.08em; }
 #stepHangar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .showroom { position: absolute; inset: 0; z-index: 8; background: #0c0d10; }
+/* step-by-step start: welcome → hangar → route → fly */
+.welcome { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; padding: 24px 16px; overflow: auto;
+  background: radial-gradient(900px 520px at 50% 30%, rgba(23,23,26,0.55), rgba(10,10,12,0.9)); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.welcome-in { width: min(720px, 100%); display: grid; gap: 18px; justify-items: center; text-align: center; animation: sheet-up 0.4s ease-out; }
+.welcome-title { margin: 0; font: 400 clamp(38px, 7vw, 72px)/1 var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg); }
+.welcome-title span { color: var(--champ); }
+.welcome-sub { margin: 0; max-width: 520px; color: var(--fg-2); font-size: 15px; line-height: 1.5; }
+.flow-steps { list-style: none; margin: 6px 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; }
+.flow-steps li { display: grid; gap: 2px; justify-items: center; padding: 14px 8px; border: 1px solid var(--hair-2); border-radius: 14px; background: rgba(23,23,26,0.6); }
+.flow-steps b { font: 400 12px var(--font-mono); color: var(--champ); width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid var(--champ-2); border-radius: 50%; }
+.flow-steps span { font: 400 19px var(--font-display); color: var(--fg); }
+.flow-steps small { font-size: 11.5px; color: var(--fg-3); }
+.welcome-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.welcome-btns .btn { min-width: 220px; }
+#wMissions::after, #backHangar::after { content: none; }
+#wMissions, #backHangar { padding-right: 30px; }
+@media (max-height: 520px) { .flow-steps { display: none; } .welcome-in { gap: 12px; } }
+#brief .flow-only { display: none; }
+#brief.flow .flow-only { display: inline-block; }
+#brief.flow .no-flow, #brief.flow #briefTabs, #brief.flow #stepHangarSec { display: none; }
 .showroom canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 .showroom canvas:active { cursor: grabbing; }
 .show-top { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 30px; background: linear-gradient(180deg, rgba(10,10,12,0.75), rgba(10,10,12,0)); pointer-events: none; }
@@ -621,7 +641,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
           <p class="mis-note" id="misNote">Ten flights that get harder as you go. Each one sets the aircraft, the airport, the weather and the time of day. Land well to earn up to three stars; passing a mission opens the next one.</p>
           <div class="missions" id="missionList"></div>
         </section>
-        <section class="step free-only" aria-labelledby="stepHangar">
+        <section class="step free-only" id="stepHangarSec" aria-labelledby="stepHangar">
           <h3 id="stepHangar"><span class="num">1</span>Hangar <button class="btn alt show-open" id="showOpen" type="button">360° hangar · try liveries</button></h3>
           <div class="filters" id="planeFilter" role="group" aria-label="Aircraft type" hidden>
             <button type="button" class="seg-btn" data-cat="all" aria-pressed="true">All</button>
@@ -664,8 +684,26 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
           <div class="btns">
             <button class="btn alt play" id="replayBtn" type="button" hidden>Replay</button>
             <button class="btn alt" id="resumeBtn" type="button" hidden>Resume flight</button>
+            <button class="btn alt flow-only" id="backHangar" type="button">← Hangar</button>
+            <button class="btn alt no-flow" id="homeBtn" type="button">Main menu</button>
             <button class="btn" id="goBtn" type="button">Take off</button>
           </div>
+        </div>
+      </div>
+    </div>
+    <div class="welcome" id="welcome" hidden role="dialog" aria-label="Welcome">
+      <div class="welcome-in">
+        <div class="eyebrow">WELCOME ABOARD</div>
+        <h2 class="welcome-title">Skyways <span>Flight Sim</span></h2>
+        <p class="welcome-sub">Pick an airliner and its colours in the hangar, choose where to fly from and to, then take off.</p>
+        <ol class="flow-steps" aria-label="How it works">
+          <li><b>1</b><span>Hangar</span><small>aircraft &amp; livery</small></li>
+          <li><b>2</b><span>Route</span><small>airports, time, weather</small></li>
+          <li><b>3</b><span>Fly</span><small>take off and land</small></li>
+        </ol>
+        <div class="welcome-btns">
+          <button class="btn" id="wStart" type="button">Start</button>
+          <button class="btn alt" id="wMissions" type="button">Missions</button>
         </div>
       </div>
     </div>
@@ -4127,15 +4165,15 @@ vec3 liveryAt(vec3 p, out float fus) {
       el.hidden = false; SHOW.on = true; resize(); setModel(k || chosen, chosenLiv[k || chosen]); renderPlanes(); renderLivs(); last = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
     }
     function close() { el.hidden = true; SHOW.on = false; cancelAnimationFrame(raf); }
-    $("showClose").addEventListener("click", close);
+    $("showClose").addEventListener("click", () => { close(); if (SHOW.onBack) SHOW.onBack(); });
     $("showSpin").addEventListener("click", (e) => { view.spin = !view.spin; e.currentTarget.setAttribute("aria-pressed", String(view.spin)); });
     $("showGear").addEventListener("click", (e) => { view.gear = !view.gear; e.currentTarget.setAttribute("aria-pressed", String(view.gear)); e.currentTarget.textContent = view.gear ? "Gear down" : "Gear up"; applyGear(); });
     $("showFly").addEventListener("click", () => {
       const inp = planesEl.querySelector(`input[value="${kind}"]`); if (inp && !inp.checked) { inp.checked = true; inp.dispatchEvent(new Event("change")); }
-      close();
+      close(); if (SHOW.onNext) SHOW.onNext();
     });
     window.addEventListener("resize", () => { if (!el.hidden) resize(); });
-    document.addEventListener("keydown", (e) => { if (!el.hidden && e.key === "Escape") close(); });
+    document.addEventListener("keydown", (e) => { if (!el.hidden && e.key === "Escape") { close(); if (SHOW.onBack) SHOW.onBack(); } });
     return { open, close, on: false };
   })();
   $("showOpen").addEventListener("click", () => SHOW.open(chosen));
@@ -5825,6 +5863,33 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (fpsOn) { fpsMeter.n++; if (now - fpsMeter.t0 >= 500) { fpsOut.textContent = `${Math.round(fpsMeter.n * 1000 / (now - fpsMeter.t0))} FPS`; fpsMeter.n = 0; fpsMeter.t0 = now; } }
     requestAnimationFrame(frame);
   }
+  // ---------- step by step: welcome screen → hangar (aircraft and livery) → route and conditions → take off ----------
+  const welcome = $("welcome"), FLOW = { on: false };
+  const ROUTE_TIP = "Pick the airports, the time of day and the weather, then take off. The runway, ILS and taxiways are set up for you.";
+  function toWelcome() {
+    FLOW.on = false; brief.hidden = true; brief.classList.remove("flow"); if (SHOW.on) SHOW.close();
+    if (S.mode === "fly") S.mode = "paused";
+    welcome.hidden = false; keys.clear(); setTimeout(() => $("wStart").focus(), 50);
+  }
+  function toHangar() {
+    FLOW.on = true; welcome.hidden = true; brief.hidden = true;
+    $("showFly").textContent = "Next: route"; document.querySelector("#showroom .show-top .eyebrow").textContent = "STEP 1 OF 3 · HANGAR";
+    SHOW.open(chosen);
+  }
+  function toRoute() {
+    FLOW.on = true; welcome.hidden = true; brief.classList.add("flow"); setTab("free");
+    showBrief("STEP 2 OF 3 · ROUTE", "Choose your airports", null, ROUTE_TIP, false);
+  }
+  SHOW.onBack = () => { if (FLOW.on) toWelcome(); };
+  SHOW.onNext = () => { if (FLOW.on) toRoute(); };
+  const leaveFlow = () => { FLOW.on = false; welcome.hidden = true; brief.classList.remove("flow"); $("showFly").textContent = "Fly this one"; document.querySelector("#showroom .show-top .eyebrow").textContent = "360° HANGAR"; };
+  $("wStart").addEventListener("click", toHangar);
+  $("wMissions").addEventListener("click", () => { leaveFlow(); welcome.hidden = true; setTab("missions"); showBrief("MISSIONS", "Choose a mission", null, "Ten flights that get harder as you go: each one sets the aircraft, airport, weather and time.", false); });
+  $("backHangar").addEventListener("click", () => { brief.hidden = true; toHangar(); });
+  $("homeBtn").addEventListener("click", toWelcome);
+  goBtn.addEventListener("click", leaveFlow);
+  $("showOpen").addEventListener("click", leaveFlow, true); $("showBtn").addEventListener("click", leaveFlow, true);
+  toWelcome();
   requestAnimationFrame(frame);
 })();
 </script>
