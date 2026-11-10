@@ -584,7 +584,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
   <header class="masthead">
     <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" fill="currentColor"/></svg></span>
       <h1>Skyways <span>Flight Sim</span></h1></div>
-    <p class="tagline">12 aircraft · 10 real airports · 17 missions · replays · 32 km world · day, sunset and night</p>
+    <p class="tagline">12 aircraft · 10 real airports · 17 missions · replays · 42 km world · day, sunset and night</p>
   </header>
 
   <div class="stage" id="stage">
@@ -888,58 +888,59 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   const AIRPORTS = [
     // ten of the world's best-known airports laid out like the real ones: runway headings, lengths, names and how the runways
     // sit around the terminals (al: metres along the main runway's heading, ac: metres to its right; xr = the other runways).
-    // The map is smaller than the world, so they sit closer together, but roughly where they are on a globe, on the flattest ground nearby.
+    // The map is smaller than the world, so they sit closer together, but roughly where they are on a globe, on the flattest ground nearby,
+    // placed (by a search over the island's terrain) with at least 3 km between neighbouring airfields and no low approach over another airport.
     // London Heathrow: two parallel east-west runways with the terminals between them, T5's satellite at the west end
-    { code: "LHR", name: "London Heathrow", x: -1000, z: -1500, hdg: 270, elev: 29, kind: "intl", sat: true,
+    { code: "LHR", name: "London Heathrow", x: 600, z: -3000, hdg: 270, elev: 15, kind: "intl", sat: true,
       rwys: [{ off: 0, len: 3660, w: 50, sfx: "L" }],
       xr: [{ al: 150, ac: 1400, hdg: 270, len: 3900, w: 50, n: "27R", n2: "09L" }],
       stands: ["b77w", "a321", "b744", "a330", "b737", "b77w", "a321", "b763", "b747", "b787", "mh", "b737"] },
     // Amsterdam Schiphol: six runways in a pinwheel round the single terminal; the Polderbaan far out to the north-west
-    { code: "AMS", name: "Amsterdam Schiphol", x: -3000, z: -8500, hdg: 360, elev: 20, kind: "intl",
+    { code: "AMS", name: "Amsterdam Schiphol", x: -5400, z: -9600, hdg: 360, elev: 15, kind: "intl",
       rwys: [{ off: 0, len: 3300, w: 45, sfx: "C" }],
       xr: [{ al: 1700, ac: -1300, hdg: 0, len: 3800, w: 60, n: "36L", n2: "18R" }, { al: -3200, ac: 700, hdg: 57, len: 3500, w: 45, n: "06", n2: "24" }],
       stands: ["b737", "b77w", "mh", "b787", "b737", "b744", "a321", "b77w"] },
     // Paris Charles de Gaulle: two pairs of parallel runways, the terminals (and round Terminal 1) in the middle
-    { code: "CDG", name: "Paris Charles de Gaulle", x: -2500, z: 4500, hdg: 270, elev: 20, kind: "intl", sat: true,
+    { code: "CDG", name: "Paris Charles de Gaulle", x: -2400, z: 2400, hdg: 270, elev: 15, kind: "intl", sat: true,
       rwys: [{ off: 0, len: 2700, w: 60, sfx: "R" }, { off: -380, len: 4200, w: 45, sfx: "L" }],
       xr: [{ al: 400, ac: 1550, hdg: 270, len: 2700, w: 60, n: "26L", n2: "08R" }],
       stands: ["a321", "a350", "a330", "b737", "b77w", "a321", "mh", "a330"] },
     // Frankfurt: the close parallel pair south of the terminals, the north-west runway, and runway 18 running south
-    { code: "FRA", name: "Frankfurt Main", x: 6500, z: -6000, hdg: 250, elev: 76, kind: "intl",
+    { code: "FRA", name: "Frankfurt Main", x: 9600, z: -9600, hdg: 250, elev: 105, kind: "intl",
       rwys: [{ off: 0, len: 4000, w: 60, sfx: "C" }, { off: -518, len: 4000, w: 45, sfx: "L" }],
       xr: [{ al: 2300, ac: 1450, hdg: 250, len: 2800, w: 45, n: "25R", n2: "07L" }],
       stands: ["b744", "a321", "b747", "a350", "b737", "b77w", "a321", "mh"] },
     // Innsbruck: the mountain airport, one runway 08/26 high among the ridges
-    { code: "INN", name: "Innsbruck", x: 10750, z: -3750, hdg: 80, elev: 760, kind: "regional",
+    { code: "INN", name: "Innsbruck", x: 10800, z: -4200, hdg: 80, elev: 759, kind: "regional",
       rwys: [{ off: 0, len: 2400, w: 45, sfx: "" }], stands: ["a321", "b737", "mh"] },
     // Moscow Sheremetyevo: two parallel runways, terminals B and C on the north side, and the newer third runway beyond them
-    { code: "SVO", name: "Moscow Sheremetyevo", x: 4500, z: -9000, hdg: 240, elev: 20, kind: "intl",
+    { code: "SVO", name: "Moscow Sheremetyevo", x: 4200, z: -13800, hdg: 240, elev: 140, kind: "intl",
       rwys: [{ off: 0, len: 3550, w: 60, sfx: "R" }, { off: -280, len: 3700, w: 60, sfx: "L" }],
       xr: [{ al: -400, ac: 1250, hdg: 240, len: 3200, w: 60, n: "24C", n2: "06C" }],
       stands: ["a321", "b77w", "a330", "b737", "a321", "b77w", "mh"] },
     // Istanbul: the terminal between a west pair (17/35) and an east pair (16/34) of runways, runway 18/36 beyond the west pair
-    { code: "IST", name: "Istanbul", x: 5000, z: 8000, hdg: 350, elev: 20, kind: "intl",
+    { code: "IST", name: "Istanbul", x: 6600, z: 9000, hdg: 350, elev: 15, kind: "intl",
       rwys: [{ off: 0, len: 3750, w: 60, sfx: "R" }, { off: -380, len: 4100, w: 60, sfx: "L" }],
       xr: [{ al: 0, ac: 1550, hdg: 340, len: 3750, w: 60, n: "34L", n2: "16R" }],
       stands: ["b77w", "a321", "a330", "b737", "b77w", "mh", "b787", "a321", "b744"] },
     // Dubai: two long parallel runways with the terminals and the long Concourse between them
-    { code: "DXB", name: "Dubai International", x: 8500, z: 5000, hdg: 300, elev: 20, kind: "intl", sat: true,
+    { code: "DXB", name: "Dubai International", x: 11400, z: 4800, hdg: 300, elev: 74, kind: "intl", sat: true,
       rwys: [{ off: 0, len: 4000, w: 60, sfx: "L" }],
       xr: [{ al: 0, ac: 1400, hdg: 300, len: 4450, w: 60, n: "30R", n2: "12L" }],
       stands: ["b77w", "b77w", "a330", "b744", "b77w", "b737", "b77w", "a321", "b747"] },
     // Singapore Changi: two parallel runways with the terminals and their piers between them
-    { code: "SIN", name: "Singapore Changi", x: -3000, z: 9500, hdg: 20, elev: 129, kind: "intl", sat: true,
+    { code: "SIN", name: "Singapore Changi", x: -3600, z: 12600, hdg: 20, elev: 15, kind: "intl", sat: true,
       rwys: [{ off: 0, len: 4000, w: 60, sfx: "L" }],
       xr: [{ al: 0, ac: 1450, hdg: 20, len: 4000, w: 60, n: "02C", n2: "20C" }],
       stands: ["a350", "b77w", "a321", "b737", "b787", "a330", "b744", "mh"] },
     // New York JFK: the terminal ring with 13L/31R and the long bay runway 13R/31L to the south, 4L/22R and 4R/22L across them
-    { code: "JFK", name: "New York JFK", x: -8000, z: 7500, hdg: 310, elev: 20, kind: "intl",
+    { code: "JFK", name: "New York JFK", x: -10800, z: 5400, hdg: 310, elev: 15, kind: "intl",
       rwys: [{ off: 0, len: 3050, w: 45, sfx: "R" }],
       xr: [{ al: -1500, ac: -950, hdg: 310, len: 4440, w: 45, n: "31L", n2: "13R" }, { al: 2550, ac: 650, hdg: 40, len: 3460, w: 45, n: "04L", n2: "22R" },
       ],
       stands: ["b77w", "b763", "a321", "b744", "b737", "b787", "a350", "mh"] },
   ];
-  const WORLD = 16000;
+  const WORLD = 21000;   // half the island: room for ten airports kept well apart
   const DIMS = { f15: [13.05, 19.43], bizjet: [19.4, 24.0], b787: [60.1, 68.3], a330: [60.3, 63.7], b744: [64.4, 70.6], b747: [64.4, 70.6], b773: [60.9, 73.6], a350: [64.8, 66.9], b77w: [64.8, 73.6], b763: [47.6, 55.2], a321: [35.8, 46.5], b739: [37.8, 43.0], b777: [60.9, 63.7], trainer: [11, 8.3], aero: [8, 6.6], islander: [35.8, 39.5], breeze: [27.1, 27.2], swift: [15.5, 17.7], atlas: [42.4, 45.1], arrow: [9.1, 14.4], regio: [28.7, 36.2], skyliner: [60.1, 62.8], jumbo: [64.4, 70.7], commuter: [17.7, 17.6], b772: [64.8, 73.9], b737: [35.8, 39.7], mh: [37.8, 35.5], b767: [47.6, 48.5] };
   const swapLR = (s) => (s === "L" ? "R" : s === "R" ? "L" : "");
   // runways long enough for the fleet: an A320/737 needs about 2 km, the 767/A330 about 2.5 km, the 777/747 about 3 km
@@ -1005,8 +1006,8 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     h += smooth(0.55, 0.7, base) * ridge(wx * 0.0011, wz * 0.0011) * 1000;
     h += (fbm(x * 0.004, z * 0.004, 3) - 0.5) * 30;
     const rr = Math.hypot(x, z);
-    h += smooth(4500, 7500, rr) * (fbm(x * 0.00011 + 50, z * 0.00011 + 20, 4) - 0.41) * 1000;
-    h -= smooth(14500, 16500, rr) * 900;
+    h += smooth(5900, 9850, rr) * (fbm(x * 0.00011 + 50, z * 0.00011 + 20, 4) - 0.41) * 1000;
+    h -= smooth(19000, 21500, rr) * 900;
     return h;
   }
   function apQ(a, x, z) {
@@ -1016,9 +1017,16 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     for (const r of a.xr) { const [rl, rc] = xrLocal(r, x, z); q = Math.min(q, Math.hypot(Math.max(0, Math.abs(rl) - r.hl), Math.max(0, rc - r.a1, r.a0 - rc))); }
     return q;
   }
+  // how much of the airfield's level ground a point is on: full on the airfield, fading out over 0.2 to 1.6 km
+  // along a wobbly edge, so the levelled ground meets hills and coasts like natural land, not a straight-edged slab
+  function apBlend(a, x, z) {
+    const q = apQ(a, x, z); if (q > 2600) return 0; if (q < 40) return 1;
+    const lip = fbm(x * 0.0009 + 31, z * 0.0009 - 17, 3) * 1300;   // the level ground runs out 0.2-1 km past the airfield, by varying amounts
+    return smooth(900, 40, Math.max(0, q - lip));
+  }
   function airportMask(x, z) {
     let best = 0, ap = null;
-    for (const a of AIRPORTS) { const f = smooth(900, 40, apQ(a, x, z)); if (f > best) { best = f; ap = a; } }
+    for (const a of AIRPORTS) { const f = apBlend(a, x, z); if (f > best) { best = f; ap = a; } }
     return [best, ap];
   }
   // approach corridors: hills are lowered under both runway approaches so a 3° glide path (and the climb-out) is always clear
@@ -1034,7 +1042,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   function heightAt(x, z) {
     let h = rawHeight(x, z);
     for (const a of AIRPORTS) h = corridorCap(a, x, z, h);
-    for (const a of AIRPORTS) { const f = smooth(900, 40, apQ(a, x, z)); if (f > 0) h = h * (1 - f) + (a.elev - 0.3) * f; }
+    for (const a of AIRPORTS) { const f = apBlend(a, x, z); if (f > 0) h = h * (1 - f) + (a.elev - 0.3) * f; }
     return h;
   }
   function runwayAt(x, z) {
@@ -1351,8 +1359,10 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       const d = Math.hypot(cam.x - t.cx, cam.z - t.cz), alt = Math.max(0, cam.y - 600);
       const want = d < QS.hi + alt * 2;
       if (want && !t.hi && d < bd) { bd = d; best = t; }
+      const seen = d - 2900 < Math.min(27000, scene.fog ? scene.fog.far : 27000);   // wholly inside the fog (or past the far plane): not drawn
+      if (!t.hi) t.lo.visible = seen;
       if (t.hi) {
-        t.hi.visible = d < QS.vis; t.lo.visible = !t.hi.visible; t.trees.visible = d < QS.trees;
+        t.hi.visible = d < QS.vis; t.lo.visible = !t.hi.visible && seen; t.trees.visible = d < QS.trees;
         const near = d < 3400; if (t.trees.userData.near !== near) { t.trees.userData.near = near; t.trees.children.forEach((im) => { if (im.userData.lod) im.geometry = im.userData.lod[near ? 0 : 1]; }); }
       }
     }
@@ -4528,7 +4538,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     { id: "m9", title: "Alpine slalom", plane: "b737", from: "FRA", to: "INN", start: "runway", time: "sunset", wx: "cloudy", wind: [9, 0], goals: [["rings"], ["stop"]],
       rings: { line: ["FRA", "INN"], n: 7, zig: 650, agl: 260 },
       desc: "From Frankfurt into the mountains: weave through 7 rings low over the ridges, then land at Innsbruck, 760 m up on a 2400 m runway. Thin air means a faster touchdown, so brake firmly." },
-    { id: "m8", title: "Against the clock", plane: "mh", from: "LHR", to: "SVO", start: "runway", time: "sunset", wx: "clear", wind: [8, 200], noAP: true, limit: 450, goals: [["time"]],
+    { id: "m8", title: "Against the clock", plane: "mh", from: "LHR", to: "SVO", start: "runway", time: "sunset", wx: "clear", wind: [8, 200], noAP: true, limit: 550, goals: [["time"]],
       desc: "The autopilot is broken and Moscow is waiting. Fly the whole trip from Heathrow by hand and come to a stop on Sheremetyevo's runway within 7:30. Turn onto the final early, a tight last turn costs more time than it saves." },
     { id: "m10", title: "Thunderstorm into Dubai", plane: "b77w", from: "DXB", to: "DXB", start: "approach", dist: 11000, time: "night", wx: "storm", wind: [24, -55], goals: [["fpm", 600], ["stop"]],
       desc: "The hardest one: a fully loaded 777 at night through a thunderstorm, lightning all around and a gusty 24-knot crosswind. Get it stable early, ride the bumps, keep the sink rate low and stop before the end." },
