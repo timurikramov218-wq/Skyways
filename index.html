@@ -3598,7 +3598,6 @@ vec3 liveryAt(vec3 p, out float fus) {
         for (const zc of [-a.apL * 0.3, 0, a.apL * 0.3]) K.arch(a.termD + 10, 7, a.apL * 0.29, M.dside, tx, roofY, zc);
         for (let k = 0; k < 4; k++) box(grp, 34, 18 + (k % 2) * 8, 46, M.brick, cx + (k % 2 ? 30 : -30), 0, Z0 + 40 + Math.floor(k / 2) * 80);
         for (let k = 0; k < 2; k++) for (let j = 0; j < 3; j++) box(grp, 30, 0.4, 3.2, M.white, cx + (k % 2 ? 30 : -30) + 0.5, 4 + j * 6, Z0 + 40 + k * 80 + 23.2);
-        for (let k = 0; k < 3; k++) { box(grp, 2.6, 4.4, 11, M.red, a.termX1 + 3.5, 0.3, -a.apL * 0.2 + k * 16); }
         flat(grp, W - 10, Lz * 0.35, M.fGrass, cx, 0.05, Z1 - Lz * 0.2);
         for (let k = 0; k < 8; k++) K.tree(X0 + 15 + (k % 4) * (W - 30) / 3, Z1 - 15 - Math.floor(k / 4) * 30, 4.5);
         break; }
@@ -3862,14 +3861,32 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (a.satX0) {
       const x0 = a.satX0, x1 = a.satX1, cxs = (x0 + x1) / 2, L = a.satL;
       flat(grp, x1 - x0 + 12, L + 90, apronM, cxs + 6, 0.04, 0);
-      { const t = placeBuilding(grp, "apt_term", 1, cxs, 0, 0, 0); t.scale.set(26 / 14.47, 15 / 4.04, L / 100); }
-      const sg = new THREE.Mesh(new THREE.PlaneGeometry(60, 7), new THREE.MeshBasicMaterial({ map: textTex("SATELLITE B", "#14385e", "#ffffff") }));
-      sg.rotation.y = -Math.PI / 2; sg.position.set(cxs - 13.8, 16, 0); grp.add(sg);
+      // the concourse: long low wings and a taller glass hall in the middle, in the airport's own colours and roof
+      for (const [zc, PL, hm, dm] of [[0, L, 1, 1], [0, L * 0.22, 1.55, 1.6]]) { const t = placeTerm(grp, tmats, cxs, zc); t.scale.set(26 * dm / 14.47, 15 * hm / 4.04, PL / 100); }
+      { const K = lmkKit(grp), Mk = K.M, top = 15 * 1.55;
+        if (a.code === "LHR") for (const zc of [-L * 0.3, 0, L * 0.3]) K.arch(34, 5, L * 0.29, Mk.dside, cxs, 15, zc);
+        else if (a.code === "DXB") { K.arch(40, 9, L * 0.98, Mk.goldD, cxs, 15, 0); }
+        else if (a.code === "SIN") { K.dome(22, 0.5, Mk.glass, cxs, top, 0, 24); for (let k = -3; k <= 3; k++) if (k) K.palm(cxs + (k % 2 ? 18 : -18), k * L * 0.12, 1.1); }
+        else if (a.code === "CDG") { K.arch(30, 13, L * 0.98, Mk.dglass, cxs, 15, 0); for (let k = 0; k < 12; k++) box(grp, 31, 1, 1.2, Mk.white, cxs, 15, -L * 0.48 + k * L * 0.96 / 11); }
+        else K.gable(30, 5, L * 0.22, Mk.dark, cxs, top, 0);
+        // the people mover's station on the concourse, under the end of the track
+        box(grp, 30, 6, 16, MAT.wall2, a.satX0 + 18, 13.6, -(a.apL * 0.45 + 30)); box(grp, 34, 0.8, 18, MAT.roof, a.satX0 + 18, 26, -(a.apL * 0.45 + 30)); }
+      const satName = { LHR: "TERMINAL 5B", CDG: "TERMINAL 2E · HALL K", DXB: "CONCOURSE B", SIN: "TERMINAL 3 · B GATES" }[a.code] || "SATELLITE B";
+      for (const sd of [-1, 1]) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(70, 7), new THREE.MeshBasicMaterial({ map: textTex(satName, "#14385e", "#ffffff", 1024, 102) }));
+        sg.rotation.y = sd < 0 ? -Math.PI / 2 : Math.PI / 2; sg.position.set(cxs + sd * (13 * 1.6 + 0.4), 15 * 1.55 + 4.5, 0); grp.add(sg); }
       const heavy = a.stands.filter((k) => PLANES[k] && PLANES[k].big), kinds = heavy.length ? heavy : a.stands;
       let n = 0;
-      for (const side of [-1, 1]) for (const fz of [-0.28, 0.28]) {
+      const perSide = Math.max(2, Math.min(3, Math.floor(L / 135))), fzs = Array.from({ length: perSide }, (_, k) => (k + 0.5) / perSide - 0.5).map((f) => f * 0.9);
+      for (const side of [-1, 1]) for (const fz of fzs) {
         const kind = kinds[n++ % kinds.length], sp = PLANES[kind], len = DIMS[kind][1], z = fz * L;
+        if (Math.abs(z) < L * 0.11 + DIMS[kind][0] * 0.1 && perSide % 2) continue;   // keep the central hall's front clear
         if (side > 0 && cxs + 22 + len > x1 - 10) continue;
+        { // jet bridge: a rotunda at the concourse and a glass tunnel to the front left door
+          const nose = cxs + side * 21, dx = nose + side * len * 0.12, dz = z + side * 4.5, rx = cxs + side * 16, rz = z + side * 14;
+          const rot = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 6, 10), MAT.wall2); rot.position.set(rx, 5, rz); grp.add(rot);
+          const tl = Math.hypot(dx - rx, dz - rz), tb = new THREE.Mesh(new THREE.BoxGeometry(tl, 3, 2.8), MAT.wall2);
+          tb.position.set((dx + rx) / 2, 4.8, (dz + rz) / 2); tb.rotation.y = -Math.atan2(dz - rz, dx - rx); grp.add(tb);
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.3, 0.8), MAT.door); leg.position.set(rx + (dx - rx) * 0.7, 1.65, rz + (dz - rz) * 0.7); grp.add(leg); }
         flat(grp, Math.max(10, (x1 - x0) / 2 - 20), 0.45, MAT.yellow, cxs + side * ((x1 - x0) / 4 + 6), 0.09, z);
         const placeS = (mdl) => {
           mdl.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2; mdl.position.set(cxs + side * (13 + 8 + len / 2), sp.gearH + 0.05, z);
@@ -3886,14 +3903,6 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (!a.satX0) { box(grp, 30, 6, 14, MAT.wall2, x1 - 6, 13.6, zM); box(grp, 34, 0.8, 16, MAT.roof, x1 - 6, 26, zM); }   // the landside station
       const tr = placeBuilding(grp, "mono_train", 1, x0 + 16, 19.6, zM, Math.PI / 2);
       a.mono = { tr, x0: x0 + 16, x1: x1 - 16, dir: 1, wait: 4 };
-    }
-    // apron traffic: tugs, baggage trains and catering trucks driving along the service road and the apron lane
-    if (!ga) {
-      const veh = [], nV = intl ? 7 : 4;
-      for (let k = 0; k < nV; k++) veh.push({ x: k % 3 === 2 ? a.apX0 + 6 : a.termX0 - 15 + (k % 2 ? 4 : -4), z: (hash(k, a.x) - 0.5) * a.apL * 0.8, v: (5 + hash(a.z, k) * 4) * (k % 2 ? 1 : -1), z1: a.apL * 0.44, kind: k % 3 });
-      const g0 = roundedBox(3.2, 1.6, 2.1, 0.3).translate(0, 0.8, 0), im = new THREE.InstancedMesh(g0, new THREE.MeshLambertMaterial(), veh.length);
-      const vc = [0xf2c230, 0xe8ecef, 0x2f6fd0].map((c) => new THREE.Color(c).convertSRGBToLinear()); veh.forEach((v, k) => im.setColorAt(k, vc[v.kind]));
-      im.frustumCulled = false; im.userData.keepAlone = true; grp.add(im); a.veh = { im, veh };
     }
     // control tower
     const hs = LK.hang, hSide = hs.side;
@@ -3937,19 +3946,14 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     // car park with cars, landside road kerb
     // the car park stays empty: no private cars at the airports, only the service vehicles on the apron
-    // ground service vehicles round the parked aircraft: tug at the nose, baggage carts and a belt loader, a fuel truck at the wing
+    // the only service vehicles: fuel trucks at the wing of some wide-bodies
     { const veh = { tug: [], cart: [], fuel: [], belt: [] };
       stands.forEach((st, si) => { if (!PLANES[st.kind].big || si % 2) return;   // a crew at every other wide-body stand
         const nx = a.termX0 - 9, x = (f) => nx - st.len * f;
-        veh.tug.push([nx - 4, st.z + 2]); veh.belt.push([x(0.72), st.z - 4.5]);
-        for (let c = 0; c < 2; c++) veh.cart.push([x(0.72) - 6 - c * 3.4, st.z - 7]);
-        if (hash(st.z, a.x) > 0.6) veh.fuel.push([x(0.45), st.z + 9]);
+        if (hash(st.z, a.x) > 0.35) veh.fuel.push([x(0.45), st.z + 9]);
       });
       const put = (list, geo, mat, h) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, mat, list.length), m4b = new THREE.Matrix4(); list.forEach(([vx, vz], i) => { m4b.makeTranslation(vx, h, vz); im.setMatrixAt(i, m4b); }); grp.add(im); };
-      put(veh.tug, roundedBox(4.2, 1.5, 2.3, 0.35), APT.tug, 0.75);
-      put(veh.cart, roundedBox(2.8, 1.4, 1.6, 0.2), APT.cart, 0.9);
       put(veh.fuel, roundedBox(9, 2.8, 2.5, 0.6), APT.fuel, 1.4);
-      { const bg = new THREE.BoxGeometry(8, 0.5, 1.2); bg.rotateZ(0.28); put(veh.belt, bg, APT.tug, 1.8); }
     }
     // apron floodlight masts
     // between neighbouring stands, close to the terminal: never on a lead-in line or in the taxi lane
