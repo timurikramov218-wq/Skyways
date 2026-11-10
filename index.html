@@ -825,7 +825,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
         <li><code>767 source</code><span><a href="https://sketchfab.com/3d-models/boeing-767-200er-41d1b62ed48c4212bf3ef7cd1fca3995" target="_blank" rel="noopener">Boeing 767-200ER</a> by beanz_ncheese</span><span>CC BY 4.0</span></li>
         <li><code>B77W</code><span><a href="https://sketchfab.com/3d-models/b777-mesh-boeing-plane-bbc3df310c284096a1e39cd8e74afeeb" target="_blank" rel="noopener">B777 Mesh boeing plane</a> by yes (MrModels) — landing gear and painted windows added for the game</span><span>CC BY 4.0</span></li>
         <li><code>B787</code><span><a href="https://sketchfab.com/3d-models/low-poly-boeing-787-dreamliner-50baa323fabd49a6b861096cb88e5c25" target="_blank" rel="noopener">Low Poly Boeing 787 Dreamliner</a> by Mauro3D — landing gear added for the game</span><span>CC BY 4.0</span></li>
-        <li><code>A350</code><span>Built for this game from the Boeing 787 model above (rescaled, longer wings, painted cockpit mask)</span><span>CC BY 4.0</span></li>
+        <li><code>A350</code><span>Built for this game from the Boeing 787 model above (rescaled, longer wings with curved tips)</span><span>CC BY 4.0</span></li>
         <li><code>B763</code><span>Built for this game from the Boeing 767-200ER model above (lengthened fuselage sections)</span><span>CC BY 4.0</span></li>
         <li><code>B747</code><span><a href="https://sketchfab.com/3d-models/boeing-747-400f-1982339cb5d147cf969b7cd0b01a2e69" target="_blank" rel="noopener">Boeing 747-400f</a> by Aviation_Liker 3D (landing gear added for the game)</span><span>CC BY 4.0</span></li>
         <li><code>Towers</code><span><a href="https://sketchfab.com/3d-models/air-traffic-control-tower-84f215391662453680e646649d42b264" target="_blank" rel="noopener">Air Traffic Control Tower</a> by abass20 (CC BY 4.0); <a href="https://sketchfab.com/3d-models/low-poly-airport-control-tower-0620e81263d44b6b87e9b1df7b85f567" target="_blank" rel="noopener">Low poly Airport Control Tower</a> by assetfactory</span><span>CC BY 4.0 · Sketchfab Standard</span></li>
@@ -2451,8 +2451,8 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   // next to the plug are copied into the new gap, so the window rows stay continuous (add = whole window pitches).
   // Plugs touch only the fuselage (|x| < fx); wings and engines keep their shape. span: [x, k] stretches the wings outboard of x.
   var DERIVED = {
-    // A350-900 (66.8 m long, 64.8 m span), made from the 787-10: a little smaller overall, longer wings, the black cockpit "mask"
-    a350: { from: "b787", s: 0.978, fx: 3.1, plugs: [], span: [3.1, 1.118], bend: { root: 3.1, c0: 29.4, tip: 32.4, ang: 1.05, flex: 0.35 }, mask: [[-1.6, 1.7, -33.7], [1.6, 3.05, -30.1]] },
+    // A350-900 (66.8 m long, 64.8 m span), made from the 787-10: a little smaller overall, longer wings; the 787's own flight-deck windows
+    a350: { from: "b787", s: 0.978, fx: 3.1, plugs: [], span: [3.1, 1.118], bend: { root: 3.1, c0: 29.4, tip: 32.4, ang: 1.05, flex: 0.35 } },
     // A330-300: 63.7 m long, 60.3 m span, 5.64 m fuselage; Airbus nose and tall raked winglets
     a330: { from: "b767", s: 1.12, fx: 3.4, plugs: [[-12.25, 8 * 0.557], [4.85, 7 * 0.557]], span: [3.4, 1.152], bend: { root: 3.8, c0: 26.8, tip: 29.8, ang: 1.35, flex: 0.35 },
       nose: { z: -24.3, len: 5.5, cy: 0.2, k: 0.86, ext: 0.9 } },
@@ -3417,10 +3417,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     eng: [9.82, -0.75, 2.0, -10.24, -3.6], bodyOnly: true, addGear: true, gearH: 3.2, wheelR: 0.62, bogie: true,
     mainX: 4.9, mainZ: 0.1, noseZ: -23.4, tailZ: 33.4, beaconY: 4.5 };
   function build787model(liv) { return buildPacked("b787", packOpts("b787"), liv); }
-  function buildA350model(liv) {
-    const d = DERIVED.a350, a = derivePoint(d, ...d.mask[0]), b = derivePoint(d, ...d.mask[1]);
-    return buildPacked("a350", packOpts("a350", { mask: [a[2], b[2], a[1], b[1]] }), liv);
-  }
+  function buildA350model(liv) { return buildPacked("a350", packOpts("a350"), liv); }
 
   function buildPlane(kind, livId) {
     const sp = PLANES[kind];
