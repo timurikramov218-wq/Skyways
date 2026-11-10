@@ -2326,7 +2326,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     mh: { name: "Boeing 737", type: "Narrow-body airliner · best-selling jet", packed: true, build: buildMHmodel, thrust: 3.2, vmax: 130, stall: 55, roll: 0.44, pitch: 0.33, yaw: 0.18, turn: 0.75, gearH: 3.0, retract: true, cam: [60, 13], cock: [1.0, -15.6], wingX: 18.9, brake: 4.5, shadow: 18, big: true, stats: [0.8, 0.32, 0.38] },
     b787: { name: "Boeing 787-10 Dreamliner", type: "Long-haul wide-body · composite twin", packed: true, build: build787model, thrust: 3.0, vmax: 142, stall: 59, roll: 0.36, pitch: 0.28, yaw: 0.16, turn: 0.66, gearH: 3.2, retract: true, cam: [120, 22], cock: [3.2, -29.4], wingX: 29.9, brake: 4.0, shadow: 34, big: true, stats: [0.94, 0.23, 0.28] },
     a350: { name: "Airbus A350-900", type: "Long-haul wide-body · curved wingtips", packed: true, build: buildA350model, thrust: 3.0, vmax: 144, stall: 59, roll: 0.36, pitch: 0.28, yaw: 0.16, turn: 0.66, gearH: 3.14, retract: true, cam: [118, 22], cock: [3.14, -28.8], wingX: 32.4, brake: 4.0, shadow: 35, big: true, stats: [0.95, 0.23, 0.28] },
-    bizjet: { name: "Business Jet", type: "Private jet · T-tail · walk-in cabin view", packed: true, build: buildBizjetModel, thrust: 3.7, vmax: 150, stall: 47, roll: 0.62, pitch: 0.42, yaw: 0.22, turn: 0.85, gearH: 1.9, retract: true, cam: [42, 9], cock: [0.55, -9.4], wingX: 9.7, brake: 4.8, shadow: 11, stats: [0.6, 0.55, 0.6], salon: [0, 0.6, -1.4] },
+    bizjet: { name: "Business Jet", type: "Private jet · T-tail · two rear engines", packed: true, build: buildBizjetModel, thrust: 3.7, vmax: 150, stall: 47, roll: 0.62, pitch: 0.42, yaw: 0.22, turn: 0.85, gearH: 1.9, retract: true, cam: [42, 9], cock: [0.55, -9.4], wingX: 9.7, brake: 4.8, shadow: 11, stats: [0.6, 0.55, 0.6] },
   };
   for (const k of Object.keys(PLANES)) PLANES[k].kind = k;
   (function realScale() {
@@ -2749,7 +2749,7 @@ uniform vec4 uGeo; uniform vec4 uZ; uniform vec4 uLn; uniform vec4 uLn2; uniform
 uniform vec3 uBody; uniform vec3 uBelly; uniform vec3 uTop; uniform vec3 uStr; uniform vec3 uStr2; uniform vec3 uFin1; uniform vec3 uFin2; uniform vec3 uFin3; uniform vec3 uWing; uniform vec3 uNose; uniform vec3 uLead;
 uniform sampler2D uTitle; uniform float uCabin;
 uniform vec4 uFg0; uniform vec4 uFg1; uniform vec4 uEng; uniform vec4 uEz; uniform vec3 uEngC; uniform vec3 uLip; uniform vec4 uMask; uniform vec4 uEng2; uniform vec4 uEz2; uniform float uPaintWin; uniform float uCkpt; uniform vec4 uCk; uniform vec4 uTip; uniform vec3 uTipC; uniform vec4 uAft; uniform vec3 uAftC; uniform vec4 uUp; uniform float uHump; uniform vec4 uDoor; uniform vec2 uDoorB; uniform vec2 uWinR; uniform float uHideWin; uniform float uPitch; uniform vec4 uEmb; uniform vec3 uEmbC; uniform vec3 uEmbC2; uniform sampler2D uFinTex; uniform sampler2D uRegTex; uniform float uHasReg;
-float gMask = 0.0, gGlass = 0.0, gHide = 0.0, gWin = 0.0;   // set when a pixel lies in the A350 mask: then even the model's own dark glass is repainted
+float gMask = 0.0, gGlass = 0.0, gHide = 0.0;   // set when a pixel lies in the A350 mask: then even the model's own dark glass is repainted
 vec3 liveryAt(vec3 p, out float fus) {
   fus = 0.0;
   float cy = uGeo.x, R = uGeo.y, finY = uGeo.z, finTop = uGeo.w;
@@ -2833,13 +2833,13 @@ vec3 liveryAt(vec3 p, out float fus) {
         float band = 1.0 - smoothstep(0.185 - wya, 0.185 + wya, abs(wy));
         cov = mix(cov, min(1.0, band * 0.5 / uPitch), far); ring = mix(ring, 0.0, far);
         vec3 glass = mix(vec3(0.03, 0.04, 0.05), vec3(0.08, 0.1, 0.12), smoothstep(-0.18, 0.18, wy));
-        c = mix(c * (1.0 - 0.16 * ring), glass, cov); gWin = max(gWin, step(0.5, cov) * (1.0 - far));
+        c = mix(c * (1.0 - 0.16 * ring), glass, cov);
       }
       { vec2 q = abs(vec2(dz0, wy + 0.6)) - vec2(0.39, 0.82); float rr = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.15;
         { float aa = max(length(vec2(dFdx(rr), dFdy(rr))), 1e-4); c *= 1.0 - 0.4 * (1.0 - smoothstep(0.02 - aa, 0.02 + aa, abs(rr))); }   // door outline, anti-aliased
         if (dmin < 0.2 && abs(wy - 0.05) < 0.11 && abs(dz0) < 0.12) c = vec3(0.04, 0.05, 0.06); } // small door window
       float bot = 0.05 + (uCk.y - 0.002 - f) * 2.2 * 0.044 / (uCk.y - uCk.x);
-      if (uUp.w < 0.5 && uHideWin < 0.5 && uCkpt > -0.5 && f > uCk.x && f < uCk.y && v > bot && v < bot + 0.15 && abs(fract((f - uCk.z) / uCk.w) - 0.5) < 0.4) { c = vec3(0.02, 0.024, 0.03); gWin = 1.0; }
+      if (uUp.w < 0.5 && uHideWin < 0.5 && uCkpt > -0.5 && f > uCk.x && f < uCk.y && v > bot && v < bot + 0.15 && abs(fract((f - uCk.z) / uCk.w) - 0.5) < 0.4) c = vec3(0.02, 0.024, 0.03);
     }
     if (uCkpt > 0.5) {   // flight-deck glazing on models that have none: windscreen and side windows round the upper nose
       float a = atan(abs(p.x), p.y - cy), fs = 0.031 + a * 0.006, fe = 0.044 + a * 0.008 - max(0.0, 0.5 - a) * 0.004;
@@ -2880,7 +2880,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     shader.vertexShader = LIV_VERT + shader.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n  vLp = position;");
     shader.fragmentShader = LIV_FRAG + shader.fragmentShader.replace("#include <color_fragment>", `#include <color_fragment>
   { float fus; vec3 lc = liveryAt(vLp, fus);
-    if (uCabin > 0.5 && fus > 0.5 && (uCabin < 1.5 || gWin > 0.5)) discard;
+    if (uCabin > 0.5 && fus > 0.5) discard;
     float pnt = max(smoothstep(0.3, 0.42, max(max(vColor.r, vColor.g), vColor.b)), max(gMask, gHide));
     diffuseColor.rgb = mix(diffuseColor.rgb, lc, pnt); }`).replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
   if (gMask > 0.5) roughnessFactor = gGlass > 0.5 ? 0.12 : 0.85;`).replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
@@ -3427,7 +3427,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   PACK_OPTS.b787 = { cy: 1.38, R: 2.93, win: 0.31, zNose: -34.15, zTail: 34.15, finTop: 13.63, fin: [4.6, 13.63, 22.0, 31.0, 30.9, 33.4],
     eng: [9.82, -0.75, 2.0, -10.24, -3.6], bodyOnly: true, addGear: true, gearH: 3.2, wheelR: 0.62, bogie: true,
     mainX: 4.9, mainZ: 0.1, noseZ: -23.4, tailZ: 33.4, beaconY: 4.5 };
-  // business jet: the model's own cabin (seats, table, carpet, bulkhead) is kept and seen from the Cabin camera; gear, cabin
+  // business jet: the model's own cabin (lining, table, carpet, bulkhead) is kept; gear, cabin
   // windows and windscreen are added (the windscreen sits further back on its long nose: ckF)
   PACK_OPTS.bizjet = { cy: -0.02, R: 1.08, win: 0.33, zNose: -12, zTail: 12, finTop: 3.47, fin: [1.05, 3.47, 6.5, 11.5, 8.25, 10.34],
     eng: [1.9, 0.6, 0.55, 5.0, 9.0], bodyOnly: true, addGear: true, gearH: 1.9, wheelR: 0.33, mainX: 1.55, mainZ: 3.9, noseZ: -9.0,
@@ -4018,7 +4018,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   shadow.rotation.x = -Math.PI / 2; scene.add(shadow);
   const boom = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xff8a3d, transparent: true, opacity: 0.9 }));
   boom.visible = false; scene.add(boom);
-  const CABIN = { value: 0 }, salonLook = { yaw: 0, pitch: -0.1 }, cabinLook = { yaw: 1.62, pitch: -0.22 }, deckLook = { yaw: 0, pitch: -0.27 };
+  const CABIN = { value: 0 }, cabinLook = { yaw: 1.62, pitch: -0.22 }, deckLook = { yaw: 0, pitch: -0.27 };
   function updateFlightDeck(fd, now) {
     const u = fd.userData;
     u.levers.forEach((l) => (l.rotation.x = -0.5 + S.throttle * 0.9));
@@ -4184,7 +4184,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   // ================= INPUT =================
   const keys = new Set(); let invert = load("sw-invert") === "1", showMap = 1;
   const stick = { x: 0, y: 0 }; let touchBrake = false, touchYaw = 0;
-  const CAMS = [["chase", "Chase"], ["cockpit", "Cockpit"], ["salon", "Cabin"], ["wing", "Wing"], ["tail", "Tail"], ["gear", "Nose gear"], ["belly", "Belly"], ["side", "Side"], ["tower", "Tower"], ["orbit", "Orbit"], ["flyby", "Fly-by"], ["free", "Free"]];
+  const CAMS = [["chase", "Chase"], ["cockpit", "Cockpit"], ["wing", "Wing"], ["tail", "Tail"], ["gear", "Nose gear"], ["belly", "Belly"], ["side", "Side"], ["tower", "Tower"], ["orbit", "Orbit"], ["flyby", "Fly-by"], ["free", "Free"]];
   const freeCam = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, speed: 40, on: false };
   const camWrap = $("cams");
   CAMS.forEach(([id, label], i) => {
@@ -4202,8 +4202,6 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (id === "cockpit") { if (COCKPIT.status === "idle") loadCockpit(); else if (COCKPIT.scene && model && model.userData.deck) seatCockpit(model.userData.deck); }
     { const nm = document.getElementById("camName"); if (nm) nm.textContent = CAMS.find((c) => c[0] === id)[1]; }
     camWrap.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.cam === id)));
-    if (id === "salon" && !spec.salon) { flash("The cabin view is in the Business Jet", 1.6); id = "chase"; S.cam = id; }
-    if (S.mode === "fly" && id === "salon") { flash("Cabin view: drag to look around", 2.2); return; }
     if (id === "cabin" && !(model && model.userData.cabinG)) { flash(spec.freighter ? "A freighter has no passenger cabin" : "This aircraft has no cabin view", 1.6); id = "chase"; S.cam = id; }
     if (S.mode === "fly" && id === "cabin") { flash("Cabin view: window seat · drag to look around", 2.4); return; }
     if (S.mode === "fly") flash(id === "free" ? "Free camera: WASD move · Q/E down/up · drag to look" : `${CAMS.find((c) => c[0] === id)[1]} view${id === "orbit" ? ": drag to look around, scroll to zoom" : ""}`, id === "free" ? 4 : 1.6);
@@ -4212,7 +4210,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   $("camCycle").addEventListener("click", () => cycleCam());
   $("moreBtn").addEventListener("click", (e) => { e.stopPropagation(); const m = $("moreMenu"); m.hidden = !m.hidden; $("moreBtn").setAttribute("aria-expanded", String(!m.hidden)); });
   document.addEventListener("click", (e) => { const m = $("moreMenu"); if (!m.hidden && !e.target.closest(".more-wrap")) { m.hidden = true; $("moreBtn").setAttribute("aria-expanded", "false"); } });
-  function cycleCam() { let i = CAMS.findIndex((c) => c[0] === S.cam); i = (i + 1) % CAMS.length; if (CAMS[i][0] === "salon" && !spec.salon) i = (i + 1) % CAMS.length; setCam(CAMS[i][0]); }
+  function cycleCam() { const i = CAMS.findIndex((c) => c[0] === S.cam); setCam(CAMS[(i + 1) % CAMS.length][0]); }
   function toggleGear() {
     if (!spec.retract) { flash("The Cessna 172 has fixed landing gear", 1.6); return; }
     if (S.grounded && S.gearDown) { flash("Can't raise the gear on the ground", 1.6); return; }
@@ -4383,7 +4381,6 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (!drag || e.pointerId !== drag.id) return;
     if (S.cam === "orbit") { orbit.yaw -= (e.clientX - drag.x) * 0.008; orbit.pitch = clamp(orbit.pitch + (e.clientY - drag.y) * 0.006, -0.3, 1.4); }
     if (S.cam === "cockpit") { deckLook.yaw = clamp(deckLook.yaw - (e.clientX - drag.x) * 0.005, -2.2, 2.2); deckLook.pitch = clamp(deckLook.pitch - (e.clientY - drag.y) * 0.005, -0.9, 0.8); }
-    if (S.cam === "salon") { salonLook.yaw = clamp(salonLook.yaw - (e.clientX - drag.x) * 0.005, -3.1, 3.1); salonLook.pitch = clamp(salonLook.pitch - (e.clientY - drag.y) * 0.005, -0.8, 0.6); }
     if (S.cam === "cabin") { cabinLook.yaw = clamp(cabinLook.yaw - (e.clientX - drag.x) * 0.005, -0.6, 3.6); cabinLook.pitch = clamp(cabinLook.pitch - (e.clientY - drag.y) * 0.005, -0.8, 0.7); }
     if (S.cam === "free") { freeCam.yaw -= (e.clientX - drag.x) * 0.005; freeCam.pitch = clamp(freeCam.pitch - (e.clientY - drag.y) * 0.005, -1.5, 1.5); }
     drag.x = e.clientX; drag.y = e.clientY;
@@ -5216,8 +5213,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     let fov = 65;
     { // the cabin is drawn (and your own fuselage skin hidden) only while you sit in it
       const cg = model && model.userData.cabinG, fd = model && model.userData.deck, live = !S.crashed && S.mode !== "brief" && S.mode !== "over";
-      const inCab = !!cg && S.cam === "cabin" && live, inDeck = !!fd && S.cam === "cockpit" && live, inSalon = !!spec.salon && S.cam === "salon" && live;
-      CABIN.value = inCab || inDeck ? 1 : inSalon ? 2 : 0; if (cg) cg.visible = inCab; if (fd) fd.visible = inDeck;
+      const inCab = !!cg && S.cam === "cabin" && live, inDeck = !!fd && S.cam === "cockpit" && live;
+      CABIN.value = inCab || inDeck ? 1 : 0; if (cg) cg.visible = inCab; if (fd) fd.visible = inDeck;
       if (inDeck && !fd.userData.glb) updateFlightDeck(fd, now);
       if (inCab && now - (cg.userData.ifeT || 0) > 250) {   // seat-back moving map
         cg.userData.ifeT = now; const { g: q, t } = cg.userData.ife;
@@ -5232,7 +5229,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         }
         q.fillStyle = "#e8eef5"; q.font = "9px sans-serif"; q.fillText(`${Math.round(Math.max(0, S.pos.y) * M2FT)} ft  ${Math.round(S.gs * MS2KT)} kt`, 4, 77); t.needsUpdate = true;
       }
-      const nr = inCab || inDeck || inSalon ? 0.1 : 0.4; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); }
+      const nr = inCab || inDeck ? 0.1 : 0.4; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); }
     }
     if (S.mode === "brief" || S.mode === "over") {
       const a = now / 8000, d = spec.cam[0] * 1.3;
@@ -5243,9 +5240,6 @@ vec3 liveryAt(vec3 p, out float fus) {
       camera.quaternion.copy(S.q).multiply(V.q2.setFromEuler(V.eul.set(deckLook.pitch, deckLook.yaw, 0, "YXZ"))); fov = 78;
     } else if (S.cam === "cockpit" && !S.crashed) {
       camera.position.copy(S.pos).addScaledVector(up, spec.cock[0]).addScaledVector(fwd, -spec.cock[1]); camera.quaternion.copy(S.q); fov = 72;
-    } else if (S.cam === "salon" && !S.crashed && spec.salon) {   // in the jet's cabin, at the back, looking forward along the aisle
-      camera.position.set(...spec.salon).applyQuaternion(S.q).add(S.pos);
-      camera.quaternion.copy(S.q).multiply(V.q2.setFromEuler(V.eul.set(salonLook.pitch, salonLook.yaw, 0, "YXZ"))); fov = 80;
     } else if (S.cam === "cabin" && !S.crashed && model.userData.cabinG) {
       camera.position.copy(model.userData.cabinG.userData.seat).applyQuaternion(S.q).add(S.pos);
       camera.quaternion.copy(S.q).multiply(V.q2.setFromEuler(V.eul.set(cabinLook.pitch, cabinLook.yaw, 0, "YXZ"))); fov = 64;
@@ -5374,7 +5368,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       else if (!S.grounded && agl < 400 && S.vs < -10 && blink) hud.fillText("PULL UP", w / 2, fs * 6);
       return;
     }
-    if ((S.cam === "cabin" || S.cam === "salon") && CABIN.value) {   // passenger view: a quiet flight-information strip instead of the HUD
+    if (S.cam === "cabin" && CABIN.value) {   // passenger view: a quiet flight-information strip instead of the HUD
       const fs = Math.max(12, Math.round(Math.min(w, h) / 46)), MONO2 = MONO;
       const kt = Math.round(S.gs * MS2KT), ft = Math.round(Math.max(0, S.pos.y - spec.gearH) * M2FT);
       let line = `${spec.name} · ${ft.toLocaleString("en-US")} ft · ${kt} kt ground speed`;
