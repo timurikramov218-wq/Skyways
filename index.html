@@ -353,7 +353,39 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .log { box-sizing: border-box; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(720px, calc(100% - 24px)); max-height: calc(100% - 96px); overflow: auto; display: grid; gap: 10px; background: #17171a; border: 1px solid var(--hair-2); border-radius: 18px; padding: 18px 20px; color: var(--fg); box-shadow: 0 40px 80px rgba(0,0,0,0.6); z-index: 7; }
 .log h3 { margin: 0; font: 400 22px var(--font-display); }
 /* career */
-#carPanel { z-index: 12; }
+/* career page */
+.cpage { position: absolute; inset: 0; z-index: 12; background: radial-gradient(120% 90% at 20% 0%, #1d1c20 0%, #0d0d10 70%); overflow: auto; color: var(--fg); }
+.cp-in { box-sizing: border-box; width: min(980px, 100%); margin: 0 auto; padding: calc(22px + env(safe-area-inset-top, 0px)) 20px 40px; display: grid; gap: 14px; }
+.cp-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 16px; align-items: start; }
+.cp-head h2 { margin: 2px 0 4px; font: 400 34px var(--font-display); }
+.cp-rank { font: 400 14px var(--font-body); color: var(--fg-2); } .cp-rank .st { color: var(--champ); letter-spacing: 2px; margin-right: 6px; }
+.cp-money { text-align: right; } .cp-money b { font: 500 28px var(--font-mono); color: var(--champ); } .cp-money small { display: block; font: 400 11px var(--font-body); color: var(--fg-3); }
+.cp-rep { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 6px; font: 400 11px var(--font-body); color: var(--fg-3); }
+.cp-rep i { width: 110px; height: 6px; border-radius: 3px; background: var(--g2); overflow: hidden; } .cp-rep i b { display: block; height: 100%; background: #7fd38a; }
+.cp-xp { height: 4px; border-radius: 2px; background: var(--g2); overflow: hidden; } .cp-xp b { display: block; height: 100%; background: var(--champ); }
+.cp-tabs { justify-self: start; }
+.cp-body { display: grid; gap: 10px; }
+.cp-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cp-note { margin: 0; font: 400 13px var(--font-body); color: var(--fg-3); }
+.cp-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--g1); border: 1px solid var(--hair); }
+.cp-card.off { opacity: 0.55; }
+.cp-tag { width: 64px; padding: 8px 0; border-radius: 10px; text-align: center; font: 700 11px var(--font-mono); letter-spacing: 0.06em; color: #10131a; background: #78beff; }
+.cp-tag.cargo { background: #e3b45a; } .cp-tag.vip { background: #d6bf96; } .cp-tag.express { background: #ff8a6a; } .cp-tag.weather { background: #9fb3c8; } .cp-tag.plane { background: var(--g3); color: var(--fg); }
+.cp-main b { display: block; font: 600 16px var(--font-body); } .cp-main span { display: block; margin-top: 3px; font: 400 12.5px var(--font-body); color: var(--fg-2); }
+.cp-main .why { color: #ff9a8a; }
+.cp-side { display: grid; gap: 6px; justify-items: end; font: 500 15px var(--font-mono); color: var(--champ); } .cp-side small { font: 400 11px var(--font-body); color: var(--fg-3); }
+.cp-cond { width: 120px; height: 6px; border-radius: 3px; background: var(--g2); overflow: hidden; margin-top: 6px; } .cp-cond b { display: block; height: 100%; }
+.cp-pick { display: inline-flex; gap: 6px; align-items: center; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--hair); background: var(--g1); color: var(--fg-2); font: 400 13px var(--font-body); cursor: pointer; }
+.cp-pick[aria-pressed="true"] { border-color: rgba(214,191,150,0.7); color: var(--fg); background: rgba(214,191,150,0.08); }
+.cp-setup { display: grid; gap: 12px; max-width: 520px; padding: 18px; border-radius: 16px; background: var(--g1); border: 1px solid var(--hair); }
+.cp-setup label { display: grid; gap: 6px; font: 400 12px var(--font-body); color: var(--fg-3); }
+.cp-setup input, .cp-setup select, .cp-buy select { font: 400 15px var(--font-body); padding: 9px 12px; border-radius: 10px; border: 1px solid var(--hair); background: #101013; color: var(--fg); }
+.cp-buy { display: flex; gap: 6px; align-items: center; }
+.cp-table { width: 100%; border-collapse: collapse; font: 400 12.5px var(--font-mono); color: var(--fg-2); } .cp-table td, .cp-table th { padding: 7px 8px; border-bottom: 1px solid var(--hair); text-align: left; } .cp-table th { color: var(--fg-3); font-weight: 400; }
+.cp-table .good { color: #7fd38a; } .cp-table .bad { color: #ff9a8a; }
+@media (max-width: 640px) { .cp-head { grid-template-columns: minmax(0, 1fr) auto; } .cp-money { grid-column: 1 / -1; text-align: left; } .cp-rep { justify-content: flex-start; } .cp-card { grid-template-columns: minmax(0, 1fr); } .cp-side { justify-items: start; } }
+.jobbar { position: absolute; left: 50%; top: calc(54px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 3; padding: 6px 14px; border-radius: 999px; background: rgba(20,18,12,0.86); border: 1px solid rgba(214,191,150,0.5); color: #f3e6c8; font: 500 12.5px var(--font-mono); white-space: nowrap; pointer-events: none; }
+.jobbar.late { border-color: #ff8a6a; color: #ffc0b0; }
 .car-chip { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(214,191,150,0.45); background: rgba(214,191,150,0.08); color: var(--fg); font: 500 13px var(--font-body); cursor: pointer; }
 .car-chip:hover { background: rgba(214,191,150,0.18); }
 .car-chip .st { color: var(--champ); letter-spacing: 1px; } .car-chip .m { font-family: var(--font-mono); color: var(--champ); }
@@ -719,10 +751,24 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       </dl>
     </div>
 
-    <div class="log career" id="carPanel" hidden role="dialog" aria-labelledby="carTitle">
-      <div class="log-head"><h3 id="carTitle">Career</h3><div class="log-acts"><button class="chip" id="carMode" type="button" aria-pressed="false" title="Only fly the aircraft your rank is licensed for">Career mode</button><button class="chip" id="carClose" type="button">Close</button></div></div>
-      <div id="carBody"></div>
+    <div class="cpage" id="careerPage" hidden role="dialog" aria-modal="true" aria-labelledby="cpTitle">
+      <div class="cp-in">
+        <header class="cp-head">
+          <div><div class="eyebrow">CAREER</div><h2 id="cpTitle">Your airline</h2><div class="cp-rank" id="cpRank"></div></div>
+          <div class="cp-money"><b id="cpCash">$0</b><small>balance</small><div class="cp-rep"><span>Reputation</span><i><b id="cpRep"></b></i></div></div>
+          <button class="chip icon cp-x" id="cpClose" type="button" aria-label="Close the career page">×</button>
+        </header>
+        <div class="cp-xp"><b id="cpXp"></b></div>
+        <nav class="seg cp-tabs" id="cpTabs" role="tablist" aria-label="Career">
+          <button type="button" class="seg-btn" data-t="jobs" aria-pressed="true">Contracts</button>
+          <button type="button" class="seg-btn" data-t="fleet" aria-pressed="false">Fleet</button>
+          <button type="button" class="seg-btn" data-t="shop" aria-pressed="false">Buy aircraft</button>
+          <button type="button" class="seg-btn" data-t="log" aria-pressed="false">Logbook</button>
+        </nav>
+        <div class="cp-body" id="cpBody"></div>
+      </div>
     </div>
+    <div class="jobbar" id="jobBar" hidden aria-live="off"></div>
     <div class="log" id="logPanel" hidden role="dialog" aria-labelledby="logTitle">
       <div class="log-head"><h3 id="logTitle">Flight log</h3><div class="log-acts"><button class="chip" id="logClear" type="button">Clear</button><button class="chip" id="logClose" type="button">Close</button></div></div>
       <div id="logBody"></div>
@@ -4871,65 +4917,190 @@ vec3 liveryAt(vec3 p, out float fus) {
     arr.push(Object.assign({ d: Date.now(), plane: spec.kind, from: S.from ? S.from.code : "?", to: S.to ? S.to.code : "", t: Math.round(S.flightT), model: ENV.model }, entry));
     save("sw-log", JSON.stringify(arr.slice(-LOG_MAX)));
   }
-  // ================= CAREER =================
-  // every completed flight to its destination pays (distance x aircraft size, with bonuses for a soft, centred landing and
-  // parking at the gate) and earns experience; a crash costs the repairs. Ranks license bigger aircraft; with Career mode on
-  // you can only take the ones you're licensed for.
+  // ================= CAREER: your own airline =================
+  // Found an airline at a hub with one aircraft. Fly contracts from wherever your aircraft is: passengers, cargo, VIP charters,
+  // express runs and bad-weather flights, each with a deadline and a pay. On-time, soft and centred landings and parking at the
+  // gate pay more and raise your reputation (which raises every pay); lateness, hard landings and crashes cost money and
+  // reputation and wear the aircraft, which needs repairs. Earn experience for promotions; each rank lets you buy bigger
+  // aircraft. Everything is saved in this browser.
   const RANKS = [["Cadet", 0], ["Junior First Officer", 300], ["First Officer", 900], ["Captain", 2200], ["Senior Captain", 5000], ["Chief Pilot", 10000]];
   const LICENCE = { b737: 0, mh: 0, bizjet: 0, a321: 1, b763: 2, b787: 2, a330: 3, a350: 3, b77w: 3, b744: 4, b747: 4, f15: 5 };
-  const CAR = Object.assign({ cash: 5000, xp: 0, flights: 0, secs: 0, best: null, mode: false, earned: 0 }, readJSON("sw-career", {}) || {});
+  const PRICE = { b737: 60000, mh: 55000, bizjet: 45000, a321: 90000, b763: 160000, b787: 240000, a330: 220000, a350: 300000, b77w: 380000, b744: 420000, b747: 400000, f15: 600000 };
+  const CAR = Object.assign({ cash: 0, xp: 0, flights: 0, secs: 0, earned: 0, rep: 50, fleet: [], sel: null, jobs: [], hist: [], started: false, airline: "", hub: "LHR", seed: 1 }, readJSON("sw-career", {}) || {});
+  if (!Array.isArray(CAR.fleet)) CAR.fleet = []; if (!Array.isArray(CAR.hist)) CAR.hist = []; if (!Array.isArray(CAR.jobs)) CAR.jobs = [];
   const carSave = () => save("sw-career", JSON.stringify(CAR));
   const rankOf = (xp) => { let i = 0; RANKS.forEach(([, x], k) => { if (xp >= x) i = k; }); return i; };
   const money = (v) => (v < 0 ? "−$" : "$") + Math.abs(Math.round(v)).toLocaleString("en-US");
   const licensed = (kind) => (LICENCE[kind] ?? 0) <= rankOf(CAR.xp);
-  function careerPay({ from, to, kind, stars, off, gate, secs }) {
-    const D = Math.hypot(to.x - from.x, to.z - from.z) / 1000, size = clamp(SEATS[kind] ? SEATS[kind] / 180 : 1, 0.4, 2.4);
-    const base = Math.round((900 + D * 260) * size / 10) * 10, lines = [[`${from.code} → ${to.code}, ${D.toFixed(1)} km · ${PLANES[kind].name}`, base]];
-    if (stars === 3) lines.push(["Soft landing ★★★ +40%", Math.round(base * 0.4)]); else if (stars === 2) lines.push(["Good landing ★★ +15%", Math.round(base * 0.15)]);
-    if (off < 2) lines.push(["On the centreline +10%", Math.round(base * 0.1)]);
-    if (gate) lines.push(["Parked at the gate +20%", Math.round(base * 0.2)]);
-    const total = lines.reduce((t, l) => t + l[1], 0), xp = Math.round(D * 10 + stars * 40 + (gate ? 30 : 0) + 20), r0 = rankOf(CAR.xp);
-    CAR.cash += total; CAR.earned += total; CAR.xp += xp; CAR.flights++; CAR.secs += secs || 0; carSave();
+  const capPax = (kind) => SEATS[kind] || 0, capCargo = (kind) => (PLANES[kind] && PLANES[kind].cargo) || Math.round((SEATS[kind] || 0) * 0.05);
+  const repMul = () => 0.85 + CAR.rep / 333;
+  const planeOf = (id) => CAR.fleet.find((f) => f.id === id);
+  const kmBetween = (a, b) => Math.hypot(a.x - b.x, a.z - b.z) / 1000;
+  const fmtT = (sec) => `${Math.floor(Math.max(0, sec) / 60)}:${String(Math.floor(Math.max(0, sec) % 60)).padStart(2, "0")}`;
+  let jobSeed = CAR.seed || 1; const jr = () => { jobSeed = (jobSeed * 16807) % 2147483647; return jobSeed / 2147483647; };
+  const JOB_T = { pax: "PAX", cargo: "CARGO", vip: "VIP", express: "EXPRESS", weather: "WEATHER" };
+  function genJobs(fromCode) {
+    const from = AP_BY[fromCode]; if (!from) return [];
+    const f = planeOf(CAR.sel) || CAR.fleet[0], seats = f ? capPax(f.kind) : 180, hold = f ? capCargo(f.kind) : 9;   // most offers fit your aircraft; one or two are bigger
+    const others = AIRPORTS.filter((a) => a !== from), out = [];
+    for (let k = 0; k < 6; k++) {
+      const to = others[Math.floor(jr() * others.length)], D = kmBetween(from, to), roll = jr();
+      const type = roll < 0.42 ? "pax" : roll < 0.62 ? "cargo" : roll < 0.74 ? "vip" : roll < 0.88 ? "express" : "weather";
+      let pax = 0, cargo = 0, pay = 0, title = "";
+      const fits = k < 4;
+      if (type === "cargo") { cargo = fits ? Math.max(1, Math.round(hold * (0.5 + jr() * 0.5))) : [30, 60, 100][Math.floor(jr() * 3)]; pay = cargo * (60 + D * 25) * (hold < 15 && fits ? 2.2 : 1); title = `${cargo} t of freight to ${to.name}`; }
+      else if (type === "vip") { pax = 4 + Math.floor(jr() * 9); pay = 4000 + D * 420; title = `VIP charter: ${pax} guests to ${to.name}`; }
+      else { pax = fits ? Math.max(4, Math.round(seats * (0.55 + jr() * 0.45) / 5) * 5) : [220, 260, 320, 380][Math.floor(jr() * 4)]; pay = pax * (12 + D * 4) * (seats < 40 && fits ? 6 : 1); title = type === "express" ? `Express: ${pax} passengers to ${to.name}, fast` : type === "weather" ? `${pax} passengers to ${to.name} through bad weather` : `${pax} passengers to ${to.name}`; }
+      if (type === "express") pay *= 1.5; if (type === "weather") pay *= 1.4;
+      const deadline = Math.round((D * 1000 / 95 + 480) * (type === "express" ? 0.78 : 1));
+      const wx = type === "weather" ? ["rain", "storm", "fog", "snow", "windy"][Math.floor(jr() * 5)] : ["clear", "clear", "cloudy", "clear", "overcast"][Math.floor(jr() * 5)];
+      const time = ["day", "day", "day", "sunset", "night"][Math.floor(jr() * 5)];
+      out.push({ id: `${Date.now().toString(36)}${k}`, type, from: from.code, to: to.code, D: +D.toFixed(1), pax, cargo, pay: Math.round(pay / 10) * 10, xp: Math.round(D * 10 + 40 + (type === "vip" || type === "weather" ? 30 : 0)), deadline, wx, time, title });
+    }
+    CAR.seed = jobSeed; return out;
+  }
+  function jobProblem(job, f) {   // why this aircraft can't take this contract (or null)
+    if (!f) return "Pick an aircraft";
+    if (f.loc !== job.from) return `Your aircraft is at ${f.loc}`;
+    if (f.cond < 35) return "The aircraft needs repairs first (Fleet)";
+    if (!licensed(f.kind)) return `Needs the rank of ${RANKS[LICENCE[f.kind]][0]}`;
+    if (job.pax && capPax(f.kind) < job.pax) return `Needs ${job.pax} seats (this one has ${capPax(f.kind)})`;
+    if (job.cargo && capCargo(f.kind) < job.cargo) return `Needs ${job.cargo} t of cargo space (this one takes ${capCargo(f.kind)} t)`;
+    return null;
+  }
+  // the contract's end: paid on arrival at its destination
+  function careerFinish(ok, info) {
+    const J = S.careerJob; S.careerJob = null; jobBar.hidden = true; if (!J) return null;
+    const job = J.job, f = planeOf(J.plane), box = document.createElement("div"); box.className = "car-pay";
+    const line = (t, v) => { const d = document.createElement("div"); d.innerHTML = v === undefined ? t : `${t}: <b>${money(v)}</b>`; box.append(d); };
+    let pay = 0, rep = 0, wear = 3, res;
+    if (ok) {
+      const base = Math.round(job.pay * repMul()); pay = base; line(`${job.title} · base pay (reputation ×${repMul().toFixed(2)})`, base);
+      const late = info.secs - job.deadline;
+      if (late <= 0) { const b = Math.round(base * 0.1); pay += b; rep += 2; line(`On time, ${fmtT(-late)} to spare +10%`, b); }
+      else { const pen = -Math.round(base * Math.min(0.5, late / 600)); pay += pen; rep -= 3; line(`Late by ${fmtT(late)}`, pen); }
+      if (info.stars === 3) { const b = Math.round(base * 0.15); pay += b; rep += 2; line("Soft landing ★★★ +15%", b); }
+      else if (info.stars === 1) { const b = -Math.round(base * 0.15); pay += b; rep -= 2; line("Rough landing ★", b); }
+      if (job.type === "vip" && info.fpm > 300) { const b = -Math.round(base * 0.4); pay += b; rep -= 4; line(`VIP guests unhappy: touchdown ${info.fpm} ft/min (over 300)`, b); }
+      if (info.off < 2) { const b = Math.round(base * 0.05); pay += b; line("On the centreline +5%", b); }
+      if (info.gate) { const b = Math.round(base * 0.1); pay += b; line("Parked at the gate +10%", b); } else { const b = -Math.round(base * 0.1); pay += b; line("No gate: passengers bussed in", b); }
+      const fuel = -Math.round(job.D * 120 * (capPax(f ? f.kind : "b737") / 180 + 0.4) + 400); pay += fuel; line("Fuel and airport fees", fuel);
+      wear += info.fpm > 600 ? 10 : info.fpm > 400 ? 4 : 0;
+      res = late <= 0 ? "on time" : "late";
+    } else if (info.diverted) { rep -= 4; res = `diverted to ${info.diverted.code}`; line(`Contract failed: you landed at ${info.diverted.name}, not ${AP_BY[job.to].name}`); }
+    else { rep -= 10; wear = 95; pay = -5000; res = "crashed"; line("Contract failed: the aircraft crashed. Insurance excess", -5000); }
+    const xp = ok ? job.xp + (info.stars || 0) * 15 : 0, r0 = rankOf(CAR.xp);
+    CAR.cash += pay; if (pay > 0) CAR.earned += pay; CAR.xp += xp; CAR.rep = clamp(CAR.rep + rep, 0, 100); CAR.flights++; CAR.secs += info.secs || 0;
+    if (f) { f.cond = Math.max(0, f.cond - wear); f.loc = ok ? job.to : info.diverted ? info.diverted.code : f.loc; }
+    CAR.hist.unshift({ d: Date.now(), from: job.from, to: job.to, type: job.type, plane: f ? f.kind : "", res, pay, fpm: info.fpm || null }); CAR.hist = CAR.hist.slice(0, 40);
+    CAR.jobs = genJobs(f ? f.loc : job.from); carSave();
+    const tot = document.createElement("div"); tot.innerHTML = `${pay >= 0 ? "Profit" : "Loss"} <b>${money(pay)}</b> · +${xp} XP · reputation ${rep >= 0 ? "+" : ""}${rep} · aircraft ${f ? Math.round(f.cond) : "–"}% · balance <b>${money(CAR.cash)}</b>`; box.append(tot);
     const r1 = rankOf(CAR.xp);
-    const box = document.createElement("div"); box.className = "car-pay";
-    for (const [t, v] of lines) { const d = document.createElement("div"); d.innerHTML = `${t}: <b>${money(v)}</b>`; box.append(d); }
-    const tot = document.createElement("div"); tot.innerHTML = `Paid <b>${money(total)}</b> · +${xp} XP · balance <b>${money(CAR.cash)}</b>`; box.append(tot);
     if (r1 > r0) { const up = document.createElement("div"); up.className = "up"; const newly = Object.keys(LICENCE).filter((k) => LICENCE[k] === r1 && PLANES[k]).map((k) => PLANES[k].name);
-      up.textContent = `Promoted to ${RANKS[r1][0]}!${newly.length ? " Now licensed for: " + newly.join(", ") : ""}`; box.append(up); chime(990, 0.3); }
+      up.textContent = `Promoted to ${RANKS[r1][0]}!${newly.length ? " You can now buy: " + newly.join(", ") : ""}`; box.append(up); chime(990, 0.3); }
     return box;
   }
-  function careerCrash() {
-    const fee = Math.max(2000, Math.round(CAR.cash * 0.15 / 10) * 10); CAR.cash -= fee; carSave(); return fee;
+  // ---------- the career page ----------
+  const cpage = $("careerPage"), jobBar = $("jobBar"); let cpTab = "jobs";
+  function openCareer() { $("moreMenu").hidden = true; $("moreBtn").setAttribute("aria-expanded", "false"); if (S.mode === "fly") pause(); renderCareerPage(); cpage.hidden = false; setTimeout(() => $("cpClose").focus(), 30); }
+  function closeCareer() { cpage.hidden = true; syncCarChips(); }
+  $("cpClose").addEventListener("click", closeCareer);
+  $("cpTabs").addEventListener("click", (e) => { const b = e.target.closest("[data-t]"); if (!b) return; cpTab = b.dataset.t; renderCareerPage(); });
+  const el = (tag, cls, html) => { const d = document.createElement(tag); if (cls) d.className = cls; if (html !== undefined) d.innerHTML = html; return d; };
+  const btn = (label, fn, cls = "btn", dis) => { const b = el("button", cls, label); b.type = "button"; if (dis) b.disabled = true; else b.addEventListener("click", fn); return b; };
+  const livName = (kind, liv) => (liv && liv !== "house" && LIV[liv] ? LIV[liv].name : "White");
+  function renderCareerPage() {
+    const r = rankOf(CAR.xp), next = RANKS[r + 1], body = $("cpBody"); body.replaceChildren();
+    $("cpTitle").textContent = CAR.started ? CAR.airline : "Start your airline";
+    $("cpRank").innerHTML = `<span class="st">${"★".repeat(r + 1)}</span>${RANKS[r][0]} · ${CAR.flights} flights · ${(CAR.secs / 3600).toFixed(1)} h${next ? ` · ${(next[1] - CAR.xp).toLocaleString("en-US")} XP to ${next[0]}` : ""}`;
+    $("cpCash").textContent = money(CAR.cash); $("cpRep").style.width = `${CAR.rep}%`;
+    $("cpXp").style.width = `${next ? Math.round((CAR.xp - RANKS[r][1]) / (next[1] - RANKS[r][1]) * 100) : 100}%`;
+    $("cpTabs").hidden = !CAR.started; $("cpTabs").querySelectorAll("[data-t]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.t === cpTab)));
+    if (!CAR.started) {   // founding the airline
+      const box = el("div", "cp-setup");
+      box.append(el("p", "cp-note", "Name your airline, pick its home airport and your first aircraft. You start with $20,000 and your aircraft parked at the hub."));
+      const nm = el("label", "", "Airline name"), ni = el("input"); ni.value = "Skyways Air"; ni.maxLength = 32; nm.append(ni);
+      const hb = el("label", "", "Home airport (hub)"), hs = el("select"); for (const a of AIRPORTS) { const o = el("option", "", `${a.code} · ${a.name}`); o.value = a.code; hs.append(o); } hb.append(hs);
+      const pl = el("label", "", "First aircraft"), ps = el("select"); for (const k of ["b737", "mh", "bizjet"]) { const o = el("option", "", `${PLANES[k].name} · ${capPax(k)} seats`); o.value = k; ps.append(o); } pl.append(ps);
+      const lv = el("label", "", "Livery"), ls = el("select"); const fillLiv = () => { ls.replaceChildren(); for (const id of ["house"].concat(LIVERIES[ps.value] || [])) { const o = el("option", "", livName(ps.value, id)); o.value = id; ls.append(o); } }; fillLiv(); ps.addEventListener("change", fillLiv); lv.append(ls);
+      box.append(nm, hb, pl, lv, btn("Found the airline", () => {
+        Object.assign(CAR, { started: true, airline: (ni.value || "Skyways Air").trim(), hub: hs.value, cash: Math.max(CAR.cash, 20000), rep: 50, fleet: [{ id: 1, kind: ps.value, liv: ls.value, cond: 100, loc: hs.value }], sel: 1, hist: [] });
+        CAR.jobs = genJobs(hs.value); carSave(); cpTab = "jobs"; renderCareerPage();
+      }));
+      body.append(box); return;
+    }
+    if (cpTab === "jobs") {
+      const pick = el("div", "cp-row"); pick.append(el("span", "cp-note", "Fly with:"));
+      for (const f of CAR.fleet) { const b = el("button", "cp-pick", `${PLANES[f.kind].name} · ${f.loc} · ${Math.round(f.cond)}%`); b.type = "button"; b.setAttribute("aria-pressed", String(f.id === CAR.sel)); b.addEventListener("click", () => { CAR.sel = f.id; if (!CAR.jobs.length || CAR.jobs[0].from !== f.loc) CAR.jobs = genJobs(f.loc); carSave(); renderCareerPage(); }); pick.append(b); }
+      body.append(pick);
+      const f = planeOf(CAR.sel) || CAR.fleet[0]; if (f && (!CAR.jobs.length || CAR.jobs[0].from !== f.loc)) { CAR.jobs = genJobs(f.loc); carSave(); }
+      for (const job of CAR.jobs) {
+        const why = jobProblem(job, f), card = el("div", "cp-card" + (why ? " off" : ""));
+        const need = job.cargo ? `${job.cargo} t cargo` : `${job.pax} passengers`;
+        card.append(el("div", `cp-tag ${job.type}`, JOB_T[job.type]),
+          el("div", "cp-main", `<b>${job.from} → ${job.to} · ${job.title}</b><span>${job.D} km · ${need} · deadline ${fmtT(job.deadline)} · ${job.wx === "clear" ? "clear skies" : job.wx} · ${job.time}${job.type === "vip" ? " · touch down under 300 ft/min" : ""}</span>${why ? `<span class="why">${why}</span>` : ""}`));
+        const side = el("div", "cp-side", `${money(job.pay * repMul())}<small>+${job.xp} XP</small>`);
+        side.append(btn("Fly", () => startJob(job, f), "btn", !!why)); card.append(side); body.append(card);
+      }
+      { const row = el("div", "cp-row"); row.append(btn("New offers", () => { CAR.jobs = genJobs(f.loc); carSave(); renderCareerPage(); }, "btn alt")); body.append(row); }
+      body.append(el("p", "cp-note", "Pay grows with distance and load. Arrive before the deadline, land softly on the centreline and park at the gate for bonuses; reputation multiplies every pay. Fuel and fees come off each job, and every landing wears the aircraft a little."));
+    } else if (cpTab === "fleet") {
+      for (const f of CAR.fleet) {
+        const rc = Math.round((100 - f.cond) / 100 * PRICE[f.kind] * 0.2), sell = Math.round(PRICE[f.kind] * 0.6 * f.cond / 100), card = el("div", "cp-card");
+        const col = f.cond > 70 ? "#7fd38a" : f.cond > 35 ? "#e3b45a" : "#ff8a6a";
+        card.append(el("div", "cp-tag plane", PLANES[f.kind].name.split(" ").pop()),
+          el("div", "cp-main", `<b>${PLANES[f.kind].name} · ${livName(f.kind, f.liv)}</b><span>At ${AP_BY[f.loc] ? AP_BY[f.loc].name : f.loc} · ${capPax(f.kind)} seats · ${capCargo(f.kind)} t cargo · condition ${Math.round(f.cond)}%${f.cond < 35 ? " · grounded until repaired" : ""}</span><div class="cp-cond"><b style="width:${f.cond}%;background:${col}"></b></div>`));
+        const side = el("div", "cp-side");
+        side.append(btn(`Repair ${money(rc)}`, () => { if (CAR.cash < rc) return; CAR.cash -= rc; f.cond = 100; carSave(); renderCareerPage(); }, "btn alt", rc <= 0 || CAR.cash < rc));
+        side.append(btn(`Sell ${money(sell)}`, () => { if (CAR.fleet.length < 2) return; CAR.cash += sell; CAR.fleet = CAR.fleet.filter((q) => q !== f); if (CAR.sel === f.id) CAR.sel = CAR.fleet[0].id; carSave(); renderCareerPage(); }, "btn alt", CAR.fleet.length < 2));
+        card.append(side); body.append(card);
+      }
+      body.append(el("p", "cp-note", "Repairs bring an aircraft back to 100%. Below 35% it's grounded. You can sell any aircraft but your last one."));
+    } else if (cpTab === "shop") {
+      for (const k of Object.keys(PRICE)) { if (!PLANES[k]) continue;
+        const ok = licensed(k), card = el("div", "cp-card" + (ok ? "" : " off"));
+        card.append(el("div", "cp-tag plane", PLANES[k].name.split(" ").pop()), el("div", "cp-main", `<b>${PLANES[k].name}</b><span>${PLANES[k].type} · ${capPax(k)} seats · ${capCargo(k)} t cargo${ok ? "" : ` · needs ${RANKS[LICENCE[k]][0]}`}</span>`));
+        const side = el("div", "cp-side", money(PRICE[k])), buy = el("div", "cp-buy"), ls = el("select");
+        for (const id of ["house"].concat(LIVERIES[k] || [])) { const o = el("option", "", livName(k, id)); o.value = id; ls.append(o); }
+        buy.append(ls, btn("Buy", () => { if (CAR.cash < PRICE[k] || !ok) return; CAR.cash -= PRICE[k]; const id = Math.max(0, ...CAR.fleet.map((f) => f.id)) + 1; CAR.fleet.push({ id, kind: k, liv: ls.value, cond: 100, loc: CAR.hub }); carSave(); flash(`${PLANES[k].name} delivered to ${CAR.hub}`, 2.5); renderCareerPage(); }, "btn", !ok || CAR.cash < PRICE[k]));
+        side.append(buy); card.append(side); body.append(card);
+      }
+      body.append(el("p", "cp-note", `New aircraft are delivered to your hub, ${AP_BY[CAR.hub] ? AP_BY[CAR.hub].name : CAR.hub}.`));
+    } else {
+      const st = el("div", "car-stats"); for (const [k, v] of [["Flights", CAR.flights], ["Hours", (CAR.secs / 3600).toFixed(1)], ["Experience", `${CAR.xp} XP`], ["Earned", money(CAR.earned)], ["Reputation", `${Math.round(CAR.rep)}/100`], ["Fleet", CAR.fleet.length]]) st.append(el("div", "", `<b>${v}</b>${k}`)); body.append(st);
+      if (!CAR.hist.length) body.append(el("p", "cp-note", "No contract flights yet."));
+      else { const t = el("table", "cp-table"); t.append(el("tr", "", "<th>Date</th><th>Route</th><th>Job</th><th>Aircraft</th><th>Result</th><th>Touchdown</th><th>Pay</th>"));
+        for (const h of CAR.hist) t.append(el("tr", "", `<td>${new Date(h.d).toLocaleDateString()}</td><td>${h.from} → ${h.to}</td><td>${JOB_T[h.type] || ""}</td><td>${PLANES[h.plane] ? PLANES[h.plane].name : ""}</td><td class="${h.res === "on time" ? "good" : h.res === "crashed" || /divert/.test(h.res) ? "bad" : ""}">${h.res}</td><td>${h.fpm ? h.fpm + " fpm" : "–"}</td><td class="${h.pay >= 0 ? "good" : "bad"}">${money(h.pay)}</td>`));
+        body.append(t); }
+      body.append(btn("Start over", () => { if (!confirm("Close your airline and start a new career? Your progress will be lost.")) return; Object.assign(CAR, { started: false, cash: 0, xp: 0, flights: 0, secs: 0, earned: 0, rep: 50, fleet: [], hist: [], jobs: [] }); carSave(); renderCareerPage(); }, "btn alt"));
+    }
   }
-  const carPanel = $("carPanel");
-  function renderCareer() {
-    const r = rankOf(CAR.xp), next = RANKS[r + 1], body = $("carBody"); body.replaceChildren();
-    const top = document.createElement("div"); top.className = "car-top";
-    const bars = document.createElement("div"); bars.className = "car-bars"; for (let k = 0; k < RANKS.length; k++) { const i = document.createElement("i"); if (k <= r) i.className = "on"; bars.append(i); }
-    const mid = document.createElement("div"); mid.innerHTML = `<div class="car-rank">${RANKS[r][0]}</div><div class="car-next">${next ? `${(next[1] - CAR.xp).toLocaleString("en-US")} XP to ${next[0]}` : "Top rank"}</div>`;
-    const cash = document.createElement("div"); cash.className = "car-cash"; cash.innerHTML = `${money(CAR.cash)}<small>balance</small>`;
-    top.append(bars, mid, cash);
-    const xp = document.createElement("div"); xp.className = "car-xp"; const xb = document.createElement("b"); xb.style.width = `${next ? Math.round((CAR.xp - RANKS[r][1]) / (next[1] - RANKS[r][1]) * 100) : 100}%`; xp.append(xb);
-    const st = document.createElement("div"); st.className = "car-stats";
-    for (const [k, v] of [["Flights", CAR.flights], ["Hours", (CAR.secs / 3600).toFixed(1)], ["Experience", `${CAR.xp} XP`], ["Earned", money(CAR.earned)]]) { const d = document.createElement("div"); d.innerHTML = `<b>${v}</b>${k}`; st.append(d); }
-    const lic = document.createElement("div"); lic.className = "car-lic";
-    for (const k of Object.keys(PLANES)) { const need = LICENCE[k] ?? 0, d = document.createElement("div"); d.className = need <= r ? "" : "no"; d.innerHTML = `${PLANES[k].name}<span>${need <= r ? "✓ licensed" : "🔒 " + RANKS[need][0]}</span>`; lic.append(d); }
-    const note = document.createElement("p"); note.className = "car-note";
-    note.textContent = "Fly free flights to their destination to get paid: longer routes and bigger aircraft pay more, a soft landing on the centreline and parking at the gate add bonuses, a crash costs the repairs. Experience brings promotions, and each rank licenses bigger aircraft. With Career mode on you can only take off in the aircraft you're licensed for.";
-    body.append(top, xp, st, lic, note);
-    $("carMode").setAttribute("aria-pressed", String(!!CAR.mode));
+  // accepting a contract: the aircraft, livery, route, time and weather are set, and you start at a gate
+  function startJob(job, f) {
+    if (jobProblem(job, f)) return;
+    const inp = planesEl.querySelector(`input[value="${f.kind}"]`); if (inp && !inp.checked) { inp.checked = true; inp.dispatchEvent(new Event("change", { bubbles: true })); }
+    chosen = f.kind; chosenLiv[f.kind] = f.liv; if (model && model.userData.kind === f.kind) { scene.remove(model); model = null; }
+    fromSel.value = String(AIRPORTS.indexOf(AP_BY[job.from])); toSel.value = String(AIRPORTS.indexOf(AP_BY[job.to]));
+    $("startSel").value = "gate"; $("timeSel").value = job.time; $("wxSel").value = job.wx;
+    cpage.hidden = true; if (typeof leaveFlow === "function") leaveFlow(); $("welcome").hidden = true; if (briefTab !== "free") setTab("free");
+    startFlight(); S.careerJob = { job, plane: f.id };
+    flash(`Contract: ${job.title}. Deadline ${fmtT(job.deadline)}`, 4.5);
   }
-  function openCareer() { $("moreMenu").hidden = true; $("moreBtn").setAttribute("aria-expanded", "false"); if (S.mode === "fly") pause(); renderCareer(); carPanel.hidden = false; $("carClose").focus(); }
+  function syncJobBar() {
+    const J = S.careerJob; if (!J || S.mode !== "fly" || S.crashed) { if (!jobBar.hidden) jobBar.hidden = true; return; }
+    const left = J.job.deadline - S.flightT; jobBar.hidden = false; jobBar.classList.toggle("late", left < 0);
+    const t = `${JOB_T[J.job.type]} · ${J.job.from} → ${J.job.to} · ${left >= 0 ? fmtT(left) + " left" : "late " + fmtT(-left)}`; if (jobBar.textContent !== t) jobBar.textContent = t;
+  }
+  setInterval(syncJobBar, 500);
   $("carBtn").addEventListener("click", openCareer);
-  // rank and balance on the welcome screen and the briefing: one tap opens the career
+  // rank and balance on the welcome screen and the briefing: one tap opens the career page
   function syncCarChips() {
-    const r = rankOf(CAR.xp), html = `<span class="st">${"★".repeat(r + 1)}</span>${RANKS[r][0]} · <span class="m">${money(CAR.cash)}</span>${CAR.mode ? " · career mode" : ""}`;
+    const r = rankOf(CAR.xp), html = CAR.started ? `<span class="st">${"★".repeat(r + 1)}</span>${CAR.airline} · ${RANKS[r][0]} · <span class="m">${money(CAR.cash)}</span>` : `<span class="st">★</span>Start your own airline`;
     for (const id of ["wCarChip", "bCarChip"]) { const b = $(id); if (b && b.innerHTML !== html) b.innerHTML = html; }
   }
   for (const id of ["wCarChip", "bCarChip", "wCareer"]) $(id).addEventListener("click", openCareer);
   setInterval(syncCarChips, 1000); syncCarChips();
-  $("carClose").addEventListener("click", () => { carPanel.hidden = true; syncCarChips(); });
-  $("carMode").addEventListener("click", () => { CAR.mode = !CAR.mode; carSave(); renderCareer(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !cpage.hidden) closeCareer(); });
   function updateSummary() {
     if (briefTab === "missions") {
       const m = selMission, i = MISSIONS.indexOf(m);
@@ -5001,7 +5172,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (pendingTakeoff) return;
     if (briefTab === "missions") { startMission(selMission); return; }
     const p = PLANES[chosen];
-    if (CAR.mode && !licensed(chosen)) { briefTip.textContent = `Career mode: the ${p.name} needs the rank of ${RANKS[LICENCE[chosen]][0]}. You're ${RANKS[rankOf(CAR.xp)][0]}: pick a licensed aircraft, or switch Career mode off (More ⋯ → Career).`; flash(`Not licensed for the ${p.name} yet`, 2.5); return; }
+    if (false) { briefTip.textContent = `Career mode: the ${p.name} needs the rank of ${RANKS[LICENCE[chosen]][0]}. You're ${RANKS[rankOf(CAR.xp)][0]}: pick a licensed aircraft, or switch Career mode off (More ⋯ → Career).`; flash(`Not licensed for the ${p.name} yet`, 2.5); return; }
     if (p.glb && !(GLB[chosen] && GLB[chosen].status === "ready")) {
       pendingTakeoff = chosen; goBtn.textContent = `Loading ${p.name}…`;
       briefTip.textContent = `${p.name} is still loading. You'll take off automatically as soon as it's ready.`;
@@ -5090,7 +5261,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       S.mode = "over";
       if (S.mission) { missionResult(false, { reason }); return; }
       const p = document.createElement("p"); p.className = "result bad"; p.textContent = reason;
-      if (S.started && S.liftT) { const fee = careerCrash(); p.textContent += ` Repairs: ${money(fee)} (balance ${money(CAR.cash)}).`; }
+      if (S.careerJob) { const cb = careerFinish(false, { secs: S.flightT }); if (cb) p.append(cb); }
       showBrief("INCIDENT REPORT", "Crashed", p, "Pick a plane and route, then try again. Tip: keep your speed up in turns and touch down gently.", false);
     }, 1400);
   }
@@ -5348,6 +5519,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   }
   function completeLanding() {
     const a = S.landedAt; S.landedAt = null;
+    if (S.careerJob && (!S.to || a !== S.to)) { const cb = careerFinish(false, { diverted: a, secs: S.flightT }); if (cb) RADIO.push({ text: `Contract failed: you landed at ${a.code}.`, t: 8 }); }
     if (!S.to || a !== S.to) { logFlight({ to: a.code, fpm: S.touchFpm, res: S.to ? `Landed at ${a.code} instead of ${S.to.code}` : `Landed at ${a.code}`, ok: null }); flash(`Stopped at ${a.name}. Throttle up to take off again.`, 4); S.touchFpm = null; return; }
     const fpm = S.touchFpm, off = Math.abs(S.touchOff || 0), tdz = S.touchDist || 0;
     let stars = fpm < 240 ? 3 : fpm < 480 ? 2 : 1;
@@ -5367,7 +5539,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const det = document.createElement("p"); det.className = "result"; det.style.opacity = "0.8";
     det.textContent = `Touchdown ${fpm} ft/min · ${S.touchKt || "–"} kt · ${Math.round(tdz)} m past threshold · ${off < 1 ? "on centreline" : `${off.toFixed(1)} m ${(S.touchOff || 0) > 0 ? "right" : "left"} of centreline`}`;
     wrap.append(st, r, det);
-    if (S.from && S.from !== a) wrap.append(careerPay({ from: S.from, to: a, kind: spec.kind, stars, off, gate: !!S.parkedDone, secs: S.flightT }));
+    if (S.careerJob) { const cb = careerFinish(true, { stars, fpm, off, gate: !!S.parkedDone, secs: S.flightT }); if (cb) wrap.append(cb); }
     const { better, old, saved } = saveBest(S.from, a, { stars, fpm, t: Math.round(S.flightT), plane: spec.kind, d: Date.now() });
     logFlight({ fpm, stars, res: `${starStr(stars)} landed`, ok: true });
     const pb = document.createElement("p"); pb.className = "result";
