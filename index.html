@@ -4411,18 +4411,29 @@ vec3 liveryAt(vec3 p, out float fus) {
   const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
   // the whole page goes full screen and the game view is stretched over it (a CSS class): every panel stays reachable,
   // and Safari is asked to keep the keyboard working (without ALLOW_KEYBOARD_INPUT it swallows key presses)
-  const docEl = document.documentElement, fsCan = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
+  // iPad and iPhone browsers (all WebKit) block a hardware keyboard in true full screen, so there the game is simply
+  // stretched over the whole window (keys keep working); "Add to Home Screen" gives the real thing without the browser bars.
+  // Desktop Safari is asked for full screen with keyboard input allowed; other browsers use the standard call.
+  const docEl = document.documentElement, appleTouch = /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
+  const appleDesk = !appleTouch && /Apple/.test(navigator.vendor || "") && !!docEl.webkitRequestFullscreen;
+  const fsCan = appleTouch || !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
+  let pseudoFs = false;
   function toggleFullscreen(e) {
-    try {
+    if (appleTouch) {
+      pseudoFs = !pseudoFs; syncFs();
+      if (pseudoFs && !matchMedia("(display-mode: standalone)").matches && !load("sw-fstip")) { save("sw-fstip", "1"); flash("Full window. For true full screen with no browser bars: Share → Add to Home Screen", 5); }
+    } else try {
       if (fsEl()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      else if (appleDesk) docEl.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
       else if (docEl.requestFullscreen) { const r = docEl.requestFullscreen({ navigationUI: "hide" }); if (r && r.catch) r.catch(() => {}); }
       else docEl.webkitRequestFullscreen(window.Element && Element.ALLOW_KEYBOARD_INPUT);
     } catch {}
     if (e && e.currentTarget && e.currentTarget.blur) e.currentTarget.blur();   // a focused button would catch Space and the arrow keys
+    try { window.focus(); } catch {}
   }
   $("fsBtn").addEventListener("click", toggleFullscreen); $("fsTop").addEventListener("click", toggleFullscreen);
   if (!fsCan) { $("fsTop").hidden = true; $("fsBtn").hidden = true; }
-  const syncFs = () => { const on = !!fsEl(); $("fsTop").setAttribute("aria-pressed", String(on)); document.body.classList.toggle("fs-on", on); setTimeout(resize, 50); };
+  const syncFs = () => { const on = !!fsEl() || pseudoFs; $("fsTop").setAttribute("aria-pressed", String(on)); document.body.classList.toggle("fs-on", on); setTimeout(resize, 50); };
   document.addEventListener("fullscreenchange", syncFs); document.addEventListener("webkitfullscreenchange", syncFs);
   $("menuBtn").addEventListener("click", () => { if (S.mode === "fly") pause(); else if (S.mode === "paused") resume(); else if (S.mode === "replay") closeReplay(); });
 
