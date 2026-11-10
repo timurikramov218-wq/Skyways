@@ -6545,20 +6545,29 @@ vec3 liveryAt(vec3 p, out float fus) {
   // ---------- taxi guidance: a lit path along the taxiways, the next turn marked, a hint at every turn ----------
   function guideMesh() {
     if (S.guideMesh) return S.guideMesh;
-    const m = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xffd25e, transparent: true, opacity: 0.95, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }));
+    const m = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xffd25e, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }));
     m.frustumCulled = false; m.renderOrder = 2; scene.add(m); S.guideMesh = m; return m;
+  }
+  // the corners of a taxi route rounded off like the painted lead-in lines (radius up to 35 m)
+  function roundPath(path) {
+    const out = [path[0]];
+    for (let i = 1; i < path.length - 1; i++) {
+      const [ax, az] = path[i - 1], [bx, bz] = path[i], [cx, cz] = path[i + 1], l1 = Math.hypot(bx - ax, bz - az), l2 = Math.hypot(cx - bx, cz - bz);
+      if (l1 < 1 || l2 < 1) { out.push(path[i]); continue; }
+      const R = Math.min(35, l1 * 0.45, l2 * 0.45), p1 = [bx - (bx - ax) / l1 * R, bz - (bz - az) / l1 * R], p2 = [bx + (cx - bx) / l2 * R, bz + (cz - bz) / l2 * R];
+      for (let k = 0; k <= 8; k++) { const t = k / 8, u = 1 - t; out.push([u * u * p1[0] + 2 * u * t * bx + t * t * p2[0], u * u * p1[1] + 2 * u * t * bz + t * t * p2[1]]); }
+    }
+    out.push(path[path.length - 1]); return out;
   }
   function buildGuidePath(pts) {
     const pos = [], idx = [], w = 1.3;
-    const path = [[S.pos.x, S.pos.z], ...pts];
-    for (let i = 0; i < path.length - 1; i++) {
-      const [x0, z0] = path[i], [x1, z1] = path[i + 1], L = Math.hypot(x1 - x0, z1 - z0); if (L < 0.5) continue;
-      const n = Math.max(1, Math.ceil(L / 6)), nx = -(z1 - z0) / L * w, nz = (x1 - x0) / L * w;
-      for (let k = 0; k < n; k++) {   // dashes, 4 m long every 6 m, laid on the ground
-        const t0 = k / n, t1 = Math.min(1, t0 + 4 / L);
-        const ax = x0 + (x1 - x0) * t0, az = z0 + (z1 - z0) * t0, bx = x0 + (x1 - x0) * t1, bz = z0 + (z1 - z0) * t1, ya = groundY(ax, az) + 0.3, yb = groundY(bx, bz) + 0.3, b = pos.length / 3;
-        pos.push(ax + nx, ya, az + nz, ax - nx, ya, az - nz, bx + nx, yb, bz + nz, bx - nx, yb, bz - nz); idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2);
-      }
+    const path = roundPath([[S.pos.x, S.pos.z], ...pts]), cum = [0];
+    for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
+    const at = (d) => { let i = 1; while (i < path.length - 1 && cum[i] < d) i++; const L = cum[i] - cum[i - 1] || 1, t = clamp((d - cum[i - 1]) / L, 0, 1), [x0, z0] = path[i - 1], [x1, z1] = path[i];
+      return [x0 + (x1 - x0) * t, z0 + (z1 - z0) * t, (x1 - x0) / L, (z1 - z0) / L]; };
+    for (let d = 0; d < cum[cum.length - 1] - 1; d += 6) {   // dashes 4 m long every 6 m, laid on the ground along the whole (rounded) route
+      const [ax, az, dxa, dza] = at(d), [bx, bz, dxb, dzb] = at(Math.min(d + 4, cum[cum.length - 1])), ya = groundY(ax, az) + 0.3, yb = groundY(bx, bz) + 0.3, b = pos.length / 3;
+      pos.push(ax - dza * w, ya, az + dxa * w, ax + dza * w, ya, az - dxa * w, bx - dzb * w, yb, bz + dxb * w, bx + dzb * w, yb, bz - dxb * w); idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2);
     }
     const m = guideMesh(), g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
     m.geometry.dispose(); m.geometry = g; m.visible = true;
@@ -6642,11 +6651,15 @@ vec3 liveryAt(vec3 p, out float fus) {
   function departureGuide() {
     const a = S.from, r = a.rwys[0], tl = r.len * 0.92, alHold = -(tl / 2 - 12), [alNow] = local(a, S.pos.x, S.pos.z), rw = a.label;
     const P = (al, ac) => toWorld(a, al, ac), here = [S.pos.x, S.pos.z];
-    const pts = [P(alNow, a.tx), P(alHold, a.tx), P(alHold, r.off + r.w / 2 + 48), P(alHold, r.off)], lineup = P(alHold + 100, r.off);
+    // straight ahead along the apron first (you face the runway end after the pushback), then a smooth turn onto taxiway A
+    const [, acNow] = local(a, S.pos.x, S.pos.z), dirA = Math.sign(alHold - alNow) || -1, gap = Math.abs(alHold - alNow);
+    const onApron = (al) => clamp(al, -a.apL / 2 + 35, a.apL / 2 - 35);   // the turn onto taxiway A stays on the paved apron
+    const ahead = onApron(alNow + dirA * Math.min(40, gap * 0.15)), join = onApron(alNow + dirA * Math.min(150, gap * 0.45));
+    const pts = [P(ahead, acNow), P(join, a.tx), P(alHold, a.tx), P(alHold, r.off + r.w / 2 + 48), P(alHold, r.off)], lineup = P(alHold + 100, r.off);
     setGuide("dep", pts,
-      ["TAXI TO TAXIWAY A", `TAXIWAY A · TO RWY ${rw}`, `HOLD SHORT RWY ${rw}`, `LINE UP RWY ${rw}`],
-      [null, null, `${a.name} Tower: line up runway ${rw}.`, null], null,
-      ["onto taxiway A (the yellow line)", `onto the link to runway ${rw}`, `and stop at the red hold line, runway ${rw} ahead`, `onto runway ${rw} and line up`]);
+      ["TAXI AHEAD", "TAXI TO TAXIWAY A", `TAXIWAY A · TO RWY ${rw}`, `HOLD SHORT RWY ${rw}`, `LINE UP RWY ${rw}`],
+      [null, null, null, `${a.name} Tower: line up runway ${rw}.`, null], null,
+      ["along the apron", "onto taxiway A (the yellow line)", `onto the link to runway ${rw}`, `and stop at the red hold line, runway ${rw} ahead`, `onto runway ${rw} and line up`]);
     flash(`Taxi to runway ${rw}: follow the yellow dashes and the card at the top`, 3.5);
   }
   function arrivalGuide(a) {
