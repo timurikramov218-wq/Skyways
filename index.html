@@ -353,6 +353,11 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .log { box-sizing: border-box; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(720px, calc(100% - 24px)); max-height: calc(100% - 96px); overflow: auto; display: grid; gap: 10px; background: #17171a; border: 1px solid var(--hair-2); border-radius: 18px; padding: 18px 20px; color: var(--fg); box-shadow: 0 40px 80px rgba(0,0,0,0.6); z-index: 7; }
 .log h3 { margin: 0; font: 400 22px var(--font-display); }
 /* career */
+#carPanel { z-index: 12; }
+.car-chip { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(214,191,150,0.45); background: rgba(214,191,150,0.08); color: var(--fg); font: 500 13px var(--font-body); cursor: pointer; }
+.car-chip:hover { background: rgba(214,191,150,0.18); }
+.car-chip .st { color: var(--champ); letter-spacing: 1px; } .car-chip .m { font-family: var(--font-mono); color: var(--champ); }
+.welcome .car-chip { margin: 14px auto 0; }
 .car-top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; }
 .car-bars { display: flex; gap: 3px; } .car-bars i { width: 8px; height: 26px; border-radius: 2px; background: var(--g3); } .car-bars i.on { background: var(--champ); }
 .car-rank { font: 400 24px var(--font-display); color: var(--fg); } .car-next { font: 400 12px var(--font-body); color: var(--fg-3); }
@@ -748,7 +753,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
     <div class="dialog" id="brief">
       <div class="panel">
         <div class="brief-head">
-          <div><div class="eyebrow" id="briefEyebrow">FLIGHT BRIEFING</div><h2 id="briefTitle">Choose your aircraft and route</h2></div>
+          <div><div class="eyebrow" id="briefEyebrow">FLIGHT BRIEFING</div><h2 id="briefTitle">Choose your aircraft and route</h2><button class="car-chip" id="bCarChip" type="button" title="Your career: rank, balance, licences"></button></div>
           <p class="summary" id="briefSummary"></p>
           <p class="best" id="briefBest" hidden></p>
         </div>
@@ -825,7 +830,9 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
         <div class="welcome-btns">
           <button class="btn" id="wStart" type="button">Start</button>
           <button class="btn alt" id="wMissions" type="button">Missions</button>
+          <button class="btn alt" id="wCareer" type="button">Career</button>
         </div>
+        <button class="car-chip" id="wCarChip" type="button"></button>
       </div>
     </div>
   </div>
@@ -4914,7 +4921,14 @@ vec3 liveryAt(vec3 p, out float fus) {
   }
   function openCareer() { $("moreMenu").hidden = true; $("moreBtn").setAttribute("aria-expanded", "false"); if (S.mode === "fly") pause(); renderCareer(); carPanel.hidden = false; $("carClose").focus(); }
   $("carBtn").addEventListener("click", openCareer);
-  $("carClose").addEventListener("click", () => { carPanel.hidden = true; });
+  // rank and balance on the welcome screen and the briefing: one tap opens the career
+  function syncCarChips() {
+    const r = rankOf(CAR.xp), html = `<span class="st">${"★".repeat(r + 1)}</span>${RANKS[r][0]} · <span class="m">${money(CAR.cash)}</span>${CAR.mode ? " · career mode" : ""}`;
+    for (const id of ["wCarChip", "bCarChip"]) { const b = $(id); if (b && b.innerHTML !== html) b.innerHTML = html; }
+  }
+  for (const id of ["wCarChip", "bCarChip", "wCareer"]) $(id).addEventListener("click", openCareer);
+  setInterval(syncCarChips, 1000); syncCarChips();
+  $("carClose").addEventListener("click", () => { carPanel.hidden = true; syncCarChips(); });
   $("carMode").addEventListener("click", () => { CAR.mode = !CAR.mode; carSave(); renderCareer(); });
   function updateSummary() {
     if (briefTab === "missions") {
