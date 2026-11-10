@@ -5116,9 +5116,6 @@ vec3 liveryAt(vec3 p, out float fus) {
       v.addScaledVector(fwd, thrustAcc * dt).addScaledVector(liftDir, lift * dt).addScaledVector(vhat, -drag * dt);
       v.y -= G * dt;
       S.alpha = alpha; S.load = lift / G;
-      // structural limits
-      const gLim = spec.kind === "arrow" ? 9 : spec.big ? 2.5 : 4.4;
-      if (S.load > gLim * 1.5) { crash(`Structural failure: you pulled ${S.load.toFixed(1)} G. This aircraft is built for ${gLim} G.`); return; }
       S.speed = sp; S.ias = sp * Math.sqrt(sigma); S.gs = Math.hypot(v.x, v.z);
       const prevY = S.pos.y;
       S.pos.addScaledVector(v, dt);
@@ -5547,8 +5544,6 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (S.mission && S.mission.limit) { const left = S.mission.limit - S.flightT; items.push([left >= 0 ? `TIME ${fmtTime(left)}` : `OVER TIME +${fmtTime(-left)}`, left < 60 ? HC.warn : HC.hud]); }
     {
       const iasKt = (S.ias || 0) * MS2KT, vmaxKt = spec.vmax * MS2KT;
-      const gLim = spec.kind === "arrow" ? 9 : spec.big ? 2.5 : 4.4;
-      if (!S.grounded && S.load > gLim) items.push(["OVERSTRESS", HC.warn]);
       if (S.flaps > 0 && iasKt > vmaxKt * 0.62) items.push(["FLAP OVERSPEED", HC.warn]);
       if (spec.retract && S.gearPos > 0.5 && !S.grounded && iasKt > vmaxKt * 0.7) items.push(["GEAR OVERSPEED", HC.warn]);
       if (!S.grounded && iasKt > vmaxKt * 0.97 && now > (S.clackT || 0)) { S.clackT = now + 900; sfx("clacker"); }
