@@ -5765,7 +5765,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   function radio(text, where) { if (S.mode !== "fly" || where.distanceTo(S.pos) > 7000) return; RADIO.push({ text, t: 10 }); if (RADIO.length > 4) RADIO.shift(); }
   const aiPorts = (kind) => AIRPORTS.filter((a) => (PLANES[kind].big ? a.kind !== "ga" : true));
   function pickDest(ai) { const list = aiPorts(ai.kind).filter((a) => a !== ai.at); return list[Math.floor(Math.random() * list.length)]; }
-  function finalFix(a) { const [x, z] = toWorld(a, -a.len / 2 - 4200, a.rwys[0].off); return new THREE.Vector3(x, a.elev + 4200 * TAN3 + 30, z); }
+  function finalFix(a) { const [x, z] = toWorld(a, -a.len / 2 - 7000, a.rwys[0].off); return new THREE.Vector3(x, a.elev + 7000 * TAN3 + 30, z); }   // 7 km out: room to line up
   function placeAtHold(ai, onRunway) {
     const a = ai.at, r = a.rwys[0], [x, z] = onRunway ? toWorld(a, -r.len / 2 + 50, r.off) : toWorld(a, -r.len * 0.46 + 40, a.tx);
     ai.pos.set(x, a.elev + 0.05 + ai.sp.gearH, z); ai.hdg = a.hdg * Math.PI / 180; ai.pitch = 0; ai.bank = 0; ai.v = 0; ai.vs = 0; ai.gear = 1;
@@ -5877,6 +5877,11 @@ vec3 liveryAt(vec3 p, out float fus) {
     const rate = clamp(d * 0.6, -maxRate, maxRate); ai.hdg = wrapA(ai.hdg + rate * dt);
     ai.bank = lerp(ai.bank, (rate / maxRate) * (ai.sp.big ? 0.42 : 0.55), Math.min(1, dt * 2));
   }
+  // on the runway: head along it, easing back onto the centreline
+  function holdCentreline(ai, a, dt) {
+    const [, ac] = local(a, ai.pos.x, ai.pos.z), want = a.hdg * Math.PI / 180 - clamp((ac - a.rwys[0].off) * 0.04, -0.12, 0.12);
+    ai.hdg = wrapA(ai.hdg + clamp(wrapA(want - ai.hdg), -0.25 * dt, 0.25 * dt));
+  }
   function moveAI(ai, dt) {
     const ch = Math.cos(ai.pitch);
     ai.pos.x += Math.sin(ai.hdg) * ai.v * ch * dt; ai.pos.z += -Math.cos(ai.hdg) * ai.v * ch * dt; ai.pos.y += ai.vs * dt;
@@ -5910,16 +5915,19 @@ vec3 liveryAt(vec3 p, out float fus) {
         break;
       }
       case "final": {
-        const r = to.rwys[0], [al, ac] = local(to, ai.pos.x, ai.pos.z);
-        const aimAlong = Math.min(al + 1400, r.len / 2), [tx, tz] = toWorld(to, aimAlong, r.off);
-        steer(ai, tx, tz, dt, maxRate * 1.4);
-        const toThr = Math.max(0, -r.len / 2 + 300 - al), glide = to.elev + toThr * TAN3 + sp.gearH;
+        // follow the extended centreline: aim at a point on it ahead (closer as the runway nears) and turn harder than in cruise
+        const r = to.rwys[0], [al, ac] = local(to, ai.pos.x, ai.pos.z), e = ac - r.off, tdAl = -r.len / 2 + 300, toTd = tdAl - al;
+        const look = clamp(toTd * 0.3, 260, 1500), [tx, tz] = toWorld(to, Math.min(al + look, r.len / 2), r.off);
+        steer(ai, tx, tz, dt, sp.big ? 0.12 : 0.2);
+        const toThr = Math.max(0, toTd), glide = to.elev + toThr * TAN3 + sp.gearH, aligned = Math.abs(e) < r.w / 2 - 3;
         ai.vs = clamp((glide - ai.pos.y) * 0.6 - ai.v * TAN3, -9, 3); ai.pitch = lerp(ai.pitch, 0.04, dt);
         ai.v = lerp(ai.v, ai.vapp, dt * 0.3); ai.gear = Math.min(1, ai.gear + dt * 0.4); moveAI(ai, dt);
         const gy = groundY(ai.pos.x, ai.pos.z) + sp.gearH;
-        if (ai.pos.y <= gy + 0.2 && al > -r.len / 2) { ai.pos.y = gy; ai.vs = 0; ai.phase = "rollout"; radio(`${ai.cs}: down at ${to.code}.`, ai.pos); }
-        else if (ai.pos.y < gy) ai.pos.y = gy;
-        if (al > r.len / 2 || (playerOnRunway(to) && al < -r.len / 2 && ai.pos.y - to.elev > 40)) { ai.phase = "goaround"; ai.wait = 40; radio(`${ai.cs}: going around.`, ai.pos); }
+        if (ai.pos.y <= gy + 0.2 && al > -r.len / 2 + 40 && aligned) {   // wheels down only on the runway itself
+          ai.pos.y = gy; ai.vs = 0; ai.bank = 0; ai.phase = "rollout"; radio(`${ai.cs}: down at ${to.code}.`, ai.pos);
+        } else if (ai.pos.y < gy) ai.pos.y = gy;
+        const unstable = !aligned && toTd < 900 && ai.pos.y - gy < 60;   // not lined up by short final: go around rather than land beside the runway
+        if (ai.phase === "final" && (unstable || al > 0 || (playerOnRunway(to) && al < -r.len / 2 && ai.pos.y - to.elev > 40))) { ai.phase = "goaround"; ai.wait = 40; radio(`${ai.cs}: going around.`, ai.pos); }
         break;
       }
       case "goaround":
@@ -5928,12 +5936,12 @@ vec3 liveryAt(vec3 p, out float fus) {
         if (ai.wait <= 0) ai.phase = "cruise";
         break;
       case "rollout":
-        ai.pitch = lerp(ai.pitch, 0, dt * 2); ai.bank = lerp(ai.bank, 0, dt * 3);
+        ai.pitch = lerp(ai.pitch, 0, dt * 2); ai.bank = lerp(ai.bank, 0, dt * 3); holdCentreline(ai, to, dt);
         ai.v = Math.max(9, ai.v - 2.4 * dt); moveAI(ai, dt); ai.pos.y = groundY(ai.pos.x, ai.pos.z) + sp.gearH;
         if (ai.v <= 9.5) { ai.phase = "taxi"; ai.wait = 10; }
         break;
       case "taxi": {
-        moveAI(ai, dt); ai.pos.y = groundY(ai.pos.x, ai.pos.z) + sp.gearH; ai.wait -= dt;
+        holdCentreline(ai, to, dt); moveAI(ai, dt); ai.pos.y = groundY(ai.pos.x, ai.pos.z) + sp.gearH; ai.wait -= dt;
         const [al] = local(to, ai.pos.x, ai.pos.z);
         if (ai.wait <= 0 || al > to.rwys[0].len / 2 - 60) { ai.at = to; ai.to = pickDest(ai); ai.phase = "hold"; ai.wait = 25 + Math.random() * 50; placeAtHold(ai, false); }
         break;
