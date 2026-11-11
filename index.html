@@ -786,7 +786,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
     <div class="log net" id="netPanel" hidden role="dialog" aria-labelledby="netTitle">
       <div class="log-head"><h3 id="netTitle">Online</h3><div class="log-acts"><button class="chip" id="netClose" type="button">Close</button></div></div>
       <p class="cp-note" id="netStatus">Fly with other players in the same world. Everyone in the same room sees each other.</p>
-      <div class="net-row"><label>Your name<input id="netName" maxlength="16" autocomplete="off" spellcheck="false"></label><label>Room<input id="netRoom" maxlength="12" autocomplete="off" spellcheck="false" value="WORLD"></label><button class="btn" id="netJoin" type="button">Join</button></div>
+      <div class="net-row"><label>Your name<input id="netName" maxlength="16" autocomplete="off" spellcheck="false"></label><label>Room<input id="netRoom" maxlength="12" autocomplete="off" spellcheck="false" value="WORLD"></label><button class="btn alt" id="netJoin" type="button">Join</button><button class="btn" id="netPlay" type="button">Play online</button></div>
       <p class="cp-note">Room WORLD is open to everyone. For a private flight, make up a room code and tell it to your friends.</p>
       <div id="netList" class="net-list"></div>
       <div class="net-say" id="netSay" hidden></div>
@@ -7697,7 +7697,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     const L = $("netList"); L.replaceChildren();
     if (on) { const me = document.createElement("div"); me.textContent = `${NET.name} (you)`; L.append(me);
       for (const o of NET.list) { const d = document.createElement("div"), sp = document.createElement("span"); d.textContent = o.n; sp.textContent = `${PLANES[o.k].name} · ${(o.p.distanceTo(S.pos) / 1000).toFixed(1)} km`; d.append(sp); L.append(d); } }
-    const say = $("netSay"); say.hidden = !on;
+    $("netPlay").textContent = on ? (S.mode === "paused" ? "Back to the flight" : "Fly now") : "Play online";
+    const say = $("netSay"); say.hidden = !on || !(S.mode === "paused" || S.mode === "fly");   // quick messages only during a flight
     if (on && !say.children.length) for (const m of ["Hello!", "Taking off", "Coming in to land", "Follow me", "Where are you?", "Nice landing!", "Thanks, bye!"]) { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = m; b.addEventListener("click", () => netSayMsg(m)); say.append(b); }
   }
   // ---- the account: Google sign-in keeps every saved setting, the career and the bests in the cloud ----
@@ -7738,6 +7739,9 @@ vec3 liveryAt(vec3 p, out float fus) {
   $("netBtn").addEventListener("click", openNet); $("wOnline").addEventListener("click", openNet);
   $("netClose").addEventListener("click", () => { netPanel.hidden = true; });
   $("netJoin").addEventListener("click", () => { if (NET.room) netLeave(); else netJoin(); });
+  // one button: connect if needed, then straight into the game (back to your flight, or to the hangar to pick an aircraft)
+  const netGo = () => { netPanel.hidden = true; if (S.mode === "paused") resume(); else if (S.mode !== "fly") toHangar(); };
+  $("netPlay").addEventListener("click", () => { if (!NET.room && !NET.joining) netJoin(); netGo(); });
   setInterval(() => { if (!netPanel.hidden && NET.room) netRender(); else if (NET.room) $("netVal").textContent = `${NET.room} · ${NET.list.length + 1}`; const w = $("wOnline"); if (w) w.textContent = NET.room ? `Online · ${NET.list.length + 1}` : "Online"; }, 2000);
   setInterval(() => { if (NET.room && document.hidden) NET.send(); }, 1000);   // a tab in the background still tells the others where it is
   // online by default: everyone lands in the shared room WORLD (or the room they chose last) unless they left it
