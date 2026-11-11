@@ -6096,11 +6096,14 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     for (const o of NET.list) {   // other players: a green marker with the name
       if (!o.model) continue; const d = o.model.position.distanceTo(S.pos); if (d > 20000) continue;
-      proj.copy(o.model.position).project(camera); if (proj.z > 1 || Math.abs(proj.x) > 0.95 || Math.abs(proj.y) > 0.95) continue;
-      const sx = (proj.x + 1) / 2 * w, sy = (1 - proj.y) / 2 * h; if (sy > h - dashH) continue;
-      hud.strokeStyle = hud.fillStyle = "#7fe39a"; hud.lineWidth = 1.5; hud.beginPath(); hud.arc(sx, sy, 8, 0, Math.PI * 2); hud.stroke();
+      proj.copy(o.model.position).project(camera); let off = false;
+      if (proj.z > 1) { proj.x = -proj.x; proj.y = -proj.y; off = true; }
+      if (off || Math.abs(proj.x) > 0.9 || Math.abs(proj.y) > 0.8) { const k = Math.max(Math.abs(proj.x) / 0.9, Math.abs(proj.y) / 0.8, off ? 1e3 * 0 + 1.001 : 1); if (off) { const m = Math.max(Math.abs(proj.x), Math.abs(proj.y)) || 1; proj.x *= 0.9 / m; proj.y *= 0.8 / m; } else { proj.x /= k; proj.y /= k; } off = true; }
+      const sx = (proj.x + 1) / 2 * w, sy = Math.min((1 - proj.y) / 2 * h, h - dashH - 30);
+      hud.strokeStyle = hud.fillStyle = "#7fe39a"; hud.setLineDash(off ? [3, 3] : []); hud.lineWidth = 1.5; hud.beginPath(); hud.arc(sx, sy, 8, 0, Math.PI * 2); hud.stroke();
       hud.font = `${Math.round(fs * 0.75)}px ${MONO}`; hud.textAlign = "left"; hud.textBaseline = "middle";
-      hud.fillText(o.n, sx + 12, sy - 7); hud.fillText(`${PLANES[o.k].name} · ${(d / 1000).toFixed(1)} km`, sx + 12, sy + 8);
+      hud.setLineDash([]); if (sx > w - 170) hud.textAlign = "right";
+      const tx = hud.textAlign === "right" ? sx - 12 : sx + 12; hud.fillText(o.n, tx, sy - 7); hud.fillText(`${PLANES[o.k].name} · ${(d / 1000).toFixed(1)} km`, tx, sy + 8);
     }
     if (threat && blink) { hud.font = `bold ${Math.round(fs * 1.25)}px ${MONO}`; hud.textAlign = "center"; warnTxt(`TRAFFIC · ${threat.cs}`, HC.warn, warnLow ? cy + 135 * sc : warnY + fs * 1.8); }
     if (RADIO.length) {
@@ -7618,16 +7621,18 @@ vec3 liveryAt(vec3 p, out float fus) {
   // saved progress in the cloud. Names and messages are only ever drawn as text.
   const FB_CFG = { apiKey: "AIzaSyBu-Dzr9wF6jrl0y5eUE5Okp70bLhUFUD8", authDomain: "skyways-61c6f.firebaseapp.com", databaseURL: "https://skyways-61c6f-default-rtdb.europe-west1.firebasedatabase.app", projectId: "skyways-61c6f", appId: "1:810722050231:web:384ad733578c1eb7370d32" };
   const NET = { list: [], by: new Map(), room: null, ref: null, uid: null, user: null, ready: null, sendT: 0, joinedAt: 0, cloudT: 0,
-    tick(dt, now) {
-      if (!this.room) return;
-      if (now - this.sendT > 200 && this.me && model && (S.mode === "fly" || S.mode === "paused")) {
+    tick(dt, now) { if (this.room) { this.send(); this.draw(dt, performance.now()); } },
+    send() {
+      const now = performance.now(), still = S.grounded && S.gs < 0.5;
+      if (now - this.sendT > (still ? 1000 : 220) && this.room && this.me && model && (S.mode === "fly" || S.mode === "paused")) {
         this.sendT = now; const r = (v) => Math.round(v * 100) / 100, q = S.q;
         this.me.set({ n: this.name, k: spec.kind, l: chosenLiv[spec.kind] || "house", p: [r(S.pos.x), r(S.pos.y), r(S.pos.z)], q: [+q.x.toFixed(4), +q.y.toFixed(4), +q.z.toFixed(4), +q.w.toFixed(4)],
           v: S.grounded ? [0, 0, 0] : [r(S.vel.x), r(S.vel.y), r(S.vel.z)], g: S.gearPos > 0.5 ? 1 : 0, t: Date.now() }).catch(() => {});
       }
-      const tnow = performance.now();
+    },
+    draw(dt, tnow) {
       for (const o of this.list) {
-        if (tnow - o.at > 15000) { this.drop(o.id); continue; }
+        if (tnow - o.at > 20000) { this.drop(o.id); continue; }
         if (!o.model) { const m = buildPlane(o.k, o.l); if (!m) continue; o.model = m; scene.add(m); m.position.copy(o.p); m.quaternion.copy(o.q); (m.userData.strobes || []).forEach((x) => (x.visible = false)); if (m.userData.glow) m.userData.glow.visible = false; }
         const age = Math.min(1, (tnow - o.at) / 1000); V.t1 = V.t1 || new THREE.Vector3(); V.t1.copy(o.p).addScaledVector(o.v, age);
         o.model.position.lerp(V.t1, 1 - Math.exp(-dt * 8)); o.model.quaternion.slerp(o.q, 1 - Math.exp(-dt * 6));
@@ -7663,8 +7668,9 @@ vec3 liveryAt(vec3 p, out float fus) {
   function netJoin() {
     const room = ($("netRoom").value || "WORLD").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12) || "WORLD"; $("netRoom").value = room;
     NET.name = ($("netName").value || "").replace(/[^\p{L}\p{N} ._-]/gu, "").trim().slice(0, 16) || `Pilot ${Math.floor(100 + Math.random() * 900)}`; $("netName").value = NET.name; save("sw-netname", NET.name);
-    netSt("Connecting…"); $("netJoin").disabled = true;
-    netLoad().then(netAuth).then((u) => {
+    netSt("Connecting…"); $("netJoin").disabled = true; NET.joining = true;
+    const slow = new Promise((_, rej) => setTimeout(() => rej(new Error("slow")), 25000));
+    Promise.race([netLoad().then(netAuth), slow]).then((u) => {
       NET.uid = u.uid; netLeave(true);
       const db = firebase.database(), base = db.ref(`rooms/${room}`); NET.ref = base; NET.room = room; NET.joinedAt = Date.now();
       NET.me = base.child(`players/${u.uid}`); NET.me.onDisconnect().remove();
@@ -7674,8 +7680,10 @@ vec3 liveryAt(vec3 p, out float fus) {
       P.on("child_removed", (sn) => { const o = NET.by.get(sn.key); if (o) flash(`${o.n} left`, 2); NET.drop(sn.key); });
       base.child("chat").limitToLast(1).on("child_added", (sn) => { const m = sn.val(); if (!m || typeof m.m !== "string" || (m.t || 0) < NET.joinedAt || m.u === NET.uid) return;
         RADIO.push({ text: `${String(m.n || "Pilot").slice(0, 16)}: ${m.m.slice(0, 80)}`, t: 8 }); if (S.mode !== "fly") flash(`${String(m.n || "Pilot").slice(0, 16)}: ${m.m.slice(0, 80)}`, 3); });
-      save("sw-netroom", room); netRender();
-    }).catch((e) => { netSt(e && /admin-restricted|operation-not-allowed/.test(e.code || "") ? "Online isn't switched on yet: anonymous sign-in is disabled in the game's Firebase project." : "Couldn't connect. Online play needs the internet and works on the game's website."); }).then(() => { $("netJoin").disabled = false; });
+      save("sw-netroom", room); netRender(); flash(`Online: room ${room}. Other pilots appear as green circles`, 3);
+    }).catch((e) => {
+      if (e && e.message === "slow" && (NET.tries = (NET.tries || 0) + 1) < 4) { netSt("Still connecting… trying again"); setTimeout(() => { if (!NET.room && !NET.joining) netJoin(); }, 1500); return; }
+      netSt(e && /admin-restricted|operation-not-allowed/.test(e.code || "") ? "Online isn't switched on yet: anonymous sign-in is disabled in the game's Firebase project." : "Couldn't connect. Online play needs the internet and works on the game's website."); }).then(() => { $("netJoin").disabled = false; NET.joining = false; });
   }
   function netLeave(quiet) {
     if (NET.ref) { NET.ref.child("players").off(); NET.ref.child("chat").off(); if (NET.me) { NET.me.onDisconnect().cancel(); NET.me.remove().catch(() => {}); } }
@@ -7730,7 +7738,10 @@ vec3 liveryAt(vec3 p, out float fus) {
   $("netBtn").addEventListener("click", openNet); $("wOnline").addEventListener("click", openNet);
   $("netClose").addEventListener("click", () => { netPanel.hidden = true; });
   $("netJoin").addEventListener("click", () => { if (NET.room) netLeave(); else netJoin(); });
-  setInterval(() => { if (!netPanel.hidden && NET.room) netRender(); }, 2000);
+  setInterval(() => { if (!netPanel.hidden && NET.room) netRender(); else if (NET.room) $("netVal").textContent = `${NET.room} · ${NET.list.length + 1}`; const w = $("wOnline"); if (w) w.textContent = NET.room ? `Online · ${NET.list.length + 1}` : "Online"; }, 2000);
+  setInterval(() => { if (NET.room && document.hidden) NET.send(); }, 1000);   // a tab in the background still tells the others where it is
+  // online by default: everyone lands in the shared room WORLD (or the room they chose last) unless they left it
+  setTimeout(() => { const r = load("sw-netroom"); if (r === "" || NET.room || NET.joining) return; $("netRoom").value = r || "WORLD"; $("netName").value = load("sw-netname") || ""; netJoin(); }, 3500);
   window.addEventListener("pagehide", () => { if (NET.me) NET.me.remove(); });
   if (load("sw-cloud-t")) setTimeout(() => netLoad().catch(() => {}), 4000);   // signed in before: reconnect the cloud save quietly
   // ---------- step by step: welcome screen → hangar (aircraft and livery) → route and conditions → take off ----------
