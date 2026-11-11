@@ -94,7 +94,9 @@ h1 small { display: block; font-family: var(--font-mono); font-size: 12px; lette
 .throttle .lbl { position: absolute; top: -20px; left: -10px; right: -10px; text-align: center; font: 11px var(--font-mono); color: var(--amber); }
 .tbtns { position: absolute; right: 76px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 6px; }
 .tbtn { font: 700 12px var(--font-body); color: var(--text); background: color-mix(in srgb, var(--deck) 65%, transparent); border: 1px solid var(--edge); border-radius: 8px; padding: 8px 10px; min-width: 64px; }
-@media (hover: hover) and (pointer: fine) { .stick, .tbtns { display: none; } }
+@media (hover: hover) and (pointer: fine) { .stick, .tbtns { display: none; } body:not(.tc-on) .touch { display: none; } }
+body.tc-off .touch { display: none !important; }
+body.tc-on .stick { display: block !important; } body.tc-on .tbtns, body.tc-on .tbtns2 { display: grid !important; }
 
 /* briefing / dialogs */
 .dialog {
@@ -664,6 +666,10 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
           <button class="chip" id="tflowBtn" type="button" aria-pressed="true" title="Free flights: the time of day moves on as you fly, day to sunset to night and back">Time passes</button>
           <button class="chip" id="qualBtn" type="button" title="Graphics quality: resolution, terrain and forest detail distance, shadows">Graphics<span class="val" id="qualVal">Medium</span></button>
           <button class="chip" id="fpsBtn" type="button" aria-pressed="false">FPS counter</button>
+          <button class="chip" id="tcBtn" type="button" title="The stick, buttons and throttle on the screen: Auto shows them on touch screens only">On-screen controls<span class="val" id="tcVal">Auto</span></button>
+          <button class="chip" id="saveBtn" type="button" title="Save your progress (career, best landings, missions, liveries, settings) to a file">Save progress to file</button>
+          <button class="chip" id="loadBtn" type="button" title="Load progress from a file saved on this or another device">Load progress from file</button>
+          <input type="file" id="loadFile" accept=".json,application/json" hidden>
           <button class="chip" id="vibBtn" type="button" aria-pressed="true" hidden>Vibration</button>
           <hr>
           <button class="chip" id="showBtn" type="button">360° hangar</button>
@@ -4191,7 +4197,13 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (!spec.freighter) { const cg = buildCabin(model.userData.cabin); cg.visible = false; model.add(cg); model.userData.cabinG = cg; }
       const fd = buildCockpit(new THREE.Vector3(-0.55, spec.cock[0], spec.cock[1]), /Airbus/.test(spec.name), spec.kind === "b747" ? 4 : 2); fd.visible = false; model.add(fd); model.userData.deck = fd;
     }
-    model.traverse((o) => { if (o.isMesh) o.castShadow = QS.shadows; });
+    if (spec.fighter) {   // afterburner: an orange flame with a blue-white core out of each nozzle, lit above 82% throttle
+      const ab = new THREE.Group(); ab.visible = false; model.add(ab); model.userData.ab = ab;
+      const cone = (r, len, col, op, add) => { const g = new THREE.ConeGeometry(r, len, 16, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, len / 2);
+        const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); m.userData.flame = true; m.renderOrder = 3; return m; };
+      for (const sx of [-1, 1]) { const n = new THREE.Group(); n.position.set(sx * 0.55, 0.95, 8.25); n.add(cone(0.42, 6.5, 0xff5a14, 0.55), cone(0.33, 4.2, 0xffa63d, 0.7), cone(0.22, 2.2, 0xdbe9ff, 1, true)); ab.add(n); }
+    }
+    model.traverse((o) => { if (o.isMesh && !o.userData.flame) o.castShadow = QS.shadows; });
     return true;
   }
 
@@ -4417,6 +4429,27 @@ vec3 liveryAt(vec3 p, out float fus) {
     const b = $(id); b.setAttribute("aria-pressed", String(OPT[key]));
     b.addEventListener("click", () => { OPT[key] = !OPT[key]; save(key, OPT[key] ? "1" : "0"); b.setAttribute("aria-pressed", String(OPT[key])); });
   }
+  // on-screen controls: Auto (touch screens only), always on, or off
+  { let tc = load("sw-tc") || "auto"; const tcB = $("tcBtn");
+    const apply = () => { document.body.classList.toggle("tc-on", tc === "on"); document.body.classList.toggle("tc-off", tc === "off"); $("tcVal").textContent = tc === "on" ? "On" : tc === "off" ? "Off" : "Auto"; };
+    tcB.addEventListener("click", () => { tc = tc === "auto" ? "off" : tc === "off" ? "on" : "auto"; save("sw-tc", tc); apply(); }); apply(); }
+  // progress is saved automatically in this browser; these move it to a file and back (another device, another browser)
+  $("saveBtn").addEventListener("click", () => {
+    const data = { game: "Skyways Flight Sim", v: 1, saved: new Date().toISOString(), keys: {} };
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^sw-/.test(k)) data.keys[k] = localStorage.getItem(k); } } catch {}
+    const blob = new Blob([JSON.stringify(data)], { type: "application/json" }), a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `skyways-progress-${new Date().toISOString().slice(0, 10)}.json`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    flash("Progress saved to a file: keep it, or open it on another device with “Load progress from file”", 4);
+  });
+  $("loadBtn").addEventListener("click", () => $("loadFile").click());
+  $("loadFile").addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    file.text().then((t) => { const d = JSON.parse(t); if (!d || d.game !== "Skyways Flight Sim" || !d.keys) throw new Error("not a Skyways save");
+      if (!confirm("Replace the progress in this browser with the one in the file?")) return;
+      for (const [k, v] of Object.entries(d.keys)) if (/^sw-/.test(k)) save(k, v);
+      location.reload(); }).catch(() => flash("That file isn't a Skyways progress file", 3));
+    e.target.value = "";
+  });
   const sndBtn = $("sndBtn");
   sndBtn.setAttribute("aria-pressed", String(soundOn));
   sndBtn.addEventListener("click", () => { soundOn = !soundOn; save("sw-sound", soundOn ? "1" : "0"); sndBtn.setAttribute("aria-pressed", String(soundOn)); if (soundOn) initAudio(); if (ac && ac.state === "suspended") ac.resume(); });
@@ -4968,6 +5001,25 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (job.cargo && capCargo(f.kind) < job.cargo) return `Needs ${job.cargo} t of cargo space (this one takes ${capCargo(f.kind)} t)`;
     return null;
   }
+  // ---------- hired pilots: aircraft you aren't flying earn money on their own (one flight every 10 minutes while the game is
+  // open, and up to 2 hours of flights you missed while it was closed); the pilot takes a quarter, fuel and wear as usual ----------
+  const PILOT_FEE = 10000, PILOT_EVERY = 10 * 60 * 1000, PILOT_NAMES = ["A. Karimov", "J. Smith", "M. Rossi", "L. Chen", "S. Novak", "R. Diaz", "K. Tanaka", "E. Müller", "D. Okafor", "N. Ivanova", "T. Haddad", "P. Silva"];
+  function runPilots(quiet) {
+    if (!CAR.started) return; const now = Date.now(); let n = 0, net = 0;
+    for (const f of CAR.fleet) {
+      const P = f.pilot; if (!P) continue;
+      if (P.next < now - 2 * 3600 * 1000) P.next = now - 2 * 3600 * 1000;
+      while (P.next <= now) {
+        P.next += PILOT_EVERY;
+        if (f.cond < 35 || (S.careerJob && S.careerJob.plane === f.id)) continue;
+        const D = 6 + Math.random() * 9, cap = capPax(f.kind) || 1, gross = Math.round((PLANES[f.kind].cargo ? capCargo(f.kind) * (60 + D * 25) : cap * 0.85 * (12 + D * 4)) * repMul() * 0.85);
+        const fuel = Math.round(D * 120 * (cap / 180 + 0.4) + 400), wage = Math.round(gross * 0.25), got = gross - wage - fuel;
+        CAR.cash += got; if (got > 0) CAR.earned += got; P.earned += got; P.flights++; f.cond = Math.max(0, f.cond - 2.5); f.loc = CAR.hub; n++; net += got;
+      }
+    }
+    if (n) { carSave(); CAR.pilotNote = `Your pilots flew ${n} flight${n > 1 ? "s" : ""}: ${money(net)}`; if (!quiet && S.mode === "fly") RADIO.push({ text: `${CAR.airline} ops: ${CAR.pilotNote}.`, t: 8 }); else if (!quiet) flash(CAR.pilotNote, 3); if (!cpage.hidden) renderCareerPage(); syncCarChips(); }
+  }
+  setTimeout(() => runPilots(true), 1500); setInterval(() => runPilots(false), 30000);
   // the contract's end: paid on arrival at its destination
   function careerFinish(ok, info) {
     const J = S.careerJob; S.careerJob = null; jobBar.hidden = true; if (!J) return null;
@@ -5031,7 +5083,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     if (cpTab === "jobs") {
       const pick = el("div", "cp-row"); pick.append(el("span", "cp-note", "Fly with:"));
-      for (const f of CAR.fleet) { const b = el("button", "cp-pick", `${PLANES[f.kind].name} · ${f.loc} · ${Math.round(f.cond)}%`); b.type = "button"; b.setAttribute("aria-pressed", String(f.id === CAR.sel)); b.addEventListener("click", () => { CAR.sel = f.id; if (!CAR.jobs.length || CAR.jobs[0].from !== f.loc) CAR.jobs = genJobs(f.loc); carSave(); renderCareerPage(); }); pick.append(b); }
+      for (const f of CAR.fleet) { const b = el("button", "cp-pick", `${PLANES[f.kind].name} · ${f.loc} · ${Math.round(f.cond)}%${f.pilot ? " · pilot flying" : ""}`); b.type = "button"; b.setAttribute("aria-pressed", String(f.id === CAR.sel)); b.addEventListener("click", () => { CAR.sel = f.id; if (!CAR.jobs.length || CAR.jobs[0].from !== f.loc) CAR.jobs = genJobs(f.loc); carSave(); renderCareerPage(); }); pick.append(b); }
       body.append(pick);
       const f = planeOf(CAR.sel) || CAR.fleet[0]; if (f && (!CAR.jobs.length || CAR.jobs[0].from !== f.loc)) { CAR.jobs = genJobs(f.loc); carSave(); }
       for (const job of CAR.jobs) {
@@ -5051,11 +5103,16 @@ vec3 liveryAt(vec3 p, out float fus) {
         card.append(el("div", "cp-tag plane", PLANES[f.kind].name.split(" ").pop()),
           el("div", "cp-main", `<b>${PLANES[f.kind].name} · ${livName(f.kind, f.liv)}</b><span>At ${AP_BY[f.loc] ? AP_BY[f.loc].name : f.loc} · ${capPax(f.kind)} seats · ${capCargo(f.kind)} t cargo · condition ${Math.round(f.cond)}%${f.cond < 35 ? " · grounded until repaired" : ""}</span><div class="cp-cond"><b style="width:${f.cond}%;background:${col}"></b></div>`));
         const side = el("div", "cp-side");
+        if (f.pilot) { const left = Math.max(0, f.pilot.next - Date.now());
+          card.querySelector(".cp-main").append(el("span", "", `Pilot ${f.pilot.name}: ${f.pilot.flights} flights from ${CAR.hub}, earned ${money(f.pilot.earned)}${f.cond < 35 ? " · waiting for repairs" : ` · next flight in ${fmtT(left / 1000)}`}`));
+          side.append(btn("Dismiss pilot", () => { delete f.pilot; carSave(); renderCareerPage(); }, "btn alt")); }
+        else side.append(btn(`Hire a pilot ${money(PILOT_FEE)}`, () => { if (CAR.cash < PILOT_FEE) return; CAR.cash -= PILOT_FEE; f.pilot = { name: PILOT_NAMES[Math.floor(Math.random() * PILOT_NAMES.length)], flights: 0, earned: 0, next: Date.now() + PILOT_EVERY }; carSave(); renderCareerPage(); }, "btn", CAR.cash < PILOT_FEE));
         side.append(btn(`Repair ${money(rc)}`, () => { if (CAR.cash < rc) return; CAR.cash -= rc; f.cond = 100; carSave(); renderCareerPage(); }, "btn alt", rc <= 0 || CAR.cash < rc));
         side.append(btn(`Sell ${money(sell)}`, () => { if (CAR.fleet.length < 2) return; CAR.cash += sell; CAR.fleet = CAR.fleet.filter((q) => q !== f); if (CAR.sel === f.id) CAR.sel = CAR.fleet[0].id; carSave(); renderCareerPage(); }, "btn alt", CAR.fleet.length < 2));
         card.append(side); body.append(card);
       }
-      body.append(el("p", "cp-note", "Repairs bring an aircraft back to 100%. Below 35% it's grounded. You can sell any aircraft but your last one."));
+      if (CAR.pilotNote) body.append(el("p", "cp-note", CAR.pilotNote));
+      body.append(el("p", "cp-note", `Hire a pilot (${money(PILOT_FEE)} once) and the aircraft flies from your hub on its own: a flight every 10 minutes while the game is open, and up to 2 hours of missed flights when you come back. The pilot keeps a quarter of each flight's takings; fuel and wear come off as usual, so keep it repaired. Repairs bring an aircraft back to 100%; below 35% it's grounded. You can sell any aircraft but your last one.`));
     } else if (cpTab === "shop") {
       for (const k of Object.keys(PRICE)) { if (!PLANES[k]) continue;
         const ok = licensed(k), card = el("div", "cp-card" + (ok ? "" : " off"));
@@ -5653,6 +5710,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (u.prop) { u.prop.rotation.z += dt * (8 + S.throttle * 70); u.prop.userData.disc.material.opacity = 0.05 + S.throttle * 0.18; }
     u.fans.forEach((f) => (f.rotation.z += dt * (6 + S.throttle * 40)));
     (u.props || []).forEach((pp) => { pp.rotation.z += dt * (8 + S.throttle * 60); pp.userData.disc.material.opacity = 0.05 + S.throttle * 0.18; });
+    if (u.ab) { const k = clamp((S.throttle - 0.82) / 0.18, 0, 1); u.ab.visible = k > 0 && !S.crashed && model.visible;
+      if (u.ab.visible) u.ab.children.forEach((n) => n.children.forEach((c, i) => c.scale.set(1, 1, (0.5 + k * 0.7) * (0.85 + Math.random() * 0.3)))); }
     if (u.glow) { u.glow.visible = S.throttle > 0.55; u.glow.scale.set(1, 1, 0.4 + (S.throttle - 0.55) * 2.6); u.glow.material.opacity = 0.5 + Math.random() * 0.4; }
     u.ail[0].rotation.x = -S.inputs.roll * 0.35; u.ail[1].rotation.x = S.inputs.roll * 0.35;
     u.elev.forEach((e) => (e.rotation.x = -S.inputs.pitch * 0.35));
