@@ -1199,11 +1199,12 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
 
   // terrain: streamed tiles. Every 4 km tile has a cheap low-detail mesh; detailed meshes (with forests) are built near the camera.
   const TC = {
-    deep: new THREE.Color(0x1f4c5c), shallow: new THREE.Color(0x8bbaa5), sand: new THREE.Color(0xd8cb9b), grass: new THREE.Color(0x648a42),
-    grass2: new THREE.Color(0x7f9a52), forest: new THREE.Color(0x2d522a), field: new THREE.Color(0xa29d59), high: new THREE.Color(0x767e53),
-    rock: new THREE.Color(0x7c766c), rock2: new THREE.Color(0x958e84), snow: new THREE.Color(0xf3f6f9), mowed: new THREE.Color(0x6f9750),
+    deep: new THREE.Color(0x1f4c5c), shallow: new THREE.Color(0x8bbaa5), sand: new THREE.Color(0xd8cb9b), grass: new THREE.Color(0x4e6c37),
+    grass2: new THREE.Color(0x67803f), forest: new THREE.Color(0x2a4b27), field: new THREE.Color(0x9c9455), high: new THREE.Color(0x707753),
+    rock: new THREE.Color(0x7c766c), rock2: new THREE.Color(0x958e84), snow: new THREE.Color(0xf3f6f9), mowed: new THREE.Color(0x5a7a40),
   };
   const _c2 = new THREE.Color();
+  const FIELDS = [0x6e5639, 0xb09a52, 0x4f7a2e, 0x8f9a4c].map((h) => new THREE.Color(h));
   // biomes, after the real places: desert round Dubai, dry Mediterranean round Istanbul, tropics round Singapore, taiga round
   // Moscow, temperate farmland everywhere else. Weights fade out with distance along a wobbly edge. Colour and trees only:
   // nothing is added to draw, so they cost nothing.
@@ -1224,6 +1225,10 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       c.copy(TC.grass).lerp(TC.grass2, v1);
       if (forest > 0.56 && y < 600) c.lerp(TC.forest, smooth(0.56, 0.62, forest));
       if (v2 > 0.62 && y < 160 && forest < 0.5) c.lerp(TC.field, 0.6);
+      if (y > 6 && y < 240 && ny > 0.93 && forest < 0.52 && am < 0.05) {   // patchwork farmland on the flat lowlands: ploughed earth, wheat, crops, meadow
+        const xr = x * 0.94 + z * 0.34, zr = z * 0.94 - x * 0.34, h = hash(Math.floor(xr / 230), Math.floor(zr / 165));
+        if (h < 0.5) c.lerp(FIELDS[Math.floor(h * 8)], 0.75 * smooth(0.93, 0.97, ny) * (1 - smooth(160, 240, y)));
+      }
       c.lerp(TC.high, smooth(220, 520, y));
       _c2.copy(TC.rock).lerp(TC.rock2, v2); c.lerp(_c2, Math.max(smooth(0.86, 0.72, ny), smooth(560, 760, y)));
       const snowLine = 760 + (v1 - 0.5) * 120;
@@ -6586,6 +6591,26 @@ vec3 liveryAt(vec3 p, out float fus) {
     CITY_NIGHT.value.x = p3(0, 0.35, 1);
     if (typeof nightLights === "function") nightLights(T > 0.6);
     renderer.toneMappingExposure = 1;
+    updateEnvMap(top, hor, T);
+  }
+  // reflections: a small sky (gradient and sun) baked into an environment map that every metal and glass surface
+  // reflects (airliner skins, cockpit and terminal glass); rebuilt only when the sky has visibly changed
+  const ENVMAP = { pm: null, rt: null, key: "", sc: null, mat: null, sun: null };
+  function updateEnvMap(top, hor, T) {
+    const key = `${top.getHexString()}${hor.getHexString()}${Math.round(T * 10)}`; if (ENVMAP.key === key) return; ENVMAP.key = key;
+    try {
+      if (!ENVMAP.pm) {
+        ENVMAP.pm = new THREE.PMREMGenerator(renderer); ENVMAP.sc = new THREE.Scene();
+        const g = new THREE.SphereGeometry(50, 24, 12), col = new Float32Array(g.attributes.position.count * 3); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+        ENVMAP.mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, toneMapped: false }); ENVMAP.sc.add(new THREE.Mesh(g, ENVMAP.mat));
+        ENVMAP.sun = new THREE.Mesh(new THREE.SphereGeometry(4, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false })); ENVMAP.sc.add(ENVMAP.sun);
+      }
+      const m = ENVMAP.sc.children[0], P = m.geometry.attributes.position, C = m.geometry.attributes.color, c = new THREE.Color(), ground = new THREE.Color(0x4a5a3a).lerp(new THREE.Color(0x0a0d10), clamp(T - 1, 0, 1));
+      for (let i = 0; i < P.count; i++) { const t = P.getY(i) / 50; if (t >= 0) c.copy(hor).lerp(top, Math.pow(t, 0.55)); else c.copy(hor).lerp(ground, Math.min(1, -t * 4)); C.setXYZ(i, c.r, c.g, c.b); }
+      C.needsUpdate = true;
+      ENVMAP.sun.visible = T < 1.4; ENVMAP.sun.position.copy(SUN_DIR).multiplyScalar(44); ENVMAP.sun.material.color.setScalar(T < 0.5 ? 6 : 3).multiply(sun.color);
+      const rt = ENVMAP.pm.fromScene(ENVMAP.sc, 0.02); if (ENVMAP.rt) ENVMAP.rt.dispose(); ENVMAP.rt = rt; scene.environment = rt.texture;
+    } catch (e) { ENVMAP.key = "x"; }
   }
 
   // ================= AUTOPILOT =================
