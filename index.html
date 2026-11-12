@@ -2466,14 +2466,14 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     swr: { name: "Swiss", reg: "HB-JNA", fin: ["#e3000f", "#ffffff"], finMode: 5, engine: "#eef0f2", tip: "#e3000f", titleScale: 1.35, title: ["SWISS", "#e3000f", "800", "sans", 0.1] },
     wzz: { name: "Wizz Air", reg: "HA-LXA", emb: ["text", "#ffffff", 0.55, 0.5, 0.13, 0, "wizz"], fin: ["#c6007e"], engine: "#c6007e", belly: "#3b1c5a", bellyY: -0.55, rise: 0.2, title: ["wizzair", "#c6007e", "900", "sans"] },
     lhc: { name: "Lufthansa Cargo", reg: "D-ALCA", emb: ["ring", "#ffffff", 0.55, 0.55, 0.2], fin: ["#05164d"], title: ["Lufthansa Cargo", "#05164d", "700", "serif"] },
-    ups: { name: "UPS", reg: "N571UP", emb: ["text", "#f2b100", 0.55, 0.5, 0.11, 0, "UPS"], belly: "#4a2c1d", bellyY: -0.2, rise: 0.35, fin: ["#4a2c1d"], title: ["UPS", "#4a2c1d", "900", "sans", 0.2] },
+    ups: { name: "UPS", reg: "N571UP", emb: ["shield", "#ffb500", 0.52, 0.5, 0.2, "#351c15"], belly: "#351c15", bellyY: -0.15, rise: 0.4, fin: ["#351c15"], engine: "#351c15", tip: "#351c15", titleScale: 1.6, titleY: 0.05, title: ["UPS", "#351c15", "900", "sans", 0.18] },
     abc: { name: "AirBridgeCargo", reg: "VP-BIG", fin: ["#d0202f", "#ffffff", "#1d3d8f"], finMode: 2, engine: "#1d3d8f", title: ["AirBridgeCargo", "#1d3d8f", "700", "sans"] },
     atl: { name: "Atlas Air", reg: "N464MC", fin: ["#0e2a5b"], stripe2: ["#c7a34b", -0.3, -0.24], title: ["ATLAS AIR", "#0e2a5b", "800", "sans", 0.12] },
     sia: { name: "Singapore Airlines", reg: "9V-SMA", fin: ["#0b2a5b", "#f2a900", "#0b2a5b"], finMode: 2, stripe2: ["#f2a900", -0.33, -0.29], stripe: ["#0b2a5b", -0.38, -0.33], engine: "#e3e6e9", title: ["SINGAPORE AIRLINES", "#0b2a5b", "600", "serif", 0.04] },
   };
   // private-jet schemes: no airline titles, a registration and a cheat line
   Object.assign(AIRLINE, {
-    fdx: { name: "FedEx Express", reg: "N601FE", top: "#4d148c", topY: 0.3, fin: ["#4d148c"], engine: "#4d148c", tip: "#4d148c", titleScale: 1.3, titleY: -0.42, title: ["FedEx Express", "#4d148c", "800", "sans", 0.02] },
+    fdx: { name: "FedEx Express", reg: "N601FE", fin: ["#4d148c"], emb: ["text", "#ffffff", 0.5, 0.55, 0.13, 0, "FedEx", "900"], engine: "#4d148c", tip: "#4d148c", belly: "#4d148c", bellyY: -0.86, titleScale: 2.4, titleY: -0.42, title: ["FedEx", "#4d148c", "900", "sans", -0.02], titleCols: [[3, "#4d148c"], [2, "#ff6200"]] },
     pjnavy: { name: "Private · navy and gold", reg: "N650GX", fin: ["#0e2a5b"], stripe: ["#0e2a5b", -0.36, -0.3], stripe2: ["#c7a34b", -0.29, -0.26], engine: "#0e2a5b" },
     pjred: { name: "Private · red line", reg: "D-CRED", fin: ["#b5121b", "#ffffff", "#b5121b"], finMode: 2, stripe: ["#b5121b", -0.33, -0.29] },
     pjblack: { name: "Private · black and silver", reg: "VP-BJT", fin: ["#16181c"], stripe: ["#16181c", -0.4, -0.3], stripe2: ["#9aa3ab", -0.29, -0.27], engine: "#16181c" },
@@ -2519,9 +2519,9 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     a350: { name: "Airbus A350-900", type: "Long-haul wide-body · curved wingtips", packed: true, build: buildA350model, thrust: 3.0, vmax: 144, stall: 59, roll: 0.36, pitch: 0.28, yaw: 0.16, turn: 0.66, gearH: 3.14, retract: true, cam: [118, 22], cock: [3.14, -28.8], wingX: 32.4, brake: 4.0, shadow: 35, big: true, stats: [0.95, 0.23, 0.28] },
     bizjet: { name: "Business Jet", type: "Private jet · T-tail · two rear engines", packed: true, build: buildBizjetModel, thrust: 3.7, vmax: 150, stall: 47, roll: 0.62, pitch: 0.42, yaw: 0.22, turn: 0.85, gearH: 1.9, retract: true, cam: [42, 9], cock: [0.55, -9.4], wingX: 9.7, brake: 4.8, shadow: 11, stats: [0.6, 0.55, 0.6] },
     f15: { name: "F-15 Eagle", type: "Air-superiority fighter · twin afterburning engines", packed: true, fighter: true, build: buildF15model, thrust: 13, vmax: 290, stall: 58, roll: 2.2, pitch: 1.05, yaw: 0.4, turn: 1.4, gearH: 2.0, retract: true, cam: [34, 7], cock: [1.95, -4.3], wingX: 8.1, brake: 5.5, shadow: 10, stats: [1.0, 1.0, 0.95] },
-    a380: { name: "Airbus A380", type: "Double-deck giant · four engines", packed: true, noDeck: true, build: (liv) => buildPacked("a380", packOpts("a380"), liv), thrust: 2.7, vmax: 150, stall: 63, roll: 0.28, pitch: 0.24, yaw: 0.13, turn: 0.58, gearH: 5.4, retract: true, cam: [145, 30], cock: [2.2, -33.0], wingX: 39.7, brake: 3.7, shadow: 42, big: true, stats: [0.97, 0.16, 0.22] },
-    md11: { name: "McDonnell Douglas MD-11F", type: "Tri-jet freighter · FedEx colours", packed: true, noDeck: true, freighter: true, cargo: 91, build: (liv) => buildPacked("md11", packOpts("md11"), liv), thrust: 2.9, vmax: 146, stall: 62, roll: 0.33, pitch: 0.27, yaw: 0.15, turn: 0.64, gearH: 4.8, retract: true, cam: [112, 22], cock: [1.6, -28.3], wingX: 25.9, brake: 3.9, shadow: 31, big: true, stats: [0.95, 0.2, 0.26] },
-    concorde: { name: "Concorde", type: "Supersonic airliner · delta wing · Mach 2", packed: true, noDeck: true, build: (liv) => buildPacked("concorde", packOpts("concorde"), liv), thrust: 9, vmax: 330, stall: 78, roll: 0.7, pitch: 0.42, yaw: 0.18, turn: 0.7, gearH: 5.0, retract: true, cam: [105, 18], cock: [0.6, -23.5], wingX: 12.9, brake: 4.2, shadow: 22, big: true, stats: [1.0, 0.5, 0.2] },
+    a380: { name: "Airbus A380", type: "Double-deck giant · four engines", packed: true, build: (liv) => buildPacked("a380", packOpts("a380"), liv), thrust: 2.7, vmax: 150, stall: 63, roll: 0.28, pitch: 0.24, yaw: 0.13, turn: 0.58, gearH: 5.4, retract: true, cam: [145, 30], cock: [2.0, -32.3], wingX: 39.7, brake: 3.7, shadow: 42, big: true, stats: [0.97, 0.16, 0.22] },
+    md11: { name: "McDonnell Douglas MD-11F", type: "Tri-jet freighter · FedEx colours", packed: true, freighter: true, cargo: 91, build: (liv) => buildPacked("md11", packOpts("md11"), liv), thrust: 2.9, vmax: 146, stall: 62, roll: 0.33, pitch: 0.27, yaw: 0.15, turn: 0.64, gearH: 4.8, retract: true, cam: [112, 22], cock: [1.5, -26.7], wingX: 25.9, brake: 3.9, shadow: 31, big: true, stats: [0.95, 0.2, 0.26] },
+    concorde: { name: "Concorde", type: "Supersonic airliner · delta wing · Mach 2", packed: true, build: (liv) => buildPacked("concorde", packOpts("concorde"), liv), thrust: 9, vmax: 330, stall: 78, roll: 0.7, pitch: 0.42, yaw: 0.18, turn: 0.7, gearH: 5.0, retract: true, cam: [105, 18], cock: [0.42, -22.9], wingX: 12.9, brake: 4.2, shadow: 22, big: true, stats: [1.0, 0.5, 0.2] },
   };
   for (const k of Object.keys(PLANES)) PLANES[k].kind = k;
   (function realScale() {
@@ -2924,12 +2924,21 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     const sp = (track || 0) * px, width = () => g.measureText(text).width + sp * (text.length - 1);
     while (width() > 1900 && px > 30) { px -= 4; g.font = font(px); }
     g.fillStyle = col; g.textBaseline = "middle";
-    let x = (2048 - width()) / 2;
-    for (const ch of text) { g.fillText(ch, x, 68); x += g.measureText(ch).width + (track || 0) * px; }
+    let x = (2048 - width()) / 2, ci = 0;
+    for (const ch of text) { if (L.titleCols) { let n = 0; for (const [cnt, cc] of L.titleCols) { n += cnt; if (ci < n) { g.fillStyle = cc; break; } } } g.fillText(ch, x, 68); x += g.measureText(ch).width + (track || 0) * px; ci++; }
     const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; t.generateMipmaps = true;
     return (PACK_CACHE[ck] = t);
   }
   // small lettering textures: the registration and tail lettering (cached per airline)
+  // the UPS shield: gold, curved top, pointed bottom, the brown letters in it
+  function shieldTex(gold, brown) {
+    const ck = `shield:${gold}`; if (PACK_CACHE[ck]) return PACK_CACHE[ck];
+    const cv = document.createElement("canvas"); cv.width = 256; cv.height = 308; const g = cv.getContext("2d");
+    const path = () => { g.beginPath(); g.moveTo(20, 46); g.quadraticCurveTo(128, -6, 236, 46); g.lineTo(236, 170); g.quadraticCurveTo(230, 262, 128, 300); g.quadraticCurveTo(26, 262, 20, 170); g.closePath(); };
+    path(); g.fillStyle = gold; g.fill();
+    g.fillStyle = brown; g.font = "900 96px 'Helvetica Neue', Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("ups", 128, 160);
+    const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; t.flipY = true; return (PACK_CACHE[ck] = t);
+  }
   function textTexAlpha(ck, text, col, weight, fam, W = 512, H = 128) {
     if (PACK_CACHE[ck]) return PACK_CACHE[ck];
     const cv = document.createElement("canvas"); cv.width = W; cv.height = H; const g = cv.getContext("2d");
@@ -2969,6 +2978,9 @@ vec3 liveryAt(vec3 p, out float fus) {
         if (uEmb.x < 1.5) { if (dd < r) fc = uEmbC; }
         else if (uEmb.x < 2.5) { if (abs(dd - r * 0.85) < r * 0.13) fc = uEmbC; }
         else if (uEmb.x < 3.5) { if (abs(dd - r * 0.88) < r * 0.09 || (dd < r * 0.8 && (abs(pm.y) < r * 0.05 || abs(abs(pm.y) - r * 0.45) < r * 0.05 || abs(length(vec2(pm.x * 1.9, pm.y)) - r * 0.82) < r * 0.07))) fc = uEmbC; }
+        else if (uEmb.x > 7.5) {   // a picture on the fin (UPS shield): a box 2r wide and 2.4r tall
+          float tu = pm.x / (r * 2.0) + 0.5, tv = pm.y / (r * 2.4) + 0.5; if (p.x > 0.0) tu = 1.0 - tu;
+          if (tu > 0.0 && tu < 1.0 && tv > 0.0 && tv < 1.0) { vec4 tx = texture2D(uFinTex, vec2(tu, tv)); fc = mix(fc, pow(clamp(tx.rgb / max(tx.a, 0.02), 0.0, 1.0), vec3(2.2)), clamp(tx.a * 1.5, 0.0, 1.0)); } }
         else if (uEmb.x > 6.5) {   // Uzbekistan Airways: a yellow disc in a red ring with a green bird flying across it
           if (dd < r) { fc = uEmbC; vec2 q = pm / r;
             if (abs(dd - r * 0.9) < r * 0.1) fc = uEmbC2;
@@ -3101,9 +3113,9 @@ vec3 liveryAt(vec3 p, out float fus) {
       uBody: V3(L.body || white), uBelly: V3(L.belly || white), uTop: V3(L.top || white), uStr: V3(L.stripe ? L.stripe[0] : white), uStr2: V3(L.stripe2 ? L.stripe2[0] : white),
       uFin1: V3(fin[0]), uFin2: V3(fin[1] || fin[0]), uFin3: V3(fin[2] || fin[1] || fin[0]), uWing: V3(L.wing || "#d9dde1"), uNose: V3(L.nose || white), uLead: V3(L.finLead || white),
       uTitle: { value: L.title ? titleTex(L) : BLANK_TEX }, uCabin: cabin || { value: 0 },
-      uEmb: { value: L.emb ? new THREE.Vector4({ disc: 1, ring: 2, globe: 3, split: 4, text: 5, ringbird: 6, uzb: 7 }[L.emb[0]], L.emb[2], L.emb[3], L.emb[4]) : new THREE.Vector4(0, 0, 0, 0) },
+      uEmb: { value: L.emb ? new THREE.Vector4({ disc: 1, ring: 2, globe: 3, split: 4, text: 5, ringbird: 6, uzb: 7, shield: 8 }[L.emb[0]], L.emb[2], L.emb[3], L.emb[4]) : new THREE.Vector4(0, 0, 0, 0) },
       uEmbC: V3(L.emb ? L.emb[1] : white), uEmbC2: V3(L.emb && L.emb[5] ? L.emb[5] : white),
-      uFinTex: { value: L.emb && L.emb[0] === "text" ? textTexAlpha(`fin:${L.id}`, L.emb[6], L.emb[1], L.emb[7] || "900", L.emb[8] || "sans") : BLANK_TEX },
+      uFinTex: { value: L.emb && L.emb[0] === "shield" ? shieldTex(L.emb[1], L.emb[5]) : L.emb && L.emb[0] === "text" ? textTexAlpha(`fin:${L.id}`, L.emb[6], L.emb[1], L.emb[7] || "900", L.emb[8] || "sans") : BLANK_TEX },
       uRegTex: { value: L.reg ? textTexAlpha(`reg:${L.id}`, L.reg, L.regCol || "#2a2f36", "700", "sans", 512, 64) : BLANK_TEX }, uHasReg: { value: L.reg ? 1 : 0 },
       uFg0: { value: new THREE.Vector4(o.fin[0], o.fin[1], o.fin[2], o.fin[3]) }, uFg1: { value: new THREE.Vector4(o.fin[4], o.fin[5], 0.35 * o.R, L.spine ? 1 : 0) },
       uEng: { value: new THREE.Vector4(o.eng[0], o.eng[1], o.eng[2], 1) }, uEz: { value: new THREE.Vector4(o.eng[3], o.eng[4], 0, 0) },
@@ -3571,7 +3583,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     // engine fronts: a bladed fan and a spinner that turn with the engines
     const fans = [];
     root.updateMatrixWorld(true);
-    for (const e of [o.eng, o.eng2]) if (e) for (const sx of [-1, 1]) {
+    for (const e of o.noFans ? [] : [o.eng, o.eng2]) if (e) for (const sx of e[0] === 0 ? [1] : [-1, 1]) {
       const fit = fitIntake(key, root, sx * e[0], e[1], e[2], e[3]);
       const fan = new THREE.Group(); fan.position.set(fit.x, fit.y, fit.z);
       const disc = new THREE.Mesh(FAN_GEO, FAN_MAT); disc.scale.setScalar(fit.r * 0.97); fan.add(disc);
@@ -3637,12 +3649,12 @@ vec3 liveryAt(vec3 p, out float fus) {
     tailZ: 11.9, beaconY: 1.2, paintWindows: true, pitch: 0.9, doors: [0.17, -5, -5, -5, -5], winRange: [0.2, 0.52], ckF: [0.08, 0.125] };
   // F-15: the model's own grey paint, no airline liveries; its gear legs replaced by retracting ones in the same places
   // A380, MD-11F and Concorde: their own painted colours (baked from the models' textures), merged into one mesh each; game gear added
-  PACK_OPTS.a380 = { cy: 1.33, R: 3.56, win: -0.08, zNose: -36.35, zTail: 36.35, finTop: 19.19, fin: [7.2, 19.19, 24.5, 35.6, 31.4, 36.26], eng: [10.8, -1.35, 1.55, -13.1, -6.6], eng2: [15.9, -2.6, 1.5, -13.6, -7.2],
+  PACK_OPTS.a380 = { cy: 1.33, R: 3.56, win: -0.08, zNose: -36.35, zTail: 36.35, finTop: 19.19, fin: [7.2, 19.19, 24.5, 35.6, 31.4, 36.26], eng: [10.6, -1.9, 1.6, -13.55, -6.2], eng2: [14.75, -2.58, 1.62, -13.6, -6.6],
     paintWindows: true, upper: [-28.5, 52, 4.45, 1], doors: [0.12, 0.3, 0.5, 0.7, 0.86], winRange: [0.1, 0.88], ckF: [0, 0], tailZ: 36, beaconY: 6.2,
     bodyOnly: true, addGear: true, gearH: 5.4, wheelR: 0.7, bogie: true, mainX: 5.9, mainZ: 2.2, bodyGear: [2.5, 5.4], noseZ: -29.5 };
   PACK_OPTS.md11 = { cy: 0.3, R: 3.17, win: 0.2, zNose: -30.8, zTail: 30.8, finTop: 12.66, fin: [8.0, 12.66, 20.5, 29.6, 25.1, 27.8], copiedCockpit: true, eng: [8.3, -2.0, 1.45, -6.8, -1.2], eng2: [0, 5.8, 1.35, 17.0, 26.0],
     tailZ: 30.5, beaconY: 3.6, bodyOnly: true, addGear: true, gearH: 4.8, wheelR: 0.62, bogie: true, mainX: 5.2, mainZ: 4.2, noseZ: -25.8 };
-  PACK_OPTS.concorde = { cy: -0.14, R: 1.53, win: 0.25, zNose: -30.83, zTail: 30.83, finTop: 6.72, fin: [1.8, 6.72, 13.7, 25.9, 21.9, 25.1], eng: [3.3, -1.65, 0.95, 7.0, 17.2],
+  PACK_OPTS.concorde = { cy: -0.14, R: 1.53, win: 0.25, zNose: -30.83, zTail: 30.83, finTop: 6.72, fin: [1.8, 6.72, 13.7, 25.9, 21.9, 25.1], eng: [3.3, -1.65, 0.95, 7.0, 17.2], noFans: true,
     paintWindows: true, pitch: 0.42, doors: [0.2, 0.62, -5, -5, -5], winRange: [0.18, 0.78], ckF: [0.095, 0.125], tailZ: 30.5, beaconY: 1.6,
     bodyOnly: true, addGear: true, gearH: 5.0, wheelR: 0.5, bogie: true, mainX: 3.85, mainZ: 7.5, noseZ: -11.5 };
   PACK_OPTS.f15 = { plain: true, bodyOnly: true, addGear: true, gearH: 2.0, wheelR: 0.42, mainX: 1.8, mainZ: 4.5, noseZ: -2.2 };
