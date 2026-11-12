@@ -377,6 +377,17 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .netrow i.paused { background: #ffc94d; } .netrow i.menu { background: #8a8a90; } .netrow i.ground { background: #78beff; }
 .netrow b { font: 600 12.5px var(--font-body); color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .netrow span { font: 400 11px var(--font-body); color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.netchat { pointer-events: auto; display: grid; gap: 6px; justify-items: start; width: min(300px, 70vw); }
+.netchat-log { display: grid; gap: 3px; justify-items: start; max-height: 26vh; overflow-y: auto; width: 100%; }
+.netchat-log div { max-width: 100%; padding: 4px 10px; border-radius: 10px; background: rgba(14,15,18,0.72); color: #e8e8ea; font: 400 12.5px var(--font-body); overflow-wrap: anywhere; transition: opacity 0.6s; }
+.netchat-log div b { color: #7fe39a; font-weight: 600; margin-right: 5px; } .netchat-log div.mine b { color: #78beff; } .netchat-log div.sys { color: var(--fg-3); font-style: italic; }
+.netchat-log div.old { opacity: 0; pointer-events: none; height: 0; padding: 0; margin: -3px 0 0; overflow: hidden; }
+.netchat.open .netchat-log { background: rgba(14,15,18,0.5); border-radius: 12px; padding: 6px; }
+.netchat.open .netchat-log div.old { opacity: 1; height: auto; padding: 4px 10px; margin: 0; }
+.netchat-in { display: flex; gap: 6px; width: 100%; }
+.netchat-btn { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--hair); background: rgba(14,15,18,0.72); color: var(--fg); font: 600 12px var(--font-body); cursor: pointer; }
+.netchat-in input { flex: 1; min-width: 0; padding: 7px 11px; border-radius: 999px; border: 1px solid rgba(127,227,154,0.6); background: rgba(10,12,14,0.92); color: #fff; font: 400 14px var(--font-body); outline: none; }
+.netchat-in input[hidden] { display: none; }
 @media (max-width: 560px) { .netbox { top: auto; bottom: calc(190px + env(safe-area-inset-bottom, 0px)); transform: none; } }
 .nettoast div { padding: 7px 13px; border-radius: 999px; background: rgba(12,22,16,0.9); border: 1px solid rgba(127,227,154,0.55); color: #c9f5d4; font: 500 13px var(--font-body); animation: ntin 0.25s ease-out; }
 .nettoast div.out { border-color: rgba(255,255,255,0.25); color: #d5d5d5; background: rgba(20,20,22,0.9); }
@@ -807,6 +818,10 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       <div class="netlist">
         <button class="netlist-h" id="netListH" type="button" aria-expanded="true"><span class="dot"></span><b id="netListT">Online</b><span class="chev">▾</span></button>
         <div class="netlist-rows" id="netListRows"></div>
+      </div>
+      <div class="netchat" id="netChat">
+        <div class="netchat-log" id="netChatLog" aria-live="polite"></div>
+        <form class="netchat-in" id="netChatForm" autocomplete="off"><button class="netchat-btn" id="netChatBtn" type="button" title="Chat (Enter)">💬 Chat</button><input id="netChatIn" maxlength="100" placeholder="Message… Enter to send" spellcheck="false" enterkeyhint="send" hidden></form>
       </div>
     </div>
     <div class="log net" id="netPanel" hidden role="dialog" aria-labelledby="netTitle">
@@ -7751,8 +7766,10 @@ vec3 liveryAt(vec3 p, out float fus) {
       P.on("child_added", (sn) => NET.take(sn.key, sn.val()), (e) => { netSt("The server refused the connection: check the database rules."); });
       P.on("child_changed", (sn) => NET.take(sn.key, sn.val()));
       P.on("child_removed", (sn) => NET.drop(sn.key));
-      base.child("chat").limitToLast(1).on("child_added", (sn) => { const m = sn.val(); if (!m || typeof m.m !== "string" || (m.t || 0) < NET.joinedAt || m.u === NET.uid) return;
-        RADIO.push({ text: `${String(m.n || "Pilot").slice(0, 16)}: ${m.m.slice(0, 80)}`, t: 8 }); if (S.mode !== "fly") flash(`${String(m.n || "Pilot").slice(0, 16)}: ${m.m.slice(0, 80)}`, 3); });
+      $("netChatLog").replaceChildren();
+      base.child("chat").limitToLast(25).on("child_added", (sn) => { const m = sn.val(); if (!m || typeof m.m !== "string") return;
+        const fresh = (m.t || 0) >= NET.joinedAt - 2000; chatAdd(String(m.n || "Pilot").slice(0, 16), m.m.slice(0, 100), m.u === NET.uid, !fresh);
+        if (fresh && m.u !== NET.uid && soundOn) chime(880, 0.08); });
       save("sw-netroom", /^WORLD\d$/.test(room) ? "WORLD" : room); netRender(); flash(`Online: room ${room}. Other pilots appear as green circles`, 3);
     }).catch((e) => {
       if (e && e.message === "slow" && (NET.tries = (NET.tries || 0) + 1) < 4) { netSt("Still connecting… trying again"); setTimeout(() => { if (!NET.room && !NET.joining) netJoin(); }, 1500); return; }
@@ -7763,7 +7780,25 @@ vec3 liveryAt(vec3 p, out float fus) {
     for (const o of NET.list.slice()) NET.drop(o.id, true);
     NET.ref = null; NET.room = null; NET.me = null; if (!quiet) { save("sw-netroom", ""); netRender(); } netListDraw();
   }
-  function netSayMsg(m) { if (!NET.ref) return; NET.ref.child("chat").push({ u: NET.uid, n: NET.name, m, t: Date.now() }).catch(() => {}); flash(`You: ${m}`, 1.6); }
+  function netSayMsg(m) { m = String(m).replace(/\s+/g, " ").trim().slice(0, 100); if (!NET.ref || !m) return;
+    const now = Date.now(); if (now - (NET.lastSay || 0) < 900) return; NET.lastSay = now;
+    NET.ref.child("chat").push({ u: NET.uid, n: NET.name, m, t: now }).catch(() => chatAdd("", "Message not sent", false, false, true)); }
+  function chatAdd(n, text, mine, old, sys) {
+    const log = $("netChatLog"), d = document.createElement("div");
+    if (sys) { d.className = "sys"; d.textContent = text; } else { const b = document.createElement("b"); b.textContent = mine ? "You" : n; d.append(b, document.createTextNode(text)); if (mine) d.classList.add("mine"); }
+    if (old) d.classList.add("old"); log.append(d); while (log.children.length > 40) log.firstChild.remove();
+    if (!old) setTimeout(() => d.classList.add("old"), 20000); log.scrollTop = log.scrollHeight;
+  }
+  function chatOpen(on) {
+    const inp = $("netChatIn"), c = $("netChat"); if (on && !NET.room) return;
+    c.classList.toggle("open", on); inp.hidden = !on; $("netChatBtn").hidden = on;
+    if (on) { keys.clear(); inp.focus(); $("netChatLog").scrollTop = 1e6; } else { inp.value = ""; inp.blur(); }
+  }
+  $("netChatBtn").addEventListener("click", () => chatOpen(true));
+  $("netChatForm").addEventListener("submit", (e) => { e.preventDefault(); const v = $("netChatIn").value; if (v.trim()) netSayMsg(v); chatOpen(false); });
+  $("netChatIn").addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); chatOpen(false); } });
+  $("netChatIn").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("netChatIn") && !$("netChatIn").value.trim()) chatOpen(false); }, 150));
+  window.addEventListener("keydown", (e) => { if (e.key === "Enter" && NET.room && !(e.target && e.target.closest && e.target.closest(S.mode === "fly" ? "input, select, textarea" : "input, select, textarea, button")) && $("netChatIn").hidden) { e.preventDefault(); chatOpen(true); } });
   function netRender() {
     const on = !!NET.room; $("netJoin").textContent = on ? "Leave" : "Join"; $("netVal").textContent = on ? `${NET.room} · ${NET.list.length + 1}` : "";
     netSt(on ? `In room ${NET.room}: ${NET.list.length + 1} player${NET.list.length ? "s" : ""} online. Other pilots show as green circles with their names.` : "Fly with other players in the same world. Everyone in the same room sees each other.");
