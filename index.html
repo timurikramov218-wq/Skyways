@@ -2921,7 +2921,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
   const LIV_FRAG = `varying vec3 vLp;
 uniform vec4 uGeo; uniform vec4 uZ; uniform vec4 uLn; uniform vec4 uLn2; uniform vec4 uTb; uniform vec4 uFl;
 uniform vec3 uBody; uniform vec3 uBelly; uniform vec3 uTop; uniform vec3 uStr; uniform vec3 uStr2; uniform vec3 uFin1; uniform vec3 uFin2; uniform vec3 uFin3; uniform vec3 uWing; uniform vec3 uNose; uniform vec3 uLead;
-uniform sampler2D uTitle; uniform float uCabin; uniform vec4 uEngD;
+uniform sampler2D uTitle; uniform float uCabin; uniform vec4 uEngD; uniform vec4 uWs; uniform vec4 uWs2;
 uniform vec4 uFg0; uniform vec4 uFg1; uniform vec4 uEng; uniform vec4 uEz; uniform vec3 uEngC; uniform vec3 uLip; uniform vec4 uMask; uniform vec4 uEng2; uniform vec4 uEz2; uniform float uPaintWin; uniform float uCkpt; uniform vec4 uCk; uniform vec4 uTip; uniform vec3 uTipC; uniform vec4 uAft; uniform vec3 uAftC; uniform vec4 uUp; uniform float uHump; uniform vec4 uDoor; uniform vec2 uDoorB; uniform vec2 uWinR; uniform float uHideWin; uniform float uPitch; uniform vec4 uEmb; uniform vec3 uEmbC; uniform vec3 uEmbC2; uniform sampler2D uFinTex; uniform sampler2D uRegTex; uniform float uHasReg;
 float gMask = 0.0, gGlass = 0.0, gHide = 0.0;   // set when a pixel lies in the A350 mask: then even the model's own dark glass is repainted
 vec3 liveryAt(vec3 p, out float fus) {
@@ -2997,6 +2997,16 @@ vec3 liveryAt(vec3 p, out float fus) {
           if (ww < 0.3) gl = 1.0; else if (ww > 0.33 && ww < 0.5) gl = 1.0; else if (ww > 0.53 && ww < 0.66 && mv < 0.82 - (ww - 0.53)) gl = 1.0;
         }
         if (gl > 0.5) { c = mix(vec3(0.012, 0.016, 0.022), vec3(0.03, 0.038, 0.05), smoothstep(0.3, 0.86, mv)); gGlass = 1.0; }   // glass: a touch bluer, and glossy
+      }
+    }
+    if (uWs2.z > 0.5 && p.z > uWs.x && p.z < uWs.y) {   // flight-deck windscreen that follows the nose: a band just under the top line, framed panes
+      // a near-horizontal slab cut through the nose: it meets the surface in a loop round the front and both sides
+      float y0 = uWs.z + uWs.w * (p.z - uWs.y), y1 = y0 + uWs2.x;
+      float a = atan(abs(p.x), uWs.y + 1.2 - p.z);
+      if (p.y > y0 && p.y < y1 && a < 1.42) {
+        float post = min(min(abs(a - 0.0), abs(a - 0.52)), abs(a - 1.0)), aa = max(fwidth(a), 0.004);
+        c = mix(vec3(0.025, 0.03, 0.04), c * 0.9, 1.0 - smoothstep(0.03 - aa, 0.03 + aa, post));
+        float edge = min(p.y - y0, y1 - p.y); if (edge < 0.035) c *= 0.85;
       }
     }
     if (uPaintWin > 0.5 && abs(p.x) > R * 0.5) {
@@ -3075,7 +3085,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       uZ: { value: new THREE.Vector4(o.zNose, o.zTail, o.win, 0) },
       uLn: { value: new THREE.Vector4(L.belly ? L.bellyY : -9, L.top ? L.topY : 9, L.stripe ? L.stripe[1] : 9, L.stripe ? L.stripe[2] : 9) },
       uLn2: { value: new THREE.Vector4(L.stripe2 ? L.stripe2[1] : 9, L.stripe2 ? L.stripe2[2] : 9, L.rise || 0, 0) },
-      uTb: { value: new THREE.Vector4(tz0, tz0 + tw, L.titleY ?? 0.07, (L.titleY ?? 0.07) + tw / 16 / o.R) }, uEngD: { value: (() => { const c = new THREE.Color(L.engDisc || "#000000").convertSRGBToLinear(); return new THREE.Vector4(c.r, c.g, c.b, L.engDisc ? 1 : 0); })() },
+      uTb: { value: new THREE.Vector4(tz0, tz0 + tw, L.titleY ?? 0.07, (L.titleY ?? 0.07) + tw / 16 / o.R) }, uWs: { value: o.ws ? new THREE.Vector4(o.ws[0], o.ws[1], o.ws[2], o.ws[3]) : new THREE.Vector4() }, uWs2: { value: o.ws ? new THREE.Vector4(o.ws[4], 0, 1, 0) : new THREE.Vector4() }, uEngD: { value: (() => { const c = new THREE.Color(L.engDisc || "#000000").convertSRGBToLinear(); return new THREE.Vector4(c.r, c.g, c.b, L.engDisc ? 1 : 0); })() },
       uFl: { value: new THREE.Vector4(L.title ? 1 : 0, L.nose ? 1 : 0, L.finLead ? 1 : 0, L.finMode || 0) },
       uBody: V3(L.body || white), uBelly: V3(L.belly || white), uTop: V3(L.top || white), uStr: V3(L.stripe ? L.stripe[0] : white), uStr2: V3(L.stripe2 ? L.stripe2[0] : white),
       uFin1: V3(fin[0]), uFin2: V3(fin[1] || fin[0]), uFin3: V3(fin[2] || fin[1] || fin[0]), uWing: V3(L.wing || "#d9dde1"), uNose: V3(L.nose || white), uLead: V3(L.finLead || white),
@@ -3617,12 +3627,12 @@ vec3 liveryAt(vec3 p, out float fus) {
   // F-15: the model's own grey paint, no airline liveries; its gear legs replaced by retracting ones in the same places
   // A380, MD-11F and Concorde: their own painted colours (baked from the models' textures), merged into one mesh each; game gear added
   PACK_OPTS.a380 = { cy: 1.33, R: 3.56, win: -0.08, zNose: -36.35, zTail: 36.35, finTop: 19.19, fin: [7.2, 19.19, 24.5, 35.6, 31.4, 36.26], eng: [10.8, -1.35, 1.55, -13.1, -6.6], eng2: [15.9, -2.6, 1.5, -13.6, -7.2],
-    paintWindows: true, upper: [-28.5, 52, 4.45, 1], doors: [0.12, 0.3, 0.5, 0.7, 0.86], winRange: [0.1, 0.88], ckF: [0.03, 0.062], tailZ: 36, beaconY: 6.2,
+    ws: [-36.4, -32.4, 1.55, 0.16, 0.62], paintWindows: true, upper: [-28.5, 52, 4.45, 1], doors: [0.12, 0.3, 0.5, 0.7, 0.86], winRange: [0.1, 0.88], ckF: [0, 0], tailZ: 36, beaconY: 6.2,
     bodyOnly: true, addGear: true, gearH: 5.4, wheelR: 0.7, bogie: true, mainX: 5.9, mainZ: 2.2, bodyGear: [2.5, 5.4], noseZ: -29.5 };
-  PACK_OPTS.md11 = { cy: 0.3, R: 3.17, win: 0.2, zNose: -30.8, zTail: 30.8, finTop: 12.66, fin: [8.0, 12.66, 20.5, 29.6, 25.1, 27.8], eng: [8.3, -2.0, 1.45, -6.8, -1.2], eng2: [0, 5.8, 1.35, 17.0, 26.0],
+  PACK_OPTS.md11 = { cy: 0.3, R: 3.17, win: 0.2, zNose: -30.8, zTail: 30.8, finTop: 12.66, fin: [8.0, 12.66, 20.5, 29.6, 25.1, 27.8], ws: [-31.0, -27.3, 1.1, 0.13, 0.6], eng: [8.3, -2.0, 1.45, -6.8, -1.2], eng2: [0, 5.8, 1.35, 17.0, 26.0],
     tailZ: 30.5, beaconY: 3.6, bodyOnly: true, addGear: true, gearH: 4.8, wheelR: 0.62, bogie: true, mainX: 5.2, mainZ: 4.2, noseZ: -25.8 };
-  PACK_OPTS.concorde = { cy: -0.14, R: 1.53, win: 0.25, zNose: -30.83, zTail: 30.83, finTop: 6.72, fin: [1.8, 6.72, 13.7, 25.9, 21.9, 25.1], eng: [3.3, -1.65, 0.95, 7.0, 17.2],
-    paintWindows: true, pitch: 0.42, doors: [0.2, 0.62, -5, -5, -5], winRange: [0.18, 0.78], ckF: [0.095, 0.125], tailZ: 30.5, beaconY: 1.6,
+  PACK_OPTS.concorde = { cy: -0.14, R: 1.53, win: 0.25, zNose: -30.83, zTail: 30.83, finTop: 6.72, fin: [1.8, 6.72, 13.7, 25.9, 21.9, 25.1], ws: [-26.6, -23.7, 0.3, 0.1, 0.3], eng: [3.3, -1.65, 0.95, 7.0, 17.2],
+    paintWindows: true, pitch: 0.42, doors: [0.2, 0.62, -5, -5, -5], winRange: [0.18, 0.78], ckF: [0, 0], tailZ: 30.5, beaconY: 1.6,
     bodyOnly: true, addGear: true, gearH: 5.0, wheelR: 0.5, bogie: true, mainX: 3.85, mainZ: 7.5, noseZ: -11.5 };
   PACK_OPTS.f15 = { plain: true, bodyOnly: true, addGear: true, gearH: 2.0, wheelR: 0.42, mainX: 1.8, mainZ: 4.5, noseZ: -2.2 };
   function buildF15model() { return buildPacked("f15", packOpts("f15")); }
