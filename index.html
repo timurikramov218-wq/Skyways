@@ -375,6 +375,9 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .netrow.me { background: rgba(255,255,255,0.05); }
 .netrow i { grid-row: span 2; width: 8px; height: 8px; border-radius: 50%; background: #7fe39a; }
 .netrow i.paused { background: #ffc94d; } .netrow i.menu { background: #8a8a90; } .netrow i.ground { background: #78beff; }
+.netrow.me { cursor: pointer; } .netrow.me:hover { background: rgba(255,255,255,0.1); }
+.netrow b em { font-style: normal; color: var(--fg-3); margin-left: 6px; font-weight: 400; }
+.netrename { width: 100%; min-width: 0; padding: 3px 7px; border-radius: 6px; border: 1px solid rgba(127,227,154,0.6); background: rgba(10,12,14,0.92); color: #fff; font: 600 12.5px var(--font-body); outline: none; }
 .netrow b { font: 600 12.5px var(--font-body); color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .netrow span { font: 400 11px var(--font-body); color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .netchat { pointer-events: auto; display: grid; gap: 6px; justify-items: start; width: min(300px, 70vw); }
@@ -7709,6 +7712,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       let o = this.by.get(id); const fresh = !o;
       if (o && (o.k !== k || o.l !== l)) { if (o.model) scene.remove(o.model); o.model = null; }
       if (!o) { o = { id, p: new THREE.Vector3(), q: new THREE.Quaternion(), v: new THREE.Vector3(), model: null }; this.by.set(id, o); this.list.push(o); }
+      if (o.n && o.n !== n) { netToast(`${o.n} is now ${n}`); chatAdd("", `${o.n} is now ${n}`, false, false, true); }
       o.k = k; o.l = l; o.n = n; o.g = d.g; o.s = ["air", "ground", "paused", "menu"].includes(d.s) ? d.s : "air"; o.a = AP_BY[d.a] ? d.a : ""; o.p.fromArray(d.p); o.q.fromArray(d.q).normalize(); o.v.fromArray(num(d.v || [], 3) ? d.v : [0, 0, 0]); o.at = performance.now();
       if (fresh) { netRender(); netToast(Date.now() - this.joinedAt > 3000 ? `${n} joined · ${PLANES[k].name}` : `${n} is online · ${PLANES[k].name}`); }
     },
@@ -7721,19 +7725,41 @@ vec3 liveryAt(vec3 p, out float fus) {
       for (const id of ["apPanel", "atcPanel", "svc"]) { const e = $(id); if (e && !e.hidden && e.offsetParent) { const r = e.getBoundingClientRect(); if (r.left - st.left < 260) y = Math.max(y, r.bottom - st.top + 8); } }
       box.style.top = y ? `${Math.round(y)}px` : ""; }
     $("netListT").textContent = `Online · ${NET.room} · ${NET.list.length + 1}`;
-    const rows = $("netListRows"); if ($("netListH").getAttribute("aria-expanded") === "false") return; rows.replaceChildren();
+    const rows = $("netListRows"); if ($("netListH").getAttribute("aria-expanded") === "false" || NET.editing) return;
     const me = { n: `${NET.name} (you)`, k: spec.kind, s: S.mode === "fly" ? (S.grounded ? "ground" : "air") : S.mode === "paused" ? "paused" : "menu", a: S.from ? S.from.code : "", me: true };
-    for (const o of [me].concat(NET.list.slice().sort((a, b) => (a.s === "menu") - (b.s === "menu") || a.n.localeCompare(b.n)))) {
-      const r = document.createElement("div"), dot = document.createElement("i"), nm = document.createElement("b"), sub = document.createElement("span");
-      r.className = "netrow" + (o.me ? " me" : ""); dot.className = o.s; nm.textContent = o.n;
+    const all = [me].concat(NET.list.slice().sort((a, b) => (a.s === "menu") - (b.s === "menu") || a.n.localeCompare(b.n)));
+    while (rows.children.length > all.length) rows.lastChild.remove();
+    all.forEach((o, i) => {   // rows are updated in place so a tap on one never lands on a node that was just replaced
+      let r = rows.children[i];
+      if (!r) { r = document.createElement("div"); r.append(document.createElement("i"), document.createElement("b"), document.createElement("span")); rows.append(r);
+        r.addEventListener("click", () => { if (r.classList.contains("me")) netRenameRow(r, r.children[1]); }); }
+      const [dot, nm, sub] = r.children;
+      r.className = "netrow" + (o.me ? " me" : ""); r.title = o.me ? "Tap to change your name" : ""; dot.className = o.s;
+      nm.textContent = o.n; if (o.me) { const pen = document.createElement("em"); pen.textContent = "✎"; nm.append(pen); }
       const dist = !o.me && o.s !== "menu" && S.mode !== "brief" ? ` · ${(o.p.distanceTo(S.pos) / 1000).toFixed(1)} km` : "";
       sub.textContent = `${PLANES[o.k] ? PLANES[o.k].name : ""} · ${NST[o.s]}${o.s === "ground" && o.a ? " at " + o.a : ""}${dist}`;
-      r.append(dot, nm, sub); rows.append(r);
-    }
+    });
   }
   $("netListH").addEventListener("click", () => { const h = $("netListH"), on = h.getAttribute("aria-expanded") !== "true"; h.setAttribute("aria-expanded", String(on)); $("netListRows").hidden = !on; save("sw-netlist", on ? "1" : "0"); netListDraw(); });
   if (load("sw-netlist") === "0" || (load("sw-netlist") === null && matchMedia("(max-width: 560px)").matches)) { $("netListH").setAttribute("aria-expanded", "false"); $("netListRows").hidden = true; }
   setInterval(netListDraw, 1000);
+  function netCleanName(v) { return String(v || "").replace(/[^\p{L}\p{N} ._-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 16); }
+  function netRename(v) {
+    const n = netCleanName(v); if (!n || n === NET.name) return false;
+    NET.name = n; save("sw-netname", n); $("netName").value = n; NET.sendT = 0;
+    if (NET.room) { chatAdd("", `You are now ${n}`, false, false, true); }
+    netRender(); netListDraw(); return true;
+  }
+  function netRenameRow(r, nm) {
+    if (NET.editing) return; NET.editing = true;
+    const inp = document.createElement("input"); inp.className = "netrename"; inp.maxLength = 16; inp.value = NET.name; inp.spellcheck = false; inp.setAttribute("enterkeyhint", "done");
+    nm.replaceWith(inp); keys.clear(); inp.focus(); inp.select();
+    let done = false; const fin = (ok) => { if (done) return; done = true; NET.editing = false; inp.replaceWith(nm); if (ok) netRename(inp.value); netListDraw(); };
+    inp.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") { e.preventDefault(); fin(true); } else if (e.key === "Escape") { e.preventDefault(); fin(false); } });
+    inp.addEventListener("click", (e) => e.stopPropagation());
+    inp.addEventListener("blur", () => fin(true));
+  }
+  $("netName").addEventListener("change", () => { if (NET.room) netRename($("netName").value); });
   function netToast(text, out) { const box = $("netToast"), d = document.createElement("div"); d.textContent = text; if (out) d.className = "out"; box.append(d); while (box.children.length > 4) box.firstChild.remove(); setTimeout(() => d.remove(), 4500); if (soundOn) chime(out ? 420 : 760, 0.12); }
   const netPanel = $("netPanel"), netSt = (t) => { $("netStatus").textContent = t; };
   function netLoad() {
