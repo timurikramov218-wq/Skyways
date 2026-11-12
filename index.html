@@ -5436,8 +5436,6 @@ vec3 liveryAt(vec3 p, out float fus) {
     const id = ++crashId;
     setTimeout(() => {
       if (id !== crashId || !S.crashed) return;   // a new flight was started meanwhile
-      if (S.shotDown) {   // shot down online: no incident report, back on the runway a moment later
-        flash("Shot down! Starting again…", 2); setTimeout(() => { if (id === crashId && S.crashed) { S.shotDown = false; if (S.mission) { S.mode = "over"; missionResult(false, { reason }); } else startFlight(); } }, 1800); return; }
       S.mode = "over";
       if (S.mission) { missionResult(false, { reason }); return; }
       const p = document.createElement("p"); p.className = "result bad"; p.textContent = reason;
