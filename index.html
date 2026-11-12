@@ -356,6 +356,7 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .log h3 { margin: 0; font: 400 22px var(--font-display); }
 /* career */
 .net-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; } .net-row label { display: grid; gap: 4px; font: 400 11px var(--font-body); color: var(--fg-3); flex: 1 1 130px; }
+.net-row input.need { border-color: #ffc94d; box-shadow: 0 0 0 2px rgba(255,201,77,0.3); } .net-row input:disabled { opacity: 0.55; }
 .net-row input { font: 400 15px var(--font-body); padding: 9px 12px; border-radius: 10px; border: 1px solid var(--hair); background: #101013; color: var(--fg); min-width: 0; text-transform: none; }
 #netRoom { text-transform: uppercase; }
 .net-list { display: grid; gap: 4px; } .net-list div { display: flex; justify-content: space-between; gap: 10px; padding: 7px 10px; border-radius: 8px; background: var(--g1); font: 400 13px var(--font-body); color: var(--fg-2); } .net-list span { font: 400 11px var(--font-mono); color: var(--fg-3); }
@@ -375,9 +376,6 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .netrow.me { background: rgba(255,255,255,0.05); }
 .netrow i { grid-row: span 2; width: 8px; height: 8px; border-radius: 50%; background: #7fe39a; }
 .netrow i.paused { background: #ffc94d; } .netrow i.menu { background: #8a8a90; } .netrow i.ground { background: #78beff; }
-.netrow.me { cursor: pointer; } .netrow.me:hover { background: rgba(255,255,255,0.1); }
-.netrow b em { font-style: normal; color: var(--fg-3); margin-left: 6px; font-weight: 400; }
-.netrename { width: 100%; min-width: 0; padding: 3px 7px; border-radius: 6px; border: 1px solid rgba(127,227,154,0.6); background: rgba(10,12,14,0.92); color: #fff; font: 600 12.5px var(--font-body); outline: none; }
 .netrow b { font: 600 12.5px var(--font-body); color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .netrow span { font: 400 11px var(--font-body); color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .netchat { pointer-events: auto; display: grid; gap: 6px; justify-items: start; width: min(300px, 70vw); }
@@ -7725,17 +7723,15 @@ vec3 liveryAt(vec3 p, out float fus) {
       for (const id of ["apPanel", "atcPanel", "svc"]) { const e = $(id); if (e && !e.hidden && e.offsetParent) { const r = e.getBoundingClientRect(); if (r.left - st.left < 260) y = Math.max(y, r.bottom - st.top + 8); } }
       box.style.top = y ? `${Math.round(y)}px` : ""; }
     $("netListT").textContent = `Online · ${NET.room} · ${NET.list.length + 1}`;
-    const rows = $("netListRows"); if ($("netListH").getAttribute("aria-expanded") === "false" || NET.editing) return;
+    const rows = $("netListRows"); if ($("netListH").getAttribute("aria-expanded") === "false") return;
     const me = { n: `${NET.name} (you)`, k: spec.kind, s: S.mode === "fly" ? (S.grounded ? "ground" : "air") : S.mode === "paused" ? "paused" : "menu", a: S.from ? S.from.code : "", me: true };
     const all = [me].concat(NET.list.slice().sort((a, b) => (a.s === "menu") - (b.s === "menu") || a.n.localeCompare(b.n)));
     while (rows.children.length > all.length) rows.lastChild.remove();
     all.forEach((o, i) => {   // rows are updated in place so a tap on one never lands on a node that was just replaced
       let r = rows.children[i];
-      if (!r) { r = document.createElement("div"); r.append(document.createElement("i"), document.createElement("b"), document.createElement("span")); rows.append(r);
-        r.addEventListener("click", () => { if (r.classList.contains("me")) netRenameRow(r, r.children[1]); }); }
+      if (!r) { r = document.createElement("div"); r.append(document.createElement("i"), document.createElement("b"), document.createElement("span")); rows.append(r); }
       const [dot, nm, sub] = r.children;
-      r.className = "netrow" + (o.me ? " me" : ""); r.title = o.me ? "Tap to change your name" : ""; dot.className = o.s;
-      nm.textContent = o.n; if (o.me) { const pen = document.createElement("em"); pen.textContent = "✎"; nm.append(pen); }
+      r.className = "netrow" + (o.me ? " me" : ""); dot.className = o.s; nm.textContent = o.n;
       const dist = !o.me && o.s !== "menu" && S.mode !== "brief" ? ` · ${(o.p.distanceTo(S.pos) / 1000).toFixed(1)} km` : "";
       sub.textContent = `${PLANES[o.k] ? PLANES[o.k].name : ""} · ${NST[o.s]}${o.s === "ground" && o.a ? " at " + o.a : ""}${dist}`;
     });
@@ -7744,22 +7740,6 @@ vec3 liveryAt(vec3 p, out float fus) {
   if (load("sw-netlist") === "0" || (load("sw-netlist") === null && matchMedia("(max-width: 560px)").matches)) { $("netListH").setAttribute("aria-expanded", "false"); $("netListRows").hidden = true; }
   setInterval(netListDraw, 1000);
   function netCleanName(v) { return String(v || "").replace(/[^\p{L}\p{N} ._-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 16); }
-  function netRename(v) {
-    const n = netCleanName(v); if (!n || n === NET.name) return false;
-    NET.name = n; save("sw-netname", n); $("netName").value = n; NET.sendT = 0;
-    if (NET.room) { chatAdd("", `You are now ${n}`, false, false, true); }
-    netRender(); netListDraw(); return true;
-  }
-  function netRenameRow(r, nm) {
-    if (NET.editing) return; NET.editing = true;
-    const inp = document.createElement("input"); inp.className = "netrename"; inp.maxLength = 16; inp.value = NET.name; inp.spellcheck = false; inp.setAttribute("enterkeyhint", "done");
-    nm.replaceWith(inp); keys.clear(); inp.focus(); inp.select();
-    let done = false; const fin = (ok) => { if (done) return; done = true; NET.editing = false; inp.replaceWith(nm); if (ok) netRename(inp.value); netListDraw(); };
-    inp.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Enter") { e.preventDefault(); fin(true); } else if (e.key === "Escape") { e.preventDefault(); fin(false); } });
-    inp.addEventListener("click", (e) => e.stopPropagation());
-    inp.addEventListener("blur", () => fin(true));
-  }
-  $("netName").addEventListener("change", () => { if (NET.room) netRename($("netName").value); });
   function netToast(text, out) { const box = $("netToast"), d = document.createElement("div"); d.textContent = text; if (out) d.className = "out"; box.append(d); while (box.children.length > 4) box.firstChild.remove(); setTimeout(() => d.remove(), 4500); if (soundOn) chime(out ? 420 : 760, 0.12); }
   const netPanel = $("netPanel"), netSt = (t) => { $("netStatus").textContent = t; };
   function netLoad() {
@@ -7776,7 +7756,9 @@ vec3 liveryAt(vec3 p, out float fus) {
   const netAuth = () => (NET.user ? Promise.resolve(NET.user) : firebase.auth().signInAnonymously().then((c) => c.user));
   function netJoin() {
     const room = ($("netRoom").value || "WORLD").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12) || "WORLD"; $("netRoom").value = room;
-    NET.name = ($("netName").value || "").replace(/[^\p{L}\p{N} ._-]/gu, "").trim().slice(0, 16) || `Pilot ${Math.floor(100 + Math.random() * 900)}`; $("netName").value = NET.name; save("sw-netname", NET.name);
+    const nm = netCleanName($("netName").value); $("netName").value = nm;
+    if (!nm) { netSt("Type your name first — that's what other pilots will see."); $("netName").classList.add("need"); netPanel.hidden = false; $("netName").focus(); return false; }
+    $("netName").classList.remove("need"); NET.name = nm; save("sw-netname", nm);
     netSt("Connecting…"); $("netJoin").disabled = true; NET.joining = true;
     const slow = new Promise((_, rej) => setTimeout(() => rej(new Error("slow")), 25000));
     Promise.race([netLoad().then(netAuth), slow]).then(async (u) => {
@@ -7826,7 +7808,8 @@ vec3 liveryAt(vec3 p, out float fus) {
   $("netChatIn").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("netChatIn") && !$("netChatIn").value.trim()) chatOpen(false); }, 150));
   window.addEventListener("keydown", (e) => { if (e.key === "Enter" && NET.room && !(e.target && e.target.closest && e.target.closest(S.mode === "fly" ? "input, select, textarea" : "input, select, textarea, button")) && $("netChatIn").hidden) { e.preventDefault(); chatOpen(true); } });
   function netRender() {
-    const on = !!NET.room; $("netJoin").textContent = on ? "Leave" : "Join"; $("netVal").textContent = on ? `${NET.room} · ${NET.list.length + 1}` : "";
+    const on = !!NET.room; $("netName").disabled = on; $("netName").title = on ? "Leave the room to change your name" : "";
+    $("netJoin").textContent = on ? "Leave" : "Join"; $("netVal").textContent = on ? `${NET.room} · ${NET.list.length + 1}` : "";
     netSt(on ? `In room ${NET.room}: ${NET.list.length + 1} player${NET.list.length ? "s" : ""} online. Other pilots show as green circles with their names.` : "Fly with other players in the same world. Everyone in the same room sees each other.");
     const L = $("netList"); L.replaceChildren();
     if (on) { const me = document.createElement("div"); me.textContent = `${NET.name} (you)`; L.append(me);
@@ -7869,17 +7852,19 @@ vec3 liveryAt(vec3 p, out float fus) {
       return a.signInWithPopup(new firebase.auth.GoogleAuthProvider());
     }).catch((e) => { netSt(e && e.code === "auth/popup-blocked" ? "The browser blocked the sign-in window: allow pop-ups for this site and try again." : "Sign-in didn't complete. It works on the game's website."); });
   });
-  function openNet() { $("moreMenu").hidden = true; if (S.mode === "fly") pause(); $("netName").value = load("sw-netname") || ""; netRender(); netAccount(); netPanel.hidden = false; }
+  function openNet() { $("moreMenu").hidden = true; if (S.mode === "fly") pause(); $("netName").value = load("sw-netname") || ""; netRender(); netAccount(); netPanel.hidden = false; if (!NET.room && !$("netName").value) setTimeout(() => $("netName").focus(), 50); }
   $("netBtn").addEventListener("click", openNet); $("wOnline").addEventListener("click", openNet);
   $("netClose").addEventListener("click", () => { netPanel.hidden = true; });
   $("netJoin").addEventListener("click", () => { if (NET.room) netLeave(); else netJoin(); });
   // one button: connect if needed, then straight into the game (back to your flight, or to the hangar to pick an aircraft)
   const netGo = () => { netPanel.hidden = true; if (S.mode === "paused") resume(); else if (S.mode !== "fly") toHangar(); };
-  $("netPlay").addEventListener("click", () => { if (!NET.room && !NET.joining) netJoin(); netGo(); });
+  $("netPlay").addEventListener("click", () => { if (!NET.room && !NET.joining && netJoin() === false) return; netGo(); });
+  $("netName").addEventListener("input", () => $("netName").classList.remove("need"));
+  $("netName").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("netPlay").click(); } });
   setInterval(() => { if (!netPanel.hidden && NET.room) netRender(); else if (NET.room) $("netVal").textContent = `${NET.room} · ${NET.list.length + 1}`; const w = $("wOnline"); if (w) w.textContent = NET.room ? `Online · ${NET.list.length + 1}` : "Online"; }, 2000);
   setInterval(() => { if (NET.room && document.hidden) NET.send(); }, 1000);   // a tab in the background still tells the others where it is
   // online by default: everyone lands in the shared room WORLD (or the room they chose last) unless they left it
-  setTimeout(() => { const r = load("sw-netroom"); if (r === "" || NET.room || NET.joining) return; $("netRoom").value = r || "WORLD"; $("netName").value = load("sw-netname") || ""; netJoin(); }, 3500);
+  setTimeout(() => { const r = load("sw-netroom"); if (r === "" || !load("sw-netname") || NET.room || NET.joining) return; $("netRoom").value = r || "WORLD"; $("netName").value = load("sw-netname") || ""; netJoin(); }, 3500);
   window.addEventListener("pagehide", () => { if (NET.me) NET.me.remove(); });
   if (load("sw-cloud-t")) setTimeout(() => netLoad().catch(() => {}), 4000);   // signed in before: reconnect the cloud save quietly
   // ---------- step by step: welcome screen → hangar (aircraft and livery) → route and conditions → take off ----------
