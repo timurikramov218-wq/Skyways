@@ -7750,13 +7750,13 @@ vec3 liveryAt(vec3 p, out float fus) {
   const GV = new THREE.Vector3(), GW = new THREE.Vector3(), GF = new THREE.Vector3(), GQ = new THREE.Quaternion(), GE = new THREE.Euler();
   function gunTargets() {   // other online pilots, and airborne traffic
     const out = [];
-    for (const o of NET.list) if (o.s !== "menu" && o.model && o.model.visible && !(o.deadT > performance.now())) out.push({ p: o.model.position, net: o, r: 16 });
-    for (const ai of AI) if (ai.model && ai.model.visible && !(ai.deadT > 0) && ai.pos.y > groundY(ai.pos.x, ai.pos.z) + 15) out.push({ p: ai.pos, ai, r: ai.sp && ai.sp.big ? 26 : 18 });
+    for (const o of NET.list) if (o.s !== "menu" && o.model && !(o.deadT > performance.now())) out.push({ p: o.model.position, net: o, r: 16 });
+    for (const ai of AI) if (ai.model && (ai.model.visible || ai.farHide) && !(ai.deadT > 0) && ai.pos.y > groundY(ai.pos.x, ai.pos.z) + 15) out.push({ p: ai.pos, ai, r: ai.sp && ai.sp.big ? 26 : 18 });
     return out;
   }
-  function gunPick() {   // the target closest to the nose, within 40° and 7 km
-    GF.set(0, 0, -1).applyQuaternion(S.q); let best = null, bs = 1e9;
-    for (const t of gunTargets()) { GV.copy(t.p).sub(S.pos); const d = GV.length(); if (d < 30 || d > 7000) continue; const c = GV.dot(GF) / d; if (c < 0.77) continue; const sc = (1 - c) * 9000 + d; if (sc < bs) { bs = sc; best = t; } }
+  function gunPick(from) {   // the nearest target in any direction (online pilots and airborne traffic), up to 25 km
+    const at = from || S.pos; let best = null, bd = 25000;
+    for (const t of gunTargets()) { const d = t.p.distanceTo(at); if (d > 40 && d < bd) { bd = d; best = t; } }
     return best;
   }
   function gunFx(p, big) { const f = GUN.fx.find((x) => x.t > 0.6) || GUN.fx[0]; f.t = 0; f.big = big; f.m.position.copy(p); f.m.visible = true; }
@@ -7786,13 +7786,14 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (S.mode !== "fly") return;
     if (GUN.jolt > 0 && !S.crashed) { GUN.jolt -= dt; GQ.setFromEuler(GE.set((Math.random() - 0.5) * 0.02, 0, (Math.random() - 0.5) * 0.04)); S.q.multiply(GQ).normalize(); }
     for (const r of GUN.rounds) {
-      if (!r.m.visible) continue; r.t += dt; if (r.t > 10) { gunFx(r.m.position, true); r.m.visible = false; continue; }
+      if (!r.m.visible) continue; r.t += dt; if (r.t > 30) { gunFx(r.m.position, true); r.m.visible = false; continue; }
       const sp = Math.min(780, r.v.length() + (r.t > 0.25 ? 420 : 40) * dt);   // drops off the rail, then the motor lights
-      if (r.tg && r.t > 0.25 && (r.tg.ai ? !(r.tg.ai.deadT > 0) : !(r.tg.net.deadT > performance.now()))) {   // proportional-ish homing on the led target position
+      if (r.t > 0.25 && (!r.tg || (r.tg.ai ? r.tg.ai.deadT > 0 : r.tg.net.deadT > performance.now() || !NET.by.has(r.tg.net.id)))) r.tg = gunPick(r.m.position);   // target gone: lock the nearest one
+      if (r.tg && r.t > 0.25) {   // proportional-ish homing on the led target position
         GV.copy(r.tg.p); if (r.tg.net) GV.addScaledVector(r.tg.net.v, Math.min(2, r.m.position.distanceTo(GV) / sp));
         GV.sub(r.m.position); const d = GV.length();
         if (d < r.tg.r + 6 + sp * dt) { gunHit(r.tg, r.m.position); r.m.visible = false; continue; }
-        GV.multiplyScalar(sp / d); r.v.lerp(GV, Math.min(1, dt * 4.5));
+        GV.multiplyScalar(sp / d); r.v.lerp(GV, Math.min(1, dt * 6));
       } else if (r.t <= 0.25) r.v.y -= 9.8 * dt;
       r.v.setLength(sp); r.m.position.addScaledVector(r.v, dt); GW.copy(r.m.position).add(r.v); r.m.lookAt(GW);
       r.m.children[2].visible = r.t > 0.25; r.m.children[2].scale.setScalar(0.8 + Math.random() * 0.5);
