@@ -362,10 +362,25 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .net-say { display: flex; flex-wrap: wrap; gap: 6px; }
 .net-acc { flex: 1 1 240px; display: grid; gap: 3px; } .net-acc b { font: 600 14px var(--font-body); } .net-acc span { font: 400 12px var(--font-body); color: var(--fg-3); }
 #netPanel { z-index: 13; }
-.nettoast { position: absolute; right: 14px; top: calc(110px + env(safe-area-inset-top, 0px)); z-index: 14; display: grid; gap: 6px; justify-items: end; pointer-events: none; }
+.netbox { position: absolute; left: 14px; top: calc(70px + env(safe-area-inset-top, 0px)); z-index: 4; display: grid; gap: 8px; justify-items: start; max-width: min(230px, 46vw); pointer-events: none; }
+.netbox[hidden] { display: none; }
+.nettoast { display: grid; gap: 6px; justify-items: start; }
+.netlist { pointer-events: auto; background: rgba(14,15,18,0.72); border: 1px solid var(--hair); border-radius: 12px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); overflow: hidden; min-width: 170px; }
+.netlist-h { display: flex; align-items: center; gap: 7px; width: 100%; padding: 7px 10px; background: none; border: 0; color: var(--fg); font: 600 12px var(--font-body); letter-spacing: 0.04em; cursor: pointer; text-align: left; }
+.netlist-h .dot { width: 7px; height: 7px; border-radius: 50%; background: #7fe39a; box-shadow: 0 0 6px #7fe39a; } .netlist-h .chev { margin-left: auto; color: var(--fg-3); transition: transform 0.15s; }
+.netlist-h[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+.netlist-rows { display: grid; gap: 2px; padding: 0 6px 6px; max-height: 30vh; overflow-y: auto; }
+.netlist-rows[hidden] { display: none; }
+.netrow { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 8px; align-items: center; padding: 5px 6px; border-radius: 8px; }
+.netrow.me { background: rgba(255,255,255,0.05); }
+.netrow i { grid-row: span 2; width: 8px; height: 8px; border-radius: 50%; background: #7fe39a; }
+.netrow i.paused { background: #ffc94d; } .netrow i.menu { background: #8a8a90; } .netrow i.ground { background: #78beff; }
+.netrow b { font: 600 12.5px var(--font-body); color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.netrow span { font: 400 11px var(--font-body); color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 560px) { .netbox { top: auto; bottom: calc(190px + env(safe-area-inset-bottom, 0px)); transform: none; } }
 .nettoast div { padding: 7px 13px; border-radius: 999px; background: rgba(12,22,16,0.9); border: 1px solid rgba(127,227,154,0.55); color: #c9f5d4; font: 500 13px var(--font-body); animation: ntin 0.25s ease-out; }
 .nettoast div.out { border-color: rgba(255,255,255,0.25); color: #d5d5d5; background: rgba(20,20,22,0.9); }
-@keyframes ntin { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+@keyframes ntin { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: none; } }
 /* career page */
 .cpage { position: absolute; inset: 0; z-index: 12; background: radial-gradient(120% 90% at 20% 0%, #1d1c20 0%, #0d0d10 70%); overflow: auto; color: var(--fg); }
 .cp-in { box-sizing: border-box; width: min(980px, 100%); margin: 0 auto; padding: calc(22px + env(safe-area-inset-top, 0px)) 20px 40px; display: grid; gap: 14px; }
@@ -787,7 +802,13 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       </div>
     </div>
     <div class="jobbar" id="jobBar" hidden aria-live="off"></div>
-    <div class="nettoast" id="netToast" aria-live="polite"></div>
+    <div class="netbox" id="netBox" hidden>
+      <div class="nettoast" id="netToast" aria-live="polite"></div>
+      <div class="netlist">
+        <button class="netlist-h" id="netListH" type="button" aria-expanded="true"><span class="dot"></span><b id="netListT">Online</b><span class="chev">▾</span></button>
+        <div class="netlist-rows" id="netListRows"></div>
+      </div>
+    </div>
     <div class="log net" id="netPanel" hidden role="dialog" aria-labelledby="netTitle">
       <div class="log-head"><h3 id="netTitle">Online</h3><div class="log-acts"><button class="chip" id="netClose" type="button">Close</button></div></div>
       <p class="cp-note" id="netStatus">Fly with other players in the same world. Everyone in the same room sees each other.</p>
@@ -6099,6 +6120,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       hud.fillText(`${PLANES[ai.kind].name}`, sx + 12, sy - 7); hud.fillText(`${ai.air || "Skyways"} · ${(d / 1000).toFixed(1)} km ${dy >= 0 ? "+" : ""}${dy}`, sx + 12, sy + 8);
     }
     for (const o of NET.list) {   // other players: a green marker with the name
+      if (o.s === "menu") continue;
       const op = o.model ? o.model.position : o.p, d = op.distanceTo(S.pos); if (d > 20000) continue;
       proj.copy(op).project(camera); let off = false;
       if (proj.z > 1) { proj.x = -proj.x; proj.y = -proj.y; off = true; }
@@ -7627,12 +7649,13 @@ vec3 liveryAt(vec3 p, out float fus) {
   const NET = { list: [], by: new Map(), room: null, ref: null, uid: null, user: null, ready: null, sendT: 0, joinedAt: 0, cloudT: 0,
     tick(dt, now) { if (this.room) { this.send(); this.draw(dt, performance.now()); } },
     send() {
-      const now = performance.now(), still = S.grounded && S.gs < 0.5;
+      const now = performance.now(), st = S.mode === "fly" ? (S.grounded ? "ground" : "air") : S.mode === "paused" ? "paused" : "menu", still = st !== "air" && !(st === "ground" && S.gs > 0.5);
       const np = this.list.length, every = np > 20 ? 700 : np > 8 ? 400 : 220;   // a busy room: everyone sends less often
-      if (now - this.sendT > (still ? 1500 : every) && this.room && this.me && model && (S.mode === "fly" || S.mode === "paused")) {
+      if (now - this.sendT > (still ? 1500 : every) && this.room && this.me && S.mode !== "replay" && (st !== "menu" || now - this.sendT > 4000 || this.st !== st)) {
+        this.st = st;
         this.sendT = now; const r = (v) => Math.round(v * 100) / 100, q = S.q;
         this.me.set({ n: this.name, k: spec.kind, l: chosenLiv[spec.kind] || "house", p: [r(S.pos.x), r(S.pos.y), r(S.pos.z)], q: [+q.x.toFixed(4), +q.y.toFixed(4), +q.z.toFixed(4), +q.w.toFixed(4)],
-          v: S.grounded ? [0, 0, 0] : [r(S.vel.x), r(S.vel.y), r(S.vel.z)], g: S.gearPos > 0.5 ? 1 : 0, t: Date.now() }).catch(() => {});
+          v: S.grounded ? [0, 0, 0] : [r(S.vel.x), r(S.vel.y), r(S.vel.z)], g: S.gearPos > 0.5 ? 1 : 0, s: st, a: S.from ? S.from.code : "", t: Date.now() }).catch(() => {});
       }
     },
     draw(dt, tnow) {
@@ -7642,6 +7665,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       }
       for (const o of this.list) {
         if (tnow - o.at > 20000) { this.drop(o.id); continue; }
+        if (o.s === "menu") { if (o.model) { scene.remove(o.model); o.model = null; } continue; }
         if (!o.model && !o.near) continue;
         if (!o.model) { if (tnow - (this.builtT || 0) < 400) continue; this.builtT = tnow; const m = buildPlane(o.k, o.l); if (!m) continue; o.model = m; scene.add(m); m.position.copy(o.p); m.quaternion.copy(o.q); (m.userData.strobes || []).forEach((x) => (x.visible = false)); if (m.userData.glow) m.userData.glow.visible = false; }
         const age = Math.min(1, (tnow - o.at) / 1000); V.t1 = V.t1 || new THREE.Vector3(); V.t1.copy(o.p).addScaledVector(o.v, age);
@@ -7658,10 +7682,31 @@ vec3 liveryAt(vec3 p, out float fus) {
       let o = this.by.get(id); const fresh = !o;
       if (o && (o.k !== k || o.l !== l)) { if (o.model) scene.remove(o.model); o.model = null; }
       if (!o) { o = { id, p: new THREE.Vector3(), q: new THREE.Quaternion(), v: new THREE.Vector3(), model: null }; this.by.set(id, o); this.list.push(o); }
-      o.k = k; o.l = l; o.n = n; o.g = d.g; o.p.fromArray(d.p); o.q.fromArray(d.q).normalize(); o.v.fromArray(num(d.v || [], 3) ? d.v : [0, 0, 0]); o.at = performance.now();
-      if (fresh) { netRender(); netToast(Date.now() - this.joinedAt > 3000 ? `${n} joined the flight · ${PLANES[k].name}` : `${n} is online · ${PLANES[k].name}`); }
+      o.k = k; o.l = l; o.n = n; o.g = d.g; o.s = ["air", "ground", "paused", "menu"].includes(d.s) ? d.s : "air"; o.a = AP_BY[d.a] ? d.a : ""; o.p.fromArray(d.p); o.q.fromArray(d.q).normalize(); o.v.fromArray(num(d.v || [], 3) ? d.v : [0, 0, 0]); o.at = performance.now();
+      if (fresh) { netRender(); netToast(Date.now() - this.joinedAt > 3000 ? `${n} joined · ${PLANES[k].name}` : `${n} is online · ${PLANES[k].name}`); }
     },
   };
+  const NST = { air: "flying", ground: "on the ground", paused: "paused", menu: "in the menu" };
+  function netListDraw() {
+    const box = $("netBox"); box.hidden = !NET.room; if (!NET.room) return;
+    { // under whatever panel is open on the left (autopilot, radio, ground services), never on top of it
+      const st = stage.getBoundingClientRect(); let y = 0;
+      for (const id of ["apPanel", "atcPanel", "svc"]) { const e = $(id); if (e && !e.hidden && e.offsetParent) { const r = e.getBoundingClientRect(); if (r.left - st.left < 260) y = Math.max(y, r.bottom - st.top + 8); } }
+      box.style.top = y ? `${Math.round(y)}px` : ""; }
+    $("netListT").textContent = `Online · ${NET.room} · ${NET.list.length + 1}`;
+    const rows = $("netListRows"); if ($("netListH").getAttribute("aria-expanded") === "false") return; rows.replaceChildren();
+    const me = { n: `${NET.name} (you)`, k: spec.kind, s: S.mode === "fly" ? (S.grounded ? "ground" : "air") : S.mode === "paused" ? "paused" : "menu", a: S.from ? S.from.code : "", me: true };
+    for (const o of [me].concat(NET.list.slice().sort((a, b) => (a.s === "menu") - (b.s === "menu") || a.n.localeCompare(b.n)))) {
+      const r = document.createElement("div"), dot = document.createElement("i"), nm = document.createElement("b"), sub = document.createElement("span");
+      r.className = "netrow" + (o.me ? " me" : ""); dot.className = o.s; nm.textContent = o.n;
+      const dist = !o.me && o.s !== "menu" && S.mode !== "brief" ? ` · ${(o.p.distanceTo(S.pos) / 1000).toFixed(1)} km` : "";
+      sub.textContent = `${PLANES[o.k] ? PLANES[o.k].name : ""} · ${NST[o.s]}${o.s === "ground" && o.a ? " at " + o.a : ""}${dist}`;
+      r.append(dot, nm, sub); rows.append(r);
+    }
+  }
+  $("netListH").addEventListener("click", () => { const h = $("netListH"), on = h.getAttribute("aria-expanded") !== "true"; h.setAttribute("aria-expanded", String(on)); $("netListRows").hidden = !on; save("sw-netlist", on ? "1" : "0"); netListDraw(); });
+  if (load("sw-netlist") === "0" || (load("sw-netlist") === null && matchMedia("(max-width: 560px)").matches)) { $("netListH").setAttribute("aria-expanded", "false"); $("netListRows").hidden = true; }
+  setInterval(netListDraw, 1000);
   function netToast(text, out) { const box = $("netToast"), d = document.createElement("div"); d.textContent = text; if (out) d.className = "out"; box.append(d); while (box.children.length > 4) box.firstChild.remove(); setTimeout(() => d.remove(), 4500); if (soundOn) chime(out ? 420 : 760, 0.12); }
   const netPanel = $("netPanel"), netSt = (t) => { $("netStatus").textContent = t; };
   function netLoad() {
@@ -7704,7 +7749,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   function netLeave(quiet) {
     if (NET.ref) { NET.ref.child("players").off(); NET.ref.child("chat").off(); if (NET.me) { NET.me.onDisconnect().cancel(); NET.me.remove().catch(() => {}); } }
     for (const o of NET.list.slice()) NET.drop(o.id, true);
-    NET.ref = null; NET.room = null; NET.me = null; if (!quiet) { save("sw-netroom", ""); netRender(); }
+    NET.ref = null; NET.room = null; NET.me = null; if (!quiet) { save("sw-netroom", ""); netRender(); } netListDraw();
   }
   function netSayMsg(m) { if (!NET.ref) return; NET.ref.child("chat").push({ u: NET.uid, n: NET.name, m, t: Date.now() }).catch(() => {}); flash(`You: ${m}`, 1.6); }
   function netRender() {
