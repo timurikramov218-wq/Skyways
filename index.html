@@ -7778,7 +7778,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (firing && GUN.cd <= 0 && free) {   // a missile every 0.6 s, alternating the left and right wing rails
       GUN.cd = 0.6; GUN.tgt = gunPick(); const r = free; GUN.n++;
       GF.set(0, 0, -1).applyQuaternion(S.q); GW.set(GUN.n % 2 ? 3.2 : -3.2, -1.2, -2).applyQuaternion(S.q);
-      r.m.position.copy(S.pos).add(GW); r.v.copy(GF).multiplyScalar(25).add(S.vel); r.t = 0; r.tg = GUN.tgt; r.m.visible = true; GW.copy(r.m.position).add(GF); r.m.lookAt(GW);
+      r.m.position.copy(S.pos).add(GW); r.v.copy(GF).multiplyScalar(25).add(S.vel); r.t = 0; r.tg = GUN.tgt; r.remote = false; r.m.visible = true; GW.copy(r.m.position).add(GF); r.m.lookAt(GW);
+      if (NET.ref) { const q = (v) => Math.round(v * 10) / 10, P = r.m.position; NET.ref.child("chat").push({ m: "", msl: 1, u: NET.uid, n: NET.name, tg: GUN.tgt && GUN.tgt.net ? GUN.tgt.net.id : "", p: [q(P.x), q(P.y), q(P.z)], v: [q(r.v.x), q(r.v.y), q(r.v.z)], t: Date.now() }).catch(() => {}); }
       if (soundOn) { chime(220, 0.25); chime(330, 0.15); }
       if (GUN.tgt) flash(`Fox two · ${GUN.tgt.net ? GUN.tgt.net.n : GUN.tgt.ai.cs || "traffic"}`, 1.2); else flash("Fox two · no lock", 1);
     }
@@ -7788,11 +7789,12 @@ vec3 liveryAt(vec3 p, out float fus) {
     for (const r of GUN.rounds) {
       if (!r.m.visible) continue; r.t += dt; if (r.t > 30) { gunFx(r.m.position, true); r.m.visible = false; continue; }
       const sp = Math.min(780, r.v.length() + (r.t > 0.25 ? 420 : 40) * dt);   // drops off the rail, then the motor lights
-      if (r.t > 0.25 && (!r.tg || (r.tg.ai ? r.tg.ai.deadT > 0 : r.tg.net.deadT > performance.now() || !NET.by.has(r.tg.net.id)))) r.tg = gunPick(r.m.position);   // target gone: lock the nearest one
+      if (!r.remote && r.t > 0.25 && (!r.tg || (r.tg.ai ? r.tg.ai.deadT > 0 : r.tg.net.deadT > performance.now() || !NET.by.has(r.tg.net.id)))) r.tg = gunPick(r.m.position);   // target gone: lock the nearest one
+      if (r.remote && r.tg && r.tg.net && (r.tg.net.deadT > performance.now() || !NET.by.has(r.tg.net.id))) r.tg = null;
       if (r.tg && r.t > 0.25) {   // proportional-ish homing on the led target position
         GV.copy(r.tg.p); if (r.tg.net) GV.addScaledVector(r.tg.net.v, Math.min(2, r.m.position.distanceTo(GV) / sp));
         GV.sub(r.m.position); const d = GV.length();
-        if (d < r.tg.r + 6 + sp * dt) { gunHit(r.tg, r.m.position); r.m.visible = false; continue; }
+        if (d < r.tg.r + 6 + sp * dt) { if (r.remote) { gunFx(r.m.position, true); if (r.tg.me) GUN.warnT = 0; } else gunHit(r.tg, r.m.position); r.m.visible = false; continue; }
         GV.multiplyScalar(sp / d); r.v.lerp(GV, Math.min(1, dt * 6));
       } else if (r.t <= 0.25) r.v.y -= 9.8 * dt;
       r.v.setLength(sp); r.m.position.addScaledVector(r.v, dt); GW.copy(r.m.position).add(r.v); r.m.lookAt(GW);
@@ -7802,6 +7804,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         GW.copy(r.v).setLength(-5).add(r.m.position); pf.m.position.copy(GW);
       }
       if (r.m.position.y < groundY(r.m.position.x, r.m.position.z)) { gunBoom(r.m.position, 0.5); r.m.visible = false; }
+      if (r.remote && r.tg && r.tg.me && (r.warn = (r.warn || 0) - dt) <= 0) { r.warn = 0.35; if (soundOn) chime(1250, 0.1); }   // missile-warning beeps
     }
     for (const pf of GUN.puffs) { if (!pf.m.visible) continue; pf.t += dt; if (pf.t > 2.6) { pf.m.visible = false; continue; } pf.m.scale.setScalar(2.4 + pf.t * 4); pf.m.material.opacity = 0.5 * (1 - pf.t / 2.6); pf.m.position.y += dt * 1.5; }
     for (const f of GUN.fx) { if (!f.m.visible) continue; f.t += dt; const k = f.t / 0.6; if (k >= 1) { f.m.visible = false; continue; } f.m.scale.setScalar((f.big ? 14 : 4) * (0.3 + k)); f.m.material.opacity = 0.9 * (1 - k); }
@@ -7810,10 +7813,26 @@ vec3 liveryAt(vec3 p, out float fus) {
     const b = $("gunBtn"), on = (e) => { e.preventDefault(); GUN.fire = true; try { b.setPointerCapture(e.pointerId); } catch {} }, off = () => { GUN.fire = false; };
     b.addEventListener("pointerdown", on); b.addEventListener("pointerup", off); b.addEventListener("pointercancel", off); b.addEventListener("lostpointercapture", off);
   }
-  function netGotHit(m) {   // another pilot's rounds hit you: a jolt, a warning, a little damage
+  function netMslMsg(m) {   // someone fired: show their missile flying after its target (the shooter alone decides the hit)
+    if ((m.t || 0) < NET.joinedAt - 1500 || m.u === NET.uid || !Array.isArray(m.p) || !Array.isArray(m.v) || S.mode !== "fly") return;
+    const r = GUN.rounds.find((x) => !x.m.visible); if (!r) return;
+    const o = m.tg ? NET.by.get(m.tg) : null;
+    r.remote = true; r.t = 0; r.puffT = 0; r.m.position.fromArray(m.p); r.v.fromArray(m.v); r.m.visible = true;
+    r.tg = m.tg === NET.uid ? { p: S.pos, me: true, r: 16 } : o ? { p: o.model ? o.model.position : o.p, net: o, r: 16 } : null;
+    if (r.tg && r.tg.me) { flash(`MISSILE! ${String(m.n || "Pilot").slice(0, 16)} fired at you`, 2.2); buzz([80, 60, 80]); }
+  }
+  function netGotHit(m) {   // shot down online: explode, then straight back onto a runway
     const who = String(m.n || "Pilot").slice(0, 16);
     if (S.mode !== "fly" || S.crashed) return;
-    gunBoom(S.pos, 1.1); S.shotDown = true; crash(`Shot down by ${who}.`); netToast(`${who} shot you down`, true);
+    gunBoom(S.pos, 1.1); netToast(`${who} shot you down`, true);
+    if (S.mission) { crash(`Shot down by ${who}.`); return; }
+    S.crashed = true; model.visible = false; buzz([180, 70, 180]); flash(`Shot down by ${who}! Back on the runway…`, 2.4);
+    const id = ++crashId;
+    setTimeout(() => {
+      if (id !== crashId || !S.crashed || S.mode !== "fly") return;
+      const sel = $("startSel"), was = sel.value; sel.value = "runway"; const job = S.careerJob;
+      startFlight(); sel.value = was; if (job) S.careerJob = job;
+    }, 1200);
   }
   const NET_F = new THREE.Vector3();
   const NET = { mine: new Set(), list: [], by: new Map(), room: null, ref: null, uid: null, user: null, ready: null, sendT: 0, joinedAt: 0, cloudT: 0,
@@ -7920,7 +7939,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       P.on("child_removed", (sn) => NET.drop(sn.key));
       $("netChatLog").replaceChildren();
       base.child("chat").limitToLast(25).on("child_added", (sn) => { const m = sn.val(); if (!m || typeof m.m !== "string") return;
-        if (m.to) { netHitMsg(m); return; }
+        if (m.to) { netHitMsg(m); return; } if (m.msl) { netMslMsg(m); return; }
         const fresh = (m.t || 0) >= NET.joinedAt - 2000; chatAdd(String(m.n || "Pilot").slice(0, 16), m.m.slice(0, 100), m.u === NET.uid, !fresh);
         if (fresh && m.u !== NET.uid && soundOn) chime(880, 0.08); });
       save("sw-netroom", /^WORLD\d$/.test(room) ? "WORLD" : room); netRender(); flash(`Online: room ${room}. Other pilots appear as green circles`, 3);
