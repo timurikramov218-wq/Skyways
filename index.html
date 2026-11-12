@@ -817,7 +817,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       </div>
     </div>
     <div class="jobbar" id="jobBar" hidden aria-live="off"></div>
-    <button class="gunbtn" id="gunBtn" type="button" hidden aria-label="Fire">FIRE<small>J</small></button>
+    <button class="gunbtn" id="gunBtn" type="button" hidden aria-label="Fire missile">FIRE<small>MSL · J</small></button>
     <div class="netbox" id="netBox" hidden>
       <div class="nettoast" id="netToast" aria-live="polite"></div>
       <div class="netlist">
@@ -5364,7 +5364,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     if ($("modelSel").value === "real") briefTip.textContent = PLANES[chosen].fbw ? `${PLANES[chosen].name} is fly-by-wire: it keeps its protections even in Realistic.` : `Realistic: no stall protection and the trim holds the angle of attack. Full power pitches the nose up, so trim nose down with ${trimKeys(true)} after liftoff and watch your speed.`;
   });
   function startFlight() {
-    goBtn.textContent = "Take off"; S.mission = null; clearMissionExtras(); ENV.vis = null; recClear();
+    goBtn.textContent = "Take off"; S.mission = null; S.shotDown = false; clearMissionExtras(); ENV.vis = null; recClear();
     S.from = AIRPORTS[+fromSel.value]; S.to = toSel.value === "-1" ? null : AIRPORTS[+toSel.value];
     if (!model || model.userData.kind !== chosen) {
       if (!setPlane(chosen)) { briefTip.textContent = `${PLANES[chosen].name} isn't ready yet. Pick another aircraft or try again.`; return; }
@@ -5436,6 +5436,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     const id = ++crashId;
     setTimeout(() => {
       if (id !== crashId || !S.crashed) return;   // a new flight was started meanwhile
+      if (S.shotDown) {   // shot down online: no incident report, back on the runway a moment later
+        flash("Shot down! Starting again…", 2); setTimeout(() => { if (id === crashId && S.crashed) { S.shotDown = false; if (S.mission) { S.mode = "over"; missionResult(false, { reason }); } else startFlight(); } }, 1800); return; }
       S.mode = "over";
       if (S.mission) { missionResult(false, { reason }); return; }
       const p = document.createElement("p"); p.className = "result bad"; p.textContent = reason;
@@ -7697,12 +7699,23 @@ vec3 liveryAt(vec3 p, out float fus) {
   async function gunCheckOwner(u) {
     const em = u && !u.isAnonymous && u.email ? u.email.trim().toLowerCase() : ""; if (GUN.checked === em) return; GUN.checked = em;
     let ok = false; try { if (em && crypto.subtle) { const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(em)); ok = [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("") === GUN_OWNER; } } catch {}
-    if (ok !== GUN.armed) { GUN.armed = ok; if (ok) flash("Owner account: F-15 guns unlocked · J or FIRE", 3); }
+    if (ok !== GUN.armed) { GUN.armed = ok; if (ok) flash("Owner account: F-15 missiles unlocked · J or FIRE", 3); }
   }
   {
-    const geo = new THREE.CylinderGeometry(0.35, 0.35, 9, 5, 1, true); geo.rotateX(Math.PI / 2);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
-    for (let i = 0; i < 48; i++) { const m = new THREE.Mesh(geo, mat); m.visible = false; m.frustumCulled = false; scene.add(m); GUN.rounds.push({ m, v: new THREE.Vector3(), t: 0, tg: null }); }
+    // missiles: white body, dark nose, four tail fins and a motor flame; nose along +z (Object3D.lookAt points +z at the target)
+    const body = new THREE.CylinderGeometry(0.19, 0.19, 3.6, 8); body.rotateX(Math.PI / 2);
+    const nose = new THREE.ConeGeometry(0.19, 0.7, 8); nose.rotateX(Math.PI / 2); nose.translate(0, 0, 2.15);
+    const fin = new THREE.BoxGeometry(0.04, 0.75, 0.6); fin.translate(0, 0.4, -1.45);
+    const flame = new THREE.ConeGeometry(0.22, 2.4, 8); flame.rotateX(-Math.PI / 2); flame.translate(0, 0, -3.0);
+    const mW = new THREE.MeshLambertMaterial({ color: 0xe8e8e4 }), mD = new THREE.MeshLambertMaterial({ color: 0x3a3c40 }), mF = new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+    for (let i = 0; i < 8; i++) {
+      const m = new THREE.Group(); m.add(new THREE.Mesh(body, mW), new THREE.Mesh(nose, mD), new THREE.Mesh(flame, mF));
+      for (let k = 0; k < 4; k++) { const f = new THREE.Mesh(fin, mD); f.rotation.z = k * Math.PI / 2; m.add(f); }
+      m.scale.setScalar(1.6); m.visible = false; scene.add(m); GUN.rounds.push({ m, v: new THREE.Vector3(), t: 0, tg: null, puffT: 0 });
+    }
+    const pg = new THREE.IcosahedronGeometry(1, 1);
+    GUN.puffs = []; for (let i = 0; i < 420; i++) { const m = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: 0xd8d8d8, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; scene.add(m); GUN.puffs.push({ m, t: 9 }); }
+    GUN.pi = 0;
     const fgeo = new THREE.IcosahedronGeometry(1, 1);
     for (let i = 0; i < 10; i++) { const m = new THREE.Mesh(fgeo, new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); m.visible = false; scene.add(m); GUN.fx.push({ m, t: 9 }); }
   }
@@ -7724,7 +7737,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const b = BOOMS.reduce((a, c) => (c.t > a.t ? c : a)); b.t = 0; b.s = s;
     for (const m of [b.fire, b.core, b.smoke]) { m.position.copy(p); m.visible = true; }
     for (const d of b.bits) { d.m.position.copy(p); d.m.visible = true; d.v.set(Math.random() - 0.5, Math.random() * 0.8 - 0.2, Math.random() - 0.5).normalize().multiplyScalar(40 + Math.random() * 90); d.w.set(Math.random() * 9, Math.random() * 9, Math.random() * 9); d.m.scale.setScalar(s * (0.6 + Math.random())); }
-    if (soundOn) { sfx("crash"); chime(70, 0.6); } buzz([90, 40, 120]);
+    if (soundOn && p.distanceTo(S.pos) < 6000) { sfx("crash"); chime(70, 0.6); } if (p.distanceTo(S.pos) < 3000) buzz([90, 40, 120]);
   }
   function boomTick(dt) {
     for (const b of BOOMS) {
@@ -7763,26 +7776,35 @@ vec3 liveryAt(vec3 p, out float fus) {
     const btn = $("gunBtn"); if (btn.hidden === show) btn.hidden = !show;
     const firing = show && (GUN.fire || keys.has("KeyJ")); btn.classList.toggle("on", firing);
     GUN.cd -= dt;
-    if (firing && GUN.cd <= 0) {   // 14 rounds a second, alternating left and right of the nose
-      GUN.cd = 1 / 14; GUN.tgt = gunPick(); const r = GUN.rounds.find((x) => !x.m.visible) || GUN.rounds[GUN.n % GUN.rounds.length]; GUN.n++;
-      GF.set(0, 0, -1).applyQuaternion(S.q); GW.set(GUN.n % 2 ? 1.6 : -1.6, -0.4, -9).applyQuaternion(S.q);
-      r.m.position.copy(S.pos).add(GW); r.v.copy(GF).multiplyScalar(950).add(S.vel); r.t = 0; r.tg = GUN.tgt; r.m.visible = true; r.m.quaternion.copy(S.q);
-      if (soundOn && GUN.n % 2) chime(1400 + Math.random() * 300, 0.025);
+    const free = GUN.rounds.find((x) => !x.m.visible);
+    if (firing && GUN.cd <= 0 && free) {   // a missile every 0.6 s, alternating the left and right wing rails
+      GUN.cd = 0.6; GUN.tgt = gunPick(); const r = free; GUN.n++;
+      GF.set(0, 0, -1).applyQuaternion(S.q); GW.set(GUN.n % 2 ? 3.2 : -3.2, -1.2, -2).applyQuaternion(S.q);
+      r.m.position.copy(S.pos).add(GW); r.v.copy(GF).multiplyScalar(25).add(S.vel); r.t = 0; r.tg = GUN.tgt; r.m.visible = true; GW.copy(r.m.position).add(GF); r.m.lookAt(GW);
+      if (soundOn) { chime(220, 0.25); chime(330, 0.15); }
+      if (GUN.tgt) flash(`Fox two · ${GUN.tgt.net ? GUN.tgt.net.n : GUN.tgt.ai.cs || "traffic"}`, 1.2); else flash("Fox two · no lock", 1);
     }
     boomTick(dt);
     if (S.mode !== "fly") return;
     if (GUN.jolt > 0 && !S.crashed) { GUN.jolt -= dt; GQ.setFromEuler(GE.set((Math.random() - 0.5) * 0.02, 0, (Math.random() - 0.5) * 0.04)); S.q.multiply(GQ).normalize(); }
     for (const r of GUN.rounds) {
-      if (!r.m.visible) continue; r.t += dt; if (r.t > 4) { r.m.visible = false; continue; }
-      if (r.tg) {   // homing: turn the round onto the target's position (led by its motion for online pilots)
-        GV.copy(r.tg.p); if (r.tg.net) GV.addScaledVector(r.tg.net.v, Math.min(1.2, r.m.position.distanceTo(GV) / 950));
-        GV.sub(r.m.position); const d = GV.length(), sp = r.v.length();
-        if (d < r.tg.r + sp * dt) { gunHit(r.tg, r.m.position); r.m.visible = false; continue; }
-        GV.multiplyScalar(sp / d); r.v.lerp(GV, Math.min(1, dt * 7)).setLength(sp);
+      if (!r.m.visible) continue; r.t += dt; if (r.t > 10) { gunFx(r.m.position, true); r.m.visible = false; continue; }
+      const sp = Math.min(780, r.v.length() + (r.t > 0.25 ? 420 : 40) * dt);   // drops off the rail, then the motor lights
+      if (r.tg && r.t > 0.25 && (r.tg.ai ? !(r.tg.ai.deadT > 0) : !(r.tg.net.deadT > performance.now()))) {   // proportional-ish homing on the led target position
+        GV.copy(r.tg.p); if (r.tg.net) GV.addScaledVector(r.tg.net.v, Math.min(2, r.m.position.distanceTo(GV) / sp));
+        GV.sub(r.m.position); const d = GV.length();
+        if (d < r.tg.r + 6 + sp * dt) { gunHit(r.tg, r.m.position); r.m.visible = false; continue; }
+        GV.multiplyScalar(sp / d); r.v.lerp(GV, Math.min(1, dt * 4.5));
+      } else if (r.t <= 0.25) r.v.y -= 9.8 * dt;
+      r.v.setLength(sp); r.m.position.addScaledVector(r.v, dt); GW.copy(r.m.position).add(r.v); r.m.lookAt(GW);
+      r.m.children[2].visible = r.t > 0.25; r.m.children[2].scale.setScalar(0.8 + Math.random() * 0.5);
+      if (r.t > 0.25 && (r.puffT -= dt) <= 0) {   // smoke trail
+        r.puffT = 0.012; const pf = GUN.puffs[GUN.pi++ % GUN.puffs.length]; pf.t = 0; pf.m.visible = true;
+        GW.copy(r.v).setLength(-5).add(r.m.position); pf.m.position.copy(GW);
       }
-      r.m.position.addScaledVector(r.v, dt); GW.copy(r.m.position).add(r.v); r.m.lookAt(GW);
-      if (r.m.position.y < groundY(r.m.position.x, r.m.position.z)) { gunFx(r.m.position, false); r.m.visible = false; }
+      if (r.m.position.y < groundY(r.m.position.x, r.m.position.z)) { gunBoom(r.m.position, 0.5); r.m.visible = false; }
     }
+    for (const pf of GUN.puffs) { if (!pf.m.visible) continue; pf.t += dt; if (pf.t > 2.6) { pf.m.visible = false; continue; } pf.m.scale.setScalar(2.4 + pf.t * 4); pf.m.material.opacity = 0.5 * (1 - pf.t / 2.6); pf.m.position.y += dt * 1.5; }
     for (const f of GUN.fx) { if (!f.m.visible) continue; f.t += dt; const k = f.t / 0.6; if (k >= 1) { f.m.visible = false; continue; } f.m.scale.setScalar((f.big ? 14 : 4) * (0.3 + k)); f.m.material.opacity = 0.9 * (1 - k); }
   }
   {
@@ -7792,7 +7814,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   function netGotHit(m) {   // another pilot's rounds hit you: a jolt, a warning, a little damage
     const who = String(m.n || "Pilot").slice(0, 16);
     if (S.mode !== "fly" || S.crashed) return;
-    gunBoom(S.pos, 1.1); crash(`Shot down by ${who}.`);
+    gunBoom(S.pos, 1.1); S.shotDown = true; crash(`Shot down by ${who}.`); netToast(`${who} shot you down`, true);
   }
   const NET_F = new THREE.Vector3();
   const NET = { list: [], by: new Map(), room: null, ref: null, uid: null, user: null, ready: null, sendT: 0, joinedAt: 0, cloudT: 0,
@@ -7896,7 +7918,9 @@ vec3 liveryAt(vec3 p, out float fus) {
       P.on("child_changed", (sn) => NET.take(sn.key, sn.val()));
       P.on("child_removed", (sn) => NET.drop(sn.key));
       $("netChatLog").replaceChildren();
-      base.child("hits").limitToLast(5).on("child_added", (sn) => { const m = sn.val(); if (m && m.to === NET.uid && (m.t || 0) >= NET.joinedAt && m.u !== NET.uid) netGotHit(m); });
+      base.child("hits").limitToLast(5).on("child_added", (sn) => { const m = sn.val(); if (!m || (m.t || 0) < NET.joinedAt || m.u === NET.uid) return;
+        if (m.to === NET.uid) { netGotHit(m); return; }
+        const o = NET.by.get(m.to); if (o && !(o.deadT > performance.now())) { o.deadT = performance.now() + 6000; gunBoom(o.model ? o.model.position : o.p, 1.1); netToast(`${String(m.n || "Pilot").slice(0, 16)} shot down ${o.n}`, true); } });
       base.child("chat").limitToLast(25).on("child_added", (sn) => { const m = sn.val(); if (!m || typeof m.m !== "string") return;
         const fresh = (m.t || 0) >= NET.joinedAt - 2000; chatAdd(String(m.n || "Pilot").slice(0, 16), m.m.slice(0, 100), m.u === NET.uid, !fresh);
         if (fresh && m.u !== NET.uid && soundOn) chime(880, 0.08); });
