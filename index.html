@@ -7697,7 +7697,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   const GUN_OWNER = "84ff1fc7b939897bfd21259fe904db361854c5d09bc5c7e2b594603be7d1c9f5";
   const GUN = { armed: false, fire: false, cd: 0, n: 0, hits: 0, rounds: [], fx: [], checked: null, tgt: null };
   async function gunCheckOwner(u) {
-    const em = u && !u.isAnonymous && u.email ? u.email.trim().toLowerCase() : ""; if (GUN.checked === em) return; GUN.checked = em;
+    const em0 = u && !u.isAnonymous ? u.email || ((u.providerData || []).find((x) => x && x.email) || {}).email : "", em = em0 ? em0.trim().toLowerCase() : ""; if (GUN.checked === em) return; GUN.checked = em;
     let ok = false; try { if (em && crypto.subtle) { const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(em)); ok = [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("") === GUN_OWNER; } } catch {}
     if (ok !== GUN.armed) { GUN.armed = ok; if (ok) flash("Owner account: F-15 missiles unlocked · J or FIRE", 3); }
   }
@@ -7769,7 +7769,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (t.ai) { t.ai.deadT = 45; flash(`Splash! ${t.ai.cs || "Traffic"} shot down`, 1.8); }
     else { t.net.deadT = performance.now() + 8000; flash(`Splash! ${t.net.n} shot down`, 1.8); }
     GUN.kills = (GUN.kills || 0) + 1;
-    const now = performance.now(); if (t.net && NET.ref && now - (t.net.hitT || 0) > 700) { t.net.hitT = now; NET.ref.child("hits").push({ to: t.net.id, u: NET.uid, n: NET.name, t: Date.now(), k: 1 }).catch(() => {}); netToast(`You shot down ${t.net.n}`); }
+    const now = performance.now(); if (t.net && NET.ref && now - (t.net.hitT || 0) > 700) { t.net.hitT = now; NET.ref.child("chat").push({ m: "", to: t.net.id, u: NET.uid, n: NET.name, t: Date.now(), k: 1 }).catch(() => {}); netToast(`You shot down ${t.net.n}`); }
   }
   function gunTick(dt) {
     const show = GUN.armed && S.mode === "fly" && spec.fighter && !S.crashed;
@@ -7817,7 +7817,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     gunBoom(S.pos, 1.1); S.shotDown = true; crash(`Shot down by ${who}.`); netToast(`${who} shot you down`, true);
   }
   const NET_F = new THREE.Vector3();
-  const NET = { list: [], by: new Map(), room: null, ref: null, uid: null, user: null, ready: null, sendT: 0, joinedAt: 0, cloudT: 0,
+  const NET = { mine: new Set(), list: [], by: new Map(), room: null, ref: null, uid: null, user: null, ready: null, sendT: 0, joinedAt: 0, cloudT: 0,
     tick(dt, now) { if (this.room) { this.send(); this.draw(dt, performance.now()); } },
     send() {
       const now = performance.now(), st = S.mode === "fly" ? (S.grounded ? "ground" : "air") : S.mode === "paused" ? "paused" : "menu", still = st !== "air" && !(st === "ground" && S.gs > 0.5);
@@ -7826,7 +7826,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         this.st = st;
         this.sendT = now; const r = (v) => Math.round(v * 100) / 100, q = S.q;
         this.me.set({ n: this.name, k: spec.kind, l: chosenLiv[spec.kind] || "house", p: [r(S.pos.x), r(S.pos.y), r(S.pos.z)], q: [+q.x.toFixed(4), +q.y.toFixed(4), +q.z.toFixed(4), +q.w.toFixed(4)],
-          v: S.grounded ? [0, 0, 0] : [r(S.vel.x), r(S.vel.y), r(S.vel.z)], g: S.gearPos > 0.5 ? 1 : 0, s: st, a: S.from ? S.from.code : "", t: Date.now() }).catch(() => {});
+          v: S.grounded ? [0, 0, 0] : [r(S.vel.x), r(S.vel.y), r(S.vel.z)], g: S.gearPos > 0.5 ? 1 : 0, s: st, a: S.from ? S.from.code : "", t: Date.now(), sid: NET.sid }).then(() => { NET.wrote = true; }).catch(() => {});
       }
     },
     draw(dt, tnow) {
@@ -7847,7 +7847,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     },
     drop(id, quiet) { const o = this.by.get(id); if (!o) return; if (!quiet) netToast(`${o.n} left`, true); if (o.model) scene.remove(o.model); this.by.delete(id); this.list = this.list.filter((q) => q !== o); netRender(); },
     take(id, d) {
-      if (id === this.uid || !d || !Array.isArray(d.p) || !Array.isArray(d.q)) return;
+      if (id === this.uid || this.mine.has(id) || !d || !Array.isArray(d.p) || !Array.isArray(d.q)) return;
       const num = (a, n) => a.length === n && a.every((x) => typeof x === "number" && isFinite(x)); if (!num(d.p, 3) || !num(d.q, 4)) return;
       const k = PLANES[d.k] ? d.k : "b737", l = (LIVERIES[k] || []).includes(d.l) ? d.l : "house", n = String(d.n || "Pilot").replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, 16) || "Pilot";
       let o = this.by.get(id); const fresh = !o;
@@ -7912,16 +7912,16 @@ vec3 liveryAt(vec3 p, out float fus) {
       return [u, db, rm];
     }).then(([u, db, room]) => {
       const base = db.ref(`rooms/${room}`); NET.ref = base; NET.room = room; NET.joinedAt = Date.now();
-      NET.me = base.child(`players/${u.uid}`); NET.me.onDisconnect().remove();
+      NET.me = base.child(`players/${u.uid}`); NET.me.onDisconnect().remove(); NET.mine.add(u.uid);
+      NET.sid = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; NET.wrote = false;
+      NET.me.child("sid").on("value", (sn) => { const v = sn.val(); if (NET.wrote && typeof v === "string" && v !== NET.sid && parseInt(v, 10) > parseInt(NET.sid, 10)) netKicked(); });
       const P = base.child("players");
       P.on("child_added", (sn) => NET.take(sn.key, sn.val()), (e) => { netSt("The server refused the connection: check the database rules."); });
       P.on("child_changed", (sn) => NET.take(sn.key, sn.val()));
       P.on("child_removed", (sn) => NET.drop(sn.key));
       $("netChatLog").replaceChildren();
-      base.child("hits").limitToLast(5).on("child_added", (sn) => { const m = sn.val(); if (!m || (m.t || 0) < NET.joinedAt || m.u === NET.uid) return;
-        if (m.to === NET.uid) { netGotHit(m); return; }
-        const o = NET.by.get(m.to); if (o && !(o.deadT > performance.now())) { o.deadT = performance.now() + 6000; gunBoom(o.model ? o.model.position : o.p, 1.1); netToast(`${String(m.n || "Pilot").slice(0, 16)} shot down ${o.n}`, true); } });
       base.child("chat").limitToLast(25).on("child_added", (sn) => { const m = sn.val(); if (!m || typeof m.m !== "string") return;
+        if (m.to) { netHitMsg(m); return; }
         const fresh = (m.t || 0) >= NET.joinedAt - 2000; chatAdd(String(m.n || "Pilot").slice(0, 16), m.m.slice(0, 100), m.u === NET.uid, !fresh);
         if (fresh && m.u !== NET.uid && soundOn) chime(880, 0.08); });
       save("sw-netroom", /^WORLD\d$/.test(room) ? "WORLD" : room); netRender(); flash(`Online: room ${room}. Other pilots appear as green circles`, 3);
@@ -7929,8 +7929,19 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (e && e.message === "slow" && (NET.tries = (NET.tries || 0) + 1) < 4) { netSt("Still connecting… trying again"); setTimeout(() => { if (!NET.room && !NET.joining) netJoin(); }, 1500); return; }
       netSt(e && /admin-restricted|operation-not-allowed/.test(e.code || "") ? "Online isn't switched on yet: anonymous sign-in is disabled in the game's Firebase project." : "Couldn't connect. Online play needs the internet and works on the game's website."); }).then(() => { $("netJoin").disabled = false; NET.joining = false; });
   }
+  function netHitMsg(m) {   // a shoot-down, sent through the chat channel: the victim explodes and restarts, everyone else sees the fireball
+    if ((m.t || 0) < NET.joinedAt || m.u === NET.uid) return;
+    if (m.to === NET.uid) { netGotHit(m); return; }
+    const o = NET.by.get(m.to); if (o && !(o.deadT > performance.now())) { o.deadT = performance.now() + 6000; gunBoom(o.model ? o.model.position : o.p, 1.1); netToast(`${String(m.n || "Pilot").slice(0, 16)} shot down ${o.n}`, true); }
+  }
+  function netKicked() {   // the same account joined from another tab or device: this one steps out without deleting the newer one's player
+    if (!NET.ref) return; NET.ref.child("players").off(); NET.ref.child("chat").off(); if (NET.me) { NET.me.child("sid").off(); NET.me.onDisconnect().cancel(); }
+    for (const o of NET.list.slice()) NET.drop(o.id, true);
+    NET.ref = null; NET.room = null; NET.me = null; netRender(); netListDraw();
+    flash("You're playing online in another tab or device, so this one left the room", 4);
+  }
   function netLeave(quiet) {
-    if (NET.ref) { NET.ref.child("players").off(); NET.ref.child("chat").off(); NET.ref.child("hits").off(); if (NET.me) { NET.me.onDisconnect().cancel(); NET.me.remove().catch(() => {}); } }
+    if (NET.ref) { NET.ref.child("players").off(); NET.ref.child("chat").off(); if (NET.me) { NET.me.child("sid").off(); NET.me.onDisconnect().cancel(); NET.me.remove().catch(() => {}); } }
     for (const o of NET.list.slice()) NET.drop(o.id, true);
     NET.ref = null; NET.room = null; NET.me = null; if (!quiet) { save("sw-netroom", ""); netRender(); } netListDraw();
   }
@@ -7994,8 +8005,19 @@ vec3 liveryAt(vec3 p, out float fus) {
   }
   $("netSign").addEventListener("click", () => {
     netLoad().then(() => {
-      const a = firebase.auth(); if (NET.user && !NET.user.isAnonymous) { if (NET.room) netLeave(); return a.signOut(); }
-      return a.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+      const a = firebase.auth(), prov = new firebase.auth.GoogleAuthProvider(), wasRoom = NET.room;
+      const rejoin = () => { if (wasRoom && !NET.room && !NET.joining) netJoin(); };
+      if (NET.user && !NET.user.isAnonymous) { if (NET.room) netLeave(true); return a.signOut().then(rejoin); }
+      const cur = a.currentUser;
+      if (!cur || !cur.isAnonymous) return a.signInWithPopup(prov);
+      // already playing as a guest: attach Google to the same player, so the online id stays the same (no second "you")
+      return cur.linkWithPopup(prov).then((res) => { NET.user = res.user || a.currentUser; gunCheckOwner(NET.user); netAccount(); cloudSync(); })
+        .catch((e) => {
+          if (!e || e.code !== "auth/credential-already-in-use" || !e.credential) throw e;
+          // this Google account already has its own player: take the guest out of the room first, then switch to it
+          if (NET.room) netLeave(true);
+          return a.signInWithCredential(e.credential).then(rejoin);
+        });
     }).catch((e) => { netSt(e && e.code === "auth/popup-blocked" ? "The browser blocked the sign-in window: allow pop-ups for this site and try again." : "Sign-in didn't complete. It works on the game's website."); });
   });
   function openNet() { $("moreMenu").hidden = true; if (S.mode === "fly") pause(); $("netName").value = load("sw-netname") || ""; netRender(); netAccount(); netPanel.hidden = false; if (!NET.room && !$("netName").value) setTimeout(() => $("netName").focus(), 50); }
