@@ -362,6 +362,10 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .net-say { display: flex; flex-wrap: wrap; gap: 6px; }
 .net-acc { flex: 1 1 240px; display: grid; gap: 3px; } .net-acc b { font: 600 14px var(--font-body); } .net-acc span { font: 400 12px var(--font-body); color: var(--fg-3); }
 #netPanel { z-index: 13; }
+.nettoast { position: absolute; right: 14px; top: calc(110px + env(safe-area-inset-top, 0px)); z-index: 14; display: grid; gap: 6px; justify-items: end; pointer-events: none; }
+.nettoast div { padding: 7px 13px; border-radius: 999px; background: rgba(12,22,16,0.9); border: 1px solid rgba(127,227,154,0.55); color: #c9f5d4; font: 500 13px var(--font-body); animation: ntin 0.25s ease-out; }
+.nettoast div.out { border-color: rgba(255,255,255,0.25); color: #d5d5d5; background: rgba(20,20,22,0.9); }
+@keyframes ntin { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
 /* career page */
 .cpage { position: absolute; inset: 0; z-index: 12; background: radial-gradient(120% 90% at 20% 0%, #1d1c20 0%, #0d0d10 70%); overflow: auto; color: var(--fg); }
 .cp-in { box-sizing: border-box; width: min(980px, 100%); margin: 0 auto; padding: calc(22px + env(safe-area-inset-top, 0px)) 20px 40px; display: grid; gap: 14px; }
@@ -783,6 +787,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       </div>
     </div>
     <div class="jobbar" id="jobBar" hidden aria-live="off"></div>
+    <div class="nettoast" id="netToast" aria-live="polite"></div>
     <div class="log net" id="netPanel" hidden role="dialog" aria-labelledby="netTitle">
       <div class="log-head"><h3 id="netTitle">Online</h3><div class="log-acts"><button class="chip" id="netClose" type="button">Close</button></div></div>
       <p class="cp-note" id="netStatus">Fly with other players in the same world. Everyone in the same room sees each other.</p>
@@ -6095,8 +6100,8 @@ vec3 liveryAt(vec3 p, out float fus) {
       hud.fillText(`${PLANES[ai.kind].name}`, sx + 12, sy - 7); hud.fillText(`${ai.air || "Skyways"} · ${(d / 1000).toFixed(1)} km ${dy >= 0 ? "+" : ""}${dy}`, sx + 12, sy + 8);
     }
     for (const o of NET.list) {   // other players: a green marker with the name
-      if (!o.model) continue; const d = o.model.position.distanceTo(S.pos); if (d > 20000) continue;
-      proj.copy(o.model.position).project(camera); let off = false;
+      const op = o.model ? o.model.position : o.p, d = op.distanceTo(S.pos); if (d > 20000) continue;
+      proj.copy(op).project(camera); let off = false;
       if (proj.z > 1) { proj.x = -proj.x; proj.y = -proj.y; off = true; }
       if (off || Math.abs(proj.x) > 0.9 || Math.abs(proj.y) > 0.8) { const k = Math.max(Math.abs(proj.x) / 0.9, Math.abs(proj.y) / 0.8, off ? 1e3 * 0 + 1.001 : 1); if (off) { const m = Math.max(Math.abs(proj.x), Math.abs(proj.y)) || 1; proj.x *= 0.9 / m; proj.y *= 0.8 / m; } else { proj.x /= k; proj.y /= k; } off = true; }
       const sx = (proj.x + 1) / 2 * w, sy = Math.min((1 - proj.y) / 2 * h, h - dashH - 30);
@@ -7624,23 +7629,29 @@ vec3 liveryAt(vec3 p, out float fus) {
     tick(dt, now) { if (this.room) { this.send(); this.draw(dt, performance.now()); } },
     send() {
       const now = performance.now(), still = S.grounded && S.gs < 0.5;
-      if (now - this.sendT > (still ? 1000 : 220) && this.room && this.me && model && (S.mode === "fly" || S.mode === "paused")) {
+      const np = this.list.length, every = np > 20 ? 700 : np > 8 ? 400 : 220;   // a busy room: everyone sends less often
+      if (now - this.sendT > (still ? 1500 : every) && this.room && this.me && model && (S.mode === "fly" || S.mode === "paused")) {
         this.sendT = now; const r = (v) => Math.round(v * 100) / 100, q = S.q;
         this.me.set({ n: this.name, k: spec.kind, l: chosenLiv[spec.kind] || "house", p: [r(S.pos.x), r(S.pos.y), r(S.pos.z)], q: [+q.x.toFixed(4), +q.y.toFixed(4), +q.z.toFixed(4), +q.w.toFixed(4)],
           v: S.grounded ? [0, 0, 0] : [r(S.vel.x), r(S.vel.y), r(S.vel.z)], g: S.gearPos > 0.5 ? 1 : 0, t: Date.now() }).catch(() => {});
       }
     },
     draw(dt, tnow) {
+      if (tnow - (this.rankT || 0) > 1000) {   // once a second: the ten nearest players are drawn as aircraft, the rest only as markers
+        this.rankT = tnow; const by = this.list.slice().sort((a, b) => a.p.distanceToSquared(camera.position) - b.p.distanceToSquared(camera.position));
+        by.forEach((o, i) => { o.near = i < 10; if (!o.near && o.model) { scene.remove(o.model); o.model = null; } });
+      }
       for (const o of this.list) {
         if (tnow - o.at > 20000) { this.drop(o.id); continue; }
-        if (!o.model) { const m = buildPlane(o.k, o.l); if (!m) continue; o.model = m; scene.add(m); m.position.copy(o.p); m.quaternion.copy(o.q); (m.userData.strobes || []).forEach((x) => (x.visible = false)); if (m.userData.glow) m.userData.glow.visible = false; }
+        if (!o.model && !o.near) continue;
+        if (!o.model) { if (tnow - (this.builtT || 0) < 400) continue; this.builtT = tnow; const m = buildPlane(o.k, o.l); if (!m) continue; o.model = m; scene.add(m); m.position.copy(o.p); m.quaternion.copy(o.q); (m.userData.strobes || []).forEach((x) => (x.visible = false)); if (m.userData.glow) m.userData.glow.visible = false; }
         const age = Math.min(1, (tnow - o.at) / 1000); V.t1 = V.t1 || new THREE.Vector3(); V.t1.copy(o.p).addScaledVector(o.v, age);
         o.model.position.lerp(V.t1, 1 - Math.exp(-dt * 8)); o.model.quaternion.slerp(o.q, 1 - Math.exp(-dt * 6));
         const g = o.model.userData.gear; if (g) g.visible = !!o.g;
         o.model.visible = o.model.position.distanceToSquared(camera.position) < 12000 * 12000;
       }
     },
-    drop(id) { const o = this.by.get(id); if (!o) return; if (o.model) scene.remove(o.model); this.by.delete(id); this.list = this.list.filter((q) => q !== o); netRender(); },
+    drop(id, quiet) { const o = this.by.get(id); if (!o) return; if (!quiet) netToast(`${o.n} left`, true); if (o.model) scene.remove(o.model); this.by.delete(id); this.list = this.list.filter((q) => q !== o); netRender(); },
     take(id, d) {
       if (id === this.uid || !d || !Array.isArray(d.p) || !Array.isArray(d.q)) return;
       const num = (a, n) => a.length === n && a.every((x) => typeof x === "number" && isFinite(x)); if (!num(d.p, 3) || !num(d.q, 4)) return;
@@ -7649,9 +7660,10 @@ vec3 liveryAt(vec3 p, out float fus) {
       if (o && (o.k !== k || o.l !== l)) { if (o.model) scene.remove(o.model); o.model = null; }
       if (!o) { o = { id, p: new THREE.Vector3(), q: new THREE.Quaternion(), v: new THREE.Vector3(), model: null }; this.by.set(id, o); this.list.push(o); }
       o.k = k; o.l = l; o.n = n; o.g = d.g; o.p.fromArray(d.p); o.q.fromArray(d.q).normalize(); o.v.fromArray(num(d.v || [], 3) ? d.v : [0, 0, 0]); o.at = performance.now();
-      if (fresh) { netRender(); if (Date.now() - this.joinedAt > 3000) flash(`${n} joined`, 2); }
+      if (fresh) { netRender(); netToast(Date.now() - this.joinedAt > 3000 ? `${n} joined the flight · ${PLANES[k].name}` : `${n} is online · ${PLANES[k].name}`); }
     },
   };
+  function netToast(text, out) { const box = $("netToast"), d = document.createElement("div"); d.textContent = text; if (out) d.className = "out"; box.append(d); while (box.children.length > 4) box.firstChild.remove(); setTimeout(() => d.remove(), 4500); if (soundOn) chime(out ? 420 : 760, 0.12); }
   const netPanel = $("netPanel"), netSt = (t) => { $("netStatus").textContent = t; };
   function netLoad() {
     if (NET.ready) return NET.ready;
@@ -7670,24 +7682,29 @@ vec3 liveryAt(vec3 p, out float fus) {
     NET.name = ($("netName").value || "").replace(/[^\p{L}\p{N} ._-]/gu, "").trim().slice(0, 16) || `Pilot ${Math.floor(100 + Math.random() * 900)}`; $("netName").value = NET.name; save("sw-netname", NET.name);
     netSt("Connecting…"); $("netJoin").disabled = true; NET.joining = true;
     const slow = new Promise((_, rej) => setTimeout(() => rej(new Error("slow")), 25000));
-    Promise.race([netLoad().then(netAuth), slow]).then((u) => {
+    Promise.race([netLoad().then(netAuth), slow]).then(async (u) => {
       NET.uid = u.uid; netLeave(true);
-      const db = firebase.database(), base = db.ref(`rooms/${room}`); NET.ref = base; NET.room = room; NET.joinedAt = Date.now();
+      const db = firebase.database(); let rm = room;
+      if (room === "WORLD") { const live = (v) => Object.values(v || {}).filter((q) => q && Date.now() - (q.t || 0) < 30000).length;
+        for (let k = 1; k <= 5; k++) { rm = k === 1 ? "WORLD" : `WORLD${k}`; const sn = await db.ref(`rooms/${rm}/players`).once("value"); if (live(sn.val()) < 24) break; } }
+      return [u, db, rm];
+    }).then(([u, db, room]) => {
+      const base = db.ref(`rooms/${room}`); NET.ref = base; NET.room = room; NET.joinedAt = Date.now();
       NET.me = base.child(`players/${u.uid}`); NET.me.onDisconnect().remove();
       const P = base.child("players");
       P.on("child_added", (sn) => NET.take(sn.key, sn.val()), (e) => { netSt("The server refused the connection: check the database rules."); });
       P.on("child_changed", (sn) => NET.take(sn.key, sn.val()));
-      P.on("child_removed", (sn) => { const o = NET.by.get(sn.key); if (o) flash(`${o.n} left`, 2); NET.drop(sn.key); });
+      P.on("child_removed", (sn) => NET.drop(sn.key));
       base.child("chat").limitToLast(1).on("child_added", (sn) => { const m = sn.val(); if (!m || typeof m.m !== "string" || (m.t || 0) < NET.joinedAt || m.u === NET.uid) return;
         RADIO.push({ text: `${String(m.n || "Pilot").slice(0, 16)}: ${m.m.slice(0, 80)}`, t: 8 }); if (S.mode !== "fly") flash(`${String(m.n || "Pilot").slice(0, 16)}: ${m.m.slice(0, 80)}`, 3); });
-      save("sw-netroom", room); netRender(); flash(`Online: room ${room}. Other pilots appear as green circles`, 3);
+      save("sw-netroom", /^WORLD\d$/.test(room) ? "WORLD" : room); netRender(); flash(`Online: room ${room}. Other pilots appear as green circles`, 3);
     }).catch((e) => {
       if (e && e.message === "slow" && (NET.tries = (NET.tries || 0) + 1) < 4) { netSt("Still connecting… trying again"); setTimeout(() => { if (!NET.room && !NET.joining) netJoin(); }, 1500); return; }
       netSt(e && /admin-restricted|operation-not-allowed/.test(e.code || "") ? "Online isn't switched on yet: anonymous sign-in is disabled in the game's Firebase project." : "Couldn't connect. Online play needs the internet and works on the game's website."); }).then(() => { $("netJoin").disabled = false; NET.joining = false; });
   }
   function netLeave(quiet) {
     if (NET.ref) { NET.ref.child("players").off(); NET.ref.child("chat").off(); if (NET.me) { NET.me.onDisconnect().cancel(); NET.me.remove().catch(() => {}); } }
-    for (const o of NET.list.slice()) NET.drop(o.id);
+    for (const o of NET.list.slice()) NET.drop(o.id, true);
     NET.ref = null; NET.room = null; NET.me = null; if (!quiet) { save("sw-netroom", ""); netRender(); }
   }
   function netSayMsg(m) { if (!NET.ref) return; NET.ref.child("chat").push({ u: NET.uid, n: NET.name, m, t: Date.now() }).catch(() => {}); flash(`You: ${m}`, 1.6); }
