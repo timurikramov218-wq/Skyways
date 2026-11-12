@@ -6208,6 +6208,16 @@ vec3 liveryAt(vec3 p, out float fus) {
         hud.save(); hud.translate(ax, az); hud.rotate(ai.hdg); hud.fillStyle = ai.phase === "hold" || ai.phase === "taxi" ? "#9fb0c0" : "#ffffff";
         hud.beginPath(); hud.moveTo(0, -4); hud.lineTo(3, 3); hud.lineTo(-3, 3); hud.closePath(); hud.fill(); hud.restore();
       }
+      if (NET.room) for (const o of NET.list) {   // online players: green arrows with their names, pinned to the edge when out of range
+        if (o.s === "menu") continue; const op = o.model ? o.model.position : o.p; let [qx, qz] = P(op.x, op.z);
+        const cx0 = mx + ms / 2, cz0 = my + ms / 2, lim = ms / 2 - 9, dx = qx - cx0, dz = qz - cz0, m = Math.max(Math.abs(dx), Math.abs(dz));
+        const edge = m > lim; if (edge) { qx = cx0 + dx * lim / m; qz = cz0 + dz * lim / m; }
+        NET_F.set(0, 0, -1).applyQuaternion(o.q);
+        hud.save(); hud.translate(qx, qz); hud.rotate(Math.atan2(NET_F.x, -NET_F.z)); hud.globalAlpha = edge ? 0.7 : 1;
+        hud.fillStyle = "#7fe39a"; hud.strokeStyle = "#0b2a16"; hud.lineWidth = 1.5; hud.beginPath(); hud.moveTo(0, -7); hud.lineTo(5, 6); hud.lineTo(0, 3); hud.lineTo(-5, 6); hud.closePath(); hud.fill(); hud.stroke(); hud.restore();
+        hud.save(); hud.globalAlpha = edge ? 0.7 : 1; hud.font = `bold ${Math.max(9, Math.round(ms / 17))}px ${MONO}`; hud.textBaseline = "middle"; hud.textAlign = qx > mx + ms - 60 ? "right" : "left";
+        const lx = hud.textAlign === "right" ? qx - 9 : qx + 9; hud.lineWidth = 3; hud.strokeStyle = "rgba(0,0,0,0.75)"; hud.strokeText(o.n, lx, qz - 1); hud.fillStyle = "#7fe39a"; hud.fillText(o.n, lx, qz - 1); hud.restore();
+      }
       const [px, pz] = P(S.pos.x, S.pos.z); hud.save(); hud.translate(px, pz); hud.rotate(Math.atan2(fwd.x, -fwd.z));
       hud.fillStyle = HC.hud; hud.strokeStyle = HC.deck; hud.lineWidth = 1.5; hud.beginPath(); hud.moveTo(0, -7); hud.lineTo(5, 6); hud.lineTo(0, 3); hud.lineTo(-5, 6); hud.closePath(); hud.fill(); hud.stroke(); hud.restore();
       hud.restore(); hud.strokeStyle = "rgba(255,255,255,0.35)"; hud.lineWidth = 1; hud.beginPath(); hud.roundRect(mx, my, ms, ms, 8); hud.stroke();
@@ -7674,6 +7684,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   // times a second; everyone else draws them, smoothed, with their aircraft and livery. Signing in with Google keeps the
   // saved progress in the cloud. Names and messages are only ever drawn as text.
   const FB_CFG = { apiKey: "AIzaSyBu-Dzr9wF6jrl0y5eUE5Okp70bLhUFUD8", authDomain: "skyways-61c6f.firebaseapp.com", databaseURL: "https://skyways-61c6f-default-rtdb.europe-west1.firebasedatabase.app", projectId: "skyways-61c6f", appId: "1:810722050231:web:384ad733578c1eb7370d32" };
+  const NET_F = new THREE.Vector3();
   const NET = { list: [], by: new Map(), room: null, ref: null, uid: null, user: null, ready: null, sendT: 0, joinedAt: 0, cloudT: 0,
     tick(dt, now) { if (this.room) { this.send(); this.draw(dt, performance.now()); } },
     send() {
@@ -7808,7 +7819,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   $("netChatIn").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("netChatIn") && !$("netChatIn").value.trim()) chatOpen(false); }, 150));
   window.addEventListener("keydown", (e) => { if (e.key === "Enter" && NET.room && !(e.target && e.target.closest && e.target.closest(S.mode === "fly" ? "input, select, textarea" : "input, select, textarea, button")) && $("netChatIn").hidden) { e.preventDefault(); chatOpen(true); } });
   function netRender() {
-    const on = !!NET.room; $("netName").disabled = on; $("netName").title = on ? "Leave the room to change your name" : "";
+    const on = !!NET.room;
     $("netJoin").textContent = on ? "Leave" : "Join"; $("netVal").textContent = on ? `${NET.room} · ${NET.list.length + 1}` : "";
     netSt(on ? `In room ${NET.room}: ${NET.list.length + 1} player${NET.list.length ? "s" : ""} online. Other pilots show as green circles with their names.` : "Fly with other players in the same world. Everyone in the same room sees each other.");
     const L = $("netList"); L.replaceChildren();
@@ -7858,7 +7869,13 @@ vec3 liveryAt(vec3 p, out float fus) {
   $("netJoin").addEventListener("click", () => { if (NET.room) netLeave(); else netJoin(); });
   // one button: connect if needed, then straight into the game (back to your flight, or to the hangar to pick an aircraft)
   const netGo = () => { netPanel.hidden = true; if (S.mode === "paused") resume(); else if (S.mode !== "fly") toHangar(); };
-  $("netPlay").addEventListener("click", () => { if (!NET.room && !NET.joining && netJoin() === false) return; netGo(); });
+  function netApplyName() {   // a new name typed while already online takes effect at once (sent with the next position update)
+    const nm = netCleanName($("netName").value); if (!nm) { $("netName").value = NET.name; return; }
+    $("netName").value = nm; if (nm === NET.name) return; NET.name = nm; save("sw-netname", nm); NET.sendT = 0;
+    chatAdd("", `You are now ${nm}`, false, false, true); netRender(); netListDraw(); flash(`Your name: ${nm}`, 1.6);
+  }
+  $("netName").addEventListener("change", () => { if (NET.room) netApplyName(); });
+  $("netPlay").addEventListener("click", () => { if (NET.room) netApplyName(); else if (!NET.joining && netJoin() === false) return; netGo(); });
   $("netName").addEventListener("input", () => $("netName").classList.remove("need"));
   $("netName").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("netPlay").click(); } });
   setInterval(() => { if (!netPanel.hidden && NET.room) netRender(); else if (NET.room) $("netVal").textContent = `${NET.room} · ${NET.list.length + 1}`; const w = $("wOnline"); if (w) w.textContent = NET.room ? `Online · ${NET.list.length + 1}` : "Online"; }, 2000);
