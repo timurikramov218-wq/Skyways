@@ -363,6 +363,9 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .net-say { display: flex; flex-wrap: wrap; gap: 6px; }
 .net-acc { flex: 1 1 240px; display: grid; gap: 3px; } .net-acc b { font: 600 14px var(--font-body); } .net-acc span { font: 400 12px var(--font-body); color: var(--fg-3); }
 #netPanel { z-index: 13; }
+.gunbtn { position: absolute; right: 18px; top: 52%; z-index: 5; width: 74px; height: 74px; border-radius: 50%; border: 2px solid rgba(255,120,80,0.85); background: rgba(60,12,6,0.55); color: #ffd2c2; font: 800 14px var(--font-body); letter-spacing: 0.06em; display: grid; place-content: center; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
+.gunbtn small { font: 500 10px var(--font-body); opacity: 0.7; } .gunbtn.on { background: rgba(200,50,20,0.75); color: #fff; } .gunbtn[hidden] { display: none; }
+@media (hover: hover) and (pointer: fine) { body:not(.tc-on) .gunbtn { width: 58px; height: 58px; font-size: 12px; } }
 .netbox { position: absolute; left: 14px; top: calc(70px + env(safe-area-inset-top, 0px)); z-index: 4; display: grid; gap: 8px; justify-items: start; max-width: min(230px, 46vw); pointer-events: none; }
 .netbox[hidden] { display: none; }
 .nettoast { display: grid; gap: 6px; justify-items: start; }
@@ -814,6 +817,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       </div>
     </div>
     <div class="jobbar" id="jobBar" hidden aria-live="off"></div>
+    <button class="gunbtn" id="gunBtn" type="button" hidden aria-label="Fire">FIRE<small>J</small></button>
     <div class="netbox" id="netBox" hidden>
       <div class="nettoast" id="netToast" aria-live="polite"></div>
       <div class="netlist">
@@ -7657,6 +7661,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (S.crashed && boom.visible && S.mode !== "replay") { S.boomT += dt; boom.scale.setScalar(1 + S.boomT * 30 * (spec.big ? 2 : 1)); boom.material.opacity = Math.max(0, 0.9 - S.boomT * 0.7); }
     animateModel(dt, now);
     if (S.mode !== "paused" && S.mode !== "replay") AI.forEach((ai) => updateAI(ai, dt, now));
+    gunTick(dt);
     // traffic more than 8.5 km away is a dot under a pixel: don't draw the whole aircraft model (it comes back as it nears)
     for (const ai of AI) { const far = ai.pos.distanceToSquared(camera.position) > 8500 * 8500;
       if (far && ai.model.visible) { ai.model.visible = false; ai.farHide = true; } else if (!far && ai.farHide) { ai.model.visible = true; ai.farHide = false; } }
@@ -7684,6 +7689,73 @@ vec3 liveryAt(vec3 p, out float fus) {
   // times a second; everyone else draws them, smoothed, with their aircraft and livery. Signing in with Google keeps the
   // saved progress in the cloud. Names and messages are only ever drawn as text.
   const FB_CFG = { apiKey: "AIzaSyBu-Dzr9wF6jrl0y5eUE5Okp70bLhUFUD8", authDomain: "skyways-61c6f.firebaseapp.com", databaseURL: "https://skyways-61c6f-default-rtdb.europe-west1.firebasedatabase.app", projectId: "skyways-61c6f", appId: "1:810722050231:web:384ad733578c1eb7370d32" };
+  // ---- the owner's F-15 guns: homing tracer rounds, unlocked only for the game owner's Google account ----
+  // (only a SHA-256 of the address is kept here, never the address itself)
+  const GUN_OWNER = "84ff1fc7b939897bfd21259fe904db361854c5d09bc5c7e2b594603be7d1c9f5";
+  const GUN = { armed: false, fire: false, cd: 0, n: 0, hits: 0, rounds: [], fx: [], checked: null, tgt: null };
+  async function gunCheckOwner(u) {
+    const em = u && !u.isAnonymous && u.email ? u.email.trim().toLowerCase() : ""; if (GUN.checked === em) return; GUN.checked = em;
+    let ok = false; try { if (em && crypto.subtle) { const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(em)); ok = [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("") === GUN_OWNER; } } catch {}
+    if (ok !== GUN.armed) { GUN.armed = ok; if (ok) flash("Owner account: F-15 guns unlocked · J or FIRE", 3); }
+  }
+  {
+    const geo = new THREE.CylinderGeometry(0.35, 0.35, 9, 5, 1, true); geo.rotateX(Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+    for (let i = 0; i < 48; i++) { const m = new THREE.Mesh(geo, mat); m.visible = false; m.frustumCulled = false; scene.add(m); GUN.rounds.push({ m, v: new THREE.Vector3(), t: 0, tg: null }); }
+    const fgeo = new THREE.IcosahedronGeometry(1, 1);
+    for (let i = 0; i < 10; i++) { const m = new THREE.Mesh(fgeo, new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); m.visible = false; scene.add(m); GUN.fx.push({ m, t: 9 }); }
+  }
+  const GV = new THREE.Vector3(), GW = new THREE.Vector3(), GF = new THREE.Vector3(), GQ = new THREE.Quaternion(), GE = new THREE.Euler();
+  function gunTargets() {   // other online pilots, and airborne traffic
+    const out = [];
+    for (const o of NET.list) if (o.s !== "menu" && o.model && o.model.visible) out.push({ p: o.model.position, net: o, r: 16 });
+    for (const ai of AI) if (ai.model && ai.model.visible && ai.pos.y > groundY(ai.pos.x, ai.pos.z) + 15) out.push({ p: ai.pos, ai, r: ai.sp && ai.sp.big ? 26 : 18 });
+    return out;
+  }
+  function gunPick() {   // the target closest to the nose, within 40° and 7 km
+    GF.set(0, 0, -1).applyQuaternion(S.q); let best = null, bs = 1e9;
+    for (const t of gunTargets()) { GV.copy(t.p).sub(S.pos); const d = GV.length(); if (d < 30 || d > 7000) continue; const c = GV.dot(GF) / d; if (c < 0.77) continue; const sc = (1 - c) * 9000 + d; if (sc < bs) { bs = sc; best = t; } }
+    return best;
+  }
+  function gunFx(p, big) { const f = GUN.fx.find((x) => x.t > 0.6) || GUN.fx[0]; f.t = 0; f.big = big; f.m.position.copy(p); f.m.visible = true; }
+  function gunHit(t, p) {
+    GUN.hits++; gunFx(p, true); if (soundOn) chime(140, 0.18);
+    const now = performance.now(); if (t.net && NET.ref && now - (t.net.hitT || 0) > 700) { t.net.hitT = now; NET.ref.child("hits").push({ to: t.net.id, u: NET.uid, n: NET.name, t: Date.now() }).catch(() => {}); if (GUN.hits % 3 === 1) netToast(`Hit ${t.net.n}`); }
+  }
+  function gunTick(dt) {
+    const show = GUN.armed && S.mode === "fly" && spec.fighter && !S.crashed;
+    const btn = $("gunBtn"); if (btn.hidden === show) btn.hidden = !show;
+    const firing = show && (GUN.fire || keys.has("KeyJ")); btn.classList.toggle("on", firing);
+    GUN.cd -= dt;
+    if (firing && GUN.cd <= 0) {   // 14 rounds a second, alternating left and right of the nose
+      GUN.cd = 1 / 14; GUN.tgt = gunPick(); const r = GUN.rounds.find((x) => !x.m.visible) || GUN.rounds[GUN.n % GUN.rounds.length]; GUN.n++;
+      GF.set(0, 0, -1).applyQuaternion(S.q); GW.set(GUN.n % 2 ? 1.6 : -1.6, -0.4, -9).applyQuaternion(S.q);
+      r.m.position.copy(S.pos).add(GW); r.v.copy(GF).multiplyScalar(950).add(S.vel); r.t = 0; r.tg = GUN.tgt; r.m.visible = true; r.m.quaternion.copy(S.q);
+      if (soundOn && GUN.n % 2) chime(1400 + Math.random() * 300, 0.025);
+    }
+    if (S.mode !== "fly") return;
+    if (GUN.jolt > 0 && !S.crashed) { GUN.jolt -= dt; GQ.setFromEuler(GE.set((Math.random() - 0.5) * 0.02, 0, (Math.random() - 0.5) * 0.04)); S.q.multiply(GQ).normalize(); }
+    for (const r of GUN.rounds) {
+      if (!r.m.visible) continue; r.t += dt; if (r.t > 4) { r.m.visible = false; continue; }
+      if (r.tg) {   // homing: turn the round onto the target's position (led by its motion for online pilots)
+        GV.copy(r.tg.p); if (r.tg.net) GV.addScaledVector(r.tg.net.v, Math.min(1.2, r.m.position.distanceTo(GV) / 950));
+        GV.sub(r.m.position); const d = GV.length(), sp = r.v.length();
+        if (d < r.tg.r + sp * dt) { gunHit(r.tg, r.m.position); r.m.visible = false; continue; }
+        GV.multiplyScalar(sp / d); r.v.lerp(GV, Math.min(1, dt * 7)).setLength(sp);
+      }
+      r.m.position.addScaledVector(r.v, dt); GW.copy(r.m.position).add(r.v); r.m.lookAt(GW);
+      if (r.m.position.y < groundY(r.m.position.x, r.m.position.z)) { gunFx(r.m.position, false); r.m.visible = false; }
+    }
+    for (const f of GUN.fx) { if (!f.m.visible) continue; f.t += dt; const k = f.t / 0.6; if (k >= 1) { f.m.visible = false; continue; } f.m.scale.setScalar((f.big ? 14 : 4) * (0.3 + k)); f.m.material.opacity = 0.9 * (1 - k); }
+  }
+  {
+    const b = $("gunBtn"), on = (e) => { e.preventDefault(); GUN.fire = true; try { b.setPointerCapture(e.pointerId); } catch {} }, off = () => { GUN.fire = false; };
+    b.addEventListener("pointerdown", on); b.addEventListener("pointerup", off); b.addEventListener("pointercancel", off); b.addEventListener("lostpointercapture", off);
+  }
+  function netGotHit(m) {   // another pilot's rounds hit you: a jolt, a warning, a little damage
+    flash(`Hit by ${String(m.n || "Pilot").slice(0, 16)}!`, 1.6); buzz([60, 40, 60]); if (soundOn) chime(120, 0.2);
+    GUN.jolt = 0.5;
+  }
   const NET_F = new THREE.Vector3();
   const NET = { list: [], by: new Map(), room: null, ref: null, uid: null, user: null, ready: null, sendT: 0, joinedAt: 0, cloudT: 0,
     tick(dt, now) { if (this.room) { this.send(); this.draw(dt, performance.now()); } },
@@ -7759,7 +7831,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const B = "https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-";
     NET.ready = one(B + "app-compat.js").then(() => one(B + "auth-compat.js")).then(() => one(B + "database-compat.js")).then(() => {
       firebase.initializeApp(FB_CFG);
-      firebase.auth().onAuthStateChanged((u) => { NET.user = u; NET.uid = u ? u.uid : null; netAccount(); if (u && !u.isAnonymous) cloudSync(); });
+      firebase.auth().onAuthStateChanged((u) => { NET.user = u; NET.uid = u ? u.uid : null; gunCheckOwner(u); netAccount(); if (u && !u.isAnonymous) cloudSync(); });
     });
     NET.ready.catch(() => { NET.ready = null; });
     return NET.ready;
@@ -7786,6 +7858,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       P.on("child_changed", (sn) => NET.take(sn.key, sn.val()));
       P.on("child_removed", (sn) => NET.drop(sn.key));
       $("netChatLog").replaceChildren();
+      base.child("hits").limitToLast(5).on("child_added", (sn) => { const m = sn.val(); if (m && m.to === NET.uid && (m.t || 0) >= NET.joinedAt && m.u !== NET.uid) netGotHit(m); });
       base.child("chat").limitToLast(25).on("child_added", (sn) => { const m = sn.val(); if (!m || typeof m.m !== "string") return;
         const fresh = (m.t || 0) >= NET.joinedAt - 2000; chatAdd(String(m.n || "Pilot").slice(0, 16), m.m.slice(0, 100), m.u === NET.uid, !fresh);
         if (fresh && m.u !== NET.uid && soundOn) chime(880, 0.08); });
@@ -7795,7 +7868,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       netSt(e && /admin-restricted|operation-not-allowed/.test(e.code || "") ? "Online isn't switched on yet: anonymous sign-in is disabled in the game's Firebase project." : "Couldn't connect. Online play needs the internet and works on the game's website."); }).then(() => { $("netJoin").disabled = false; NET.joining = false; });
   }
   function netLeave(quiet) {
-    if (NET.ref) { NET.ref.child("players").off(); NET.ref.child("chat").off(); if (NET.me) { NET.me.onDisconnect().cancel(); NET.me.remove().catch(() => {}); } }
+    if (NET.ref) { NET.ref.child("players").off(); NET.ref.child("chat").off(); NET.ref.child("hits").off(); if (NET.me) { NET.me.onDisconnect().cancel(); NET.me.remove().catch(() => {}); } }
     for (const o of NET.list.slice()) NET.drop(o.id, true);
     NET.ref = null; NET.room = null; NET.me = null; if (!quiet) { save("sw-netroom", ""); netRender(); } netListDraw();
   }
