@@ -363,6 +363,13 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .net-say { display: flex; flex-wrap: wrap; gap: 6px; }
 .net-acc { flex: 1 1 240px; display: grid; gap: 3px; } .net-acc b { font: 600 14px var(--font-body); } .net-acc span { font: 400 12px var(--font-body); color: var(--fg-3); }
 #netPanel { z-index: 13; }
+.extbtn { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); z-index: 6; padding: 12px 20px; border-radius: 999px; border: 2px solid #ff5a3c; background: rgba(70,10,4,0.85); color: #fff; font: 800 15px var(--font-body); display: grid; justify-items: center; cursor: pointer; animation: extp 0.8s ease-in-out infinite alternate; }
+.extbtn small { font: 500 10px var(--font-body); opacity: 0.7; } .extbtn[hidden] { display: none; } @keyframes extp { to { box-shadow: 0 0 0 8px rgba(255,90,60,0.25); } }
+.annbox { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); z-index: 7; max-width: min(620px, 88vw); padding: 12px 22px; border-radius: 14px; background: rgba(20,14,4,0.9); border: 1px solid #e3c27a; color: #ffe9b8; font: 600 16px var(--font-body); text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.4); pointer-events: none; }
+.annbox b { display: block; font: 700 11px var(--font-body); letter-spacing: 0.12em; color: #e3c27a; margin-bottom: 4px; } .annbox[hidden] { display: none; }
+.owner-tools { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: 12px; border: 1px solid rgba(227,194,122,0.45); background: rgba(227,194,122,0.06); }
+.owner-tools[hidden] { display: none; } .owner-tools h4 { margin: 0; font: 700 12px var(--font-body); letter-spacing: 0.1em; color: #e3c27a; }
+.owner-tools .row { display: flex; gap: 8px; flex-wrap: wrap; } .owner-tools input, .owner-tools select { flex: 1 1 120px; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--hair); background: #101013; color: var(--fg); font: 400 14px var(--font-body); }
 .gunbtn { position: absolute; right: 18px; top: 52%; z-index: 5; width: 74px; height: 74px; border-radius: 50%; border: 2px solid rgba(255,120,80,0.85); background: rgba(60,12,6,0.55); color: #ffd2c2; font: 800 14px var(--font-body); letter-spacing: 0.06em; display: grid; place-content: center; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
 .gunbtn small { font: 500 10px var(--font-body); opacity: 0.7; } .gunbtn.on { background: rgba(200,50,20,0.75); color: #fff; } .gunbtn[hidden] { display: none; }
 @media (hover: hover) and (pointer: fine) { body:not(.tc-on) .gunbtn { width: 58px; height: 58px; font-size: 12px; } }
@@ -707,6 +714,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
           <button class="chip" id="warnBtn" type="button" aria-pressed="true" title="Warning tones: stall, pull up, terrain, traffic, overspeed clacker, gear horn">Warning sounds</button>
           <button class="chip" id="atcvBtn" type="button" aria-pressed="true" title="The tower and ground controllers' voices (the messages still show)">ATC voice</button>
           <button class="chip" id="tflowBtn" type="button" aria-pressed="true" title="Free flights: the time of day moves on as you fly, day to sunset to night and back">Time passes</button>
+          <button class="chip" id="failBtn" type="button" aria-pressed="true" title="Free flights: now and then something goes wrong in the air (engine fire, bird strike, hydraulics, landing gear)">Random failures</button>
           <button class="chip" id="qualBtn" type="button" title="Graphics quality: resolution, terrain and forest detail distance, shadows">Graphics<span class="val" id="qualVal">Medium</span></button>
           <button class="chip" id="fpsBtn" type="button" aria-pressed="false">FPS counter</button>
           <button class="chip" id="tcBtn" type="button" title="The stick, buttons and throttle on the screen: Auto shows them on touch screens only">On-screen controls<span class="val" id="tcVal">Auto</span></button>
@@ -819,6 +827,8 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       </div>
     </div>
     <div class="jobbar" id="jobBar" hidden aria-live="off"></div>
+    <button class="extbtn" id="extBtn" type="button" hidden>🧯 Extinguish<small>O</small></button>
+    <div class="annbox" id="annBox" hidden></div>
     <button class="gunbtn" id="gunBtn" type="button" hidden aria-label="Fire missile">FIRE<small>MSL · J</small></button>
     <div class="netbox" id="netBox" hidden>
       <div class="nettoast" id="netToast" aria-live="polite"></div>
@@ -838,6 +848,12 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
       <p class="cp-note">Room WORLD is open to everyone. For a private flight, make up a room code and tell it to your friends.</p>
       <div id="netList" class="net-list"></div>
       <div class="net-say" id="netSay" hidden></div>
+      <div class="owner-tools" id="ownTools" hidden>
+        <h4>OWNER TOOLS</h4>
+        <div class="row"><input id="ownMsg" maxlength="120" placeholder="Announcement to everyone in the room" autocomplete="off"><button class="btn alt" id="ownSay" type="button">Announce</button></div>
+        <div class="row"><select id="ownTime" aria-label="Time for everyone"><option value="day">Day</option><option value="sunset">Sunset</option><option value="night">Night</option></select><select id="ownWx" aria-label="Weather for everyone"></select><button class="btn alt" id="ownSky" type="button">Set for everyone</button></div>
+        <div class="row"><select id="ownKickSel" aria-label="Player to remove"></select><button class="btn alt" id="ownKick" type="button">Kick</button></div>
+      </div>
       <hr>
       <div class="net-row"><div class="net-acc"><b id="netAcc">Not signed in</b><span id="netAccSub">Your progress is saved in this browser. Sign in to keep it in the cloud and open it on any device.</span></div><button class="btn alt" id="netSign" type="button">Sign in with Google</button></div>
     </div>
@@ -4344,7 +4360,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const [x, z] = toWorld(at, along, 0);
     S.pos.set(x, at.elev + 0.05 + spec.gearH, z);
     S.q.setFromAxisAngle(AY, -at.hdg * Math.PI / 180); S.vel.set(0, 0, 0);
-    Object.assign(S, { speed: 0, sink: 0, throttle: 0, grounded: true, crashed: false, flaps: 1, gearDown: true, gearPos: 1, flapPos: 1, flightT: 0, vs: 0, wr: 0, wp: 0, wy: 0, pc: 0, touchFpm: null, landedAt: null, autobrake: false, calls: {}, callUntil: 0, boomT: 0, started: false, gate: null, push: null, taxiOut: false, groundPitch: 0, alpha: 0, load: 1, gust: 0, gs: 0, ias: 0, n1: 0, trimAlpha: 0.09, spoiler: 0, autoSpoiler: false, reverse: false, trim: 0, park: false, alerts: {}, msgQ: [], gammaPrev: undefined, gammaRate: 0, engOut: false, lights: typeof ENV !== "undefined" && ENV.time !== "day" });
+    Object.assign(S, { failFire: false, failGear: false, failHyd: false, failPlan: false, failAt: 0, failDone: false, extT: 0, gearTries: 0, speed: 0, sink: 0, throttle: 0, grounded: true, crashed: false, flaps: 1, gearDown: true, gearPos: 1, flapPos: 1, flightT: 0, vs: 0, wr: 0, wp: 0, wy: 0, pc: 0, touchFpm: null, landedAt: null, autobrake: false, calls: {}, callUntil: 0, boomT: 0, started: false, gate: null, push: null, taxiOut: false, groundPitch: 0, alpha: 0, load: 1, gust: 0, gs: 0, ias: 0, n1: 0, trimAlpha: 0.09, spoiler: 0, autoSpoiler: false, reverse: false, trim: 0, park: false, alerts: {}, msgQ: [], gammaPrev: undefined, gammaRate: 0, engOut: false, lights: typeof ENV !== "undefined" && ENV.time !== "day" });
     if (typeof syncTouchKeys === "function") syncTouchKeys();
     if (typeof AP !== "undefined") { AP.on = false; AP.athr = false; AP.app = false; AP.lat = "HDG"; AP.flare = false; apSync(); pushBtn.hidden = true; }
     boom.visible = false; model.visible = true; flyby.set = false;
@@ -4365,7 +4381,7 @@ vec3 liveryAt(vec3 p, out float fus) {
 
   // ================= SOUND =================
   let ac = null, eng = null, engGain = null, soundOn = load("sw-sound") !== "0", SFX = null;
-  const OPT = { "sw-call": load("sw-call") !== "0", "sw-warn": load("sw-warn") !== "0", "sw-atcv": load("sw-atcv") !== "0", "sw-tflow": load("sw-tflow") !== "0" };
+  const OPT = { "sw-fail": load("sw-fail") !== "0", "sw-call": load("sw-call") !== "0", "sw-warn": load("sw-warn") !== "0", "sw-atcv": load("sw-atcv") !== "0", "sw-tflow": load("sw-tflow") !== "0" };
   // ---------- sound: a small synthesiser, no audio files ----------
   // jet: low rumble + fan buzz + a whine that rises with N1; wind over the airframe with airspeed; tyre rumble on the ground;
   // one-shot effects for the gear, flaps, spoilers, touchdown and the cabin chime
@@ -4488,11 +4504,11 @@ vec3 liveryAt(vec3 p, out float fus) {
   function toggleGear() {
     if (!spec.retract) { flash("The Cessna 172 has fixed landing gear", 1.6); return; }
     if (S.grounded && S.gearDown) { flash("Can't raise the gear on the ground", 1.6); return; }
-    if (S.mission && S.mission.gearJam && !S.gearDown && (S.gearTries || 0) < 2) {   // the fault: the first tries don't unlock it
+    if (((S.mission && S.mission.gearJam) || S.failGear) && !S.gearDown && (S.gearTries || 0) < 2) {   // the fault: the first tries don't unlock it
       S.gearTries = (S.gearTries || 0) + 1; sfx("gear", false); buzz(120);
       flash(S.gearTries === 1 ? "GEAR UNSAFE: nothing happened. Try the alternate extension: press G again" : "Still locked up... once more (G)", 2.6); return;
     }
-    S.gearDown = !S.gearDown; flash(S.gearDown ? (S.mission && S.mission.gearJam ? "Alternate extension: the gear is falling free… wait for it" : "Gear down") : "Gear up", 1.4); sfx("gear", S.gearDown);
+    S.gearDown = !S.gearDown; flash(S.gearDown ? ((S.mission && S.mission.gearJam) || S.failGear ? "Alternate extension: the gear is falling free… wait for it" : "Gear down") : "Gear up", 1.4); sfx("gear", S.gearDown);
   }
   function trimStep(noseUp) {
     if (S.mode !== "fly") return;
@@ -4547,7 +4563,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   const invBtn = $("invBtn"); const syncInv = () => invBtn.setAttribute("aria-pressed", String(invert)); syncInv();
   invBtn.addEventListener("click", () => { invert = !invert; save("sw-invert", invert ? "1" : "0"); syncInv(); });
   // separate switches for the aircraft's voice, its warning tones, the controllers' voices and the passing of time (saved)
-  for (const [id, key] of [["callBtn", "sw-call"], ["warnBtn", "sw-warn"], ["atcvBtn", "sw-atcv"], ["tflowBtn", "sw-tflow"]]) {
+  for (const [id, key] of [["callBtn", "sw-call"], ["warnBtn", "sw-warn"], ["atcvBtn", "sw-atcv"], ["tflowBtn", "sw-tflow"], ["failBtn", "sw-fail"]]) {
     const b = $(id); b.setAttribute("aria-pressed", String(OPT[key]));
     b.addEventListener("click", () => { OPT[key] = !OPT[key]; save(key, OPT[key] ? "1" : "0"); b.setAttribute("aria-pressed", String(OPT[key])); });
   }
@@ -5461,6 +5477,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const pad = readPad(); let brake = keys.has("Space") || keys.has("KeyB") || touchBrake;
     if (pad) { pitch += invert ? -pad.pitch : pad.pitch; roll += pad.roll; yaw += pad.yaw; if (pad.thr) S.throttle = clamp(S.throttle + pad.thr * dt * 0.8, 0, 1); brake = brake || pad.brake; }
     pitch = clamp(pitch, -1, 1); roll = clamp(roll, -1, 1); yaw = clamp(yaw, -1, 1);
+    if (S.failHyd) { pitch *= 0.45; roll *= 0.45; yaw *= 0.45; }   // hydraulic failure: heavy, slow controls
     if (!AP.on) pitch = clamp(pitch + (S.grounded ? 0 : S.trim), -1, 1);
     if (AP.on) {
       if (Math.abs(pitch - S.trim) > 0.4 || Math.abs(roll) > 0.4) apEngage(false);
@@ -5477,7 +5494,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (stepDock(dt)) return;
     if (stepServices(dt)) return;
 
-    S.gearPos = clamp(S.gearPos + (S.gearDown ? 1 : -1) * dt * (S.mission && S.mission.gearJam ? 0.12 : 0.5), 0, 1);
+    S.gearPos = clamp(S.gearPos + (S.gearDown ? 1 : -1) * dt * ((S.mission && S.mission.gearJam) || S.failGear ? 0.12 : 0.5), 0, 1);
     S.flapPos = lerp(S.flapPos, S.flaps / 2, Math.min(1, dt * 1.2));
     if (S.reverse && (!S.grounded || S.gs < 2.5)) { S.reverse = false; syncTouchKeys(); if (S.grounded) flash("Reverse thrust off", 1.2); }
     if (S.autoSpoiler && S.throttle > 0.5) { S.spoiler = 0; S.autoSpoiler = false; syncTouchKeys(); }
@@ -6073,7 +6090,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (S.park && S.grounded) items.push(["PARK BRK", HC.warn]);
     if (ENV.model === "real" && !spec.fbw) items.push([`TRIM ${(S.trimAlpha * 57.3).toFixed(1)}°`, HC.hud]);
     if (Math.abs(S.n1 - S.throttle) > 0.08) items.push([`ENG ${Math.round(S.n1 * 100)}%`, HC.caution]);
-    if (S.engOut) items.push(["ENG 2 FAIL", HC.warn]);
+    if (S.failFire) items.push(["ENG 2 FIRE", HC.warn]); else if (S.engOut) items.push(["ENG 2 FAIL", HC.warn]);
+    if (S.failHyd) items.push(["HYD LOW", HC.warn]); if (S.failGear && !S.gearDown) items.push(["GEAR FAULT", HC.caution]);
     if (S.mission && S.mission.noAP) items.push(["AP INOP", HC.caution]);
     if (S.mission && S.mission.fuel) { const left = S.mission.fuel - S.flightT; items.push([left > 0 ? `FUEL ${fmtTime(left)}` : "NO FUEL", left < 45 ? HC.warn : HC.hud]); }
     if (S.rings && S.rings.i < S.rings.list.length) items.push([`RING ${S.rings.i + 1}/${S.rings.list.length}`, HC.nav]);
@@ -7667,7 +7685,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (S.crashed && boom.visible && S.mode !== "replay") { S.boomT += dt; boom.scale.setScalar(1 + S.boomT * 30 * (spec.big ? 2 : 1)); boom.material.opacity = Math.max(0, 0.9 - S.boomT * 0.7); }
     animateModel(dt, now);
     if (S.mode !== "paused" && S.mode !== "replay") AI.forEach((ai) => updateAI(ai, dt, now));
-    gunTick(dt);
+    gunTick(dt); if (S.mode !== "paused" && S.mode !== "replay") { trailTick(dt); failTick(dt); }
     // traffic more than 8.5 km away is a dot under a pixel: don't draw the whole aircraft model (it comes back as it nears)
     for (const ai of AI) { const far = ai.pos.distanceToSquared(camera.position) > 8500 * 8500;
       if (ai.deadT > 0) { ai.deadT -= dt; ai.model.visible = false; ai.farHide = true; continue; }   // shot down: gone for a while, then back in the traffic
@@ -7865,6 +7883,127 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (o.v.lengthSq() > 900) S.vel.copy(o.v); else S.vel.set(0, 0, -1).applyQuaternion(S.q).multiplyScalar(90);
     const v = S.vel.length(); S.speed = S.ias = S.gs = v; S.vs = S.vel.y; S.throttle = 0.75; S.sink = 0;
   }
+
+  // ---- contrails: white trails behind the engines above 8,000 ft, for you and for every online pilot ----
+  const TRAIL_ALT = 2440, TRAIL_LIFE = 40, TRAIL_MAX = 360, TRAILS = new Map();
+  const trailMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uL: { value: 1 } },
+    vertexShader: "attribute float a; varying float vA; void main() { vA = a; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+    fragmentShader: "uniform float uL; varying float vA; void main() { gl_FragColor = vec4(vec3(0.97, 0.98, 1.0) * uL, vA * (0.4 + 0.6 * uL)); }" });
+  function trailFor(id) {
+    let t = TRAILS.get(id); if (t) return t;
+    const n = TRAIL_MAX * 2 * 4, g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute("a", new THREE.BufferAttribute(new Float32Array(n), 1).setUsage(THREE.DynamicDrawUsage));
+    g.setIndex(new THREE.BufferAttribute(new Uint32Array(TRAIL_MAX * 2 * 12), 1).setUsage(THREE.DynamicDrawUsage));
+    const m = new THREE.Mesh(g, trailMat); m.frustumCulled = false; m.renderOrder = 4; scene.add(m);
+    t = { pts: [], m, acc: 0, run: 0, on: false, seen: 0 }; TRAILS.set(id, t); return t;
+  }
+  const TV = new THREE.Vector3(), TS = new THREE.Vector3(), TU = new THREE.Vector3(0, 1, 0);
+  function trailSample(id, pos, q, sp, dt, now) {   // sp: the aircraft's spec (where the engines are)
+    const t = trailFor(id); t.seen = now; t.acc += dt;
+    const on = pos.y > TRAIL_ALT;
+    if (!on) { if (t.on) t.run++; t.on = false; return; }
+    if (!t.on) { t.on = true; t.run++; }
+    if (t.acc < 0.12) return; t.acc = 0;
+    const fighter = sp && sp.fighter, x = fighter ? 0.7 : Math.max(2.5, (sp && sp.wingX || 18) * 0.34), z = fighter ? 8 : 4;
+    for (const sx of [-1, 1]) { TV.set(sx * x, fighter ? 0 : -1.2, z).applyQuaternion(q).add(pos); t.pts.push({ x: TV.x, y: TV.y, z: TV.z, s: sx, born: now, run: t.run }); }
+    while (t.pts.length > TRAIL_MAX * 2) t.pts.shift();
+  }
+  function trailDraw(t, now) {
+    const P = t.m.geometry.attributes.position.array, A = t.m.geometry.attributes.a.array, I = t.m.geometry.index.array; let v = 0, k = 0;
+    while (t.pts.length && now - t.pts[0].born > TRAIL_LIFE) t.pts.shift();
+    for (const side of [-1, 1]) {
+      let prev = -1, pp = null;
+      for (const p of t.pts) {
+        if (p.s !== side) continue; const age = now - p.born, w = Math.min(16, 0.9 + age * 0.75), al = Math.min(1, age / 0.5) * Math.pow(1 - age / TRAIL_LIFE, 1.5) * 0.5;
+        if (pp) TS.set(p.x - pp.x, 0, p.z - pp.z); else TS.set(0, 0, 1);
+        TS.set(-TS.z, 0, TS.x).normalize().multiplyScalar(w);
+        const b = v; P.set([p.x - TS.x, p.y, p.z - TS.z, p.x + TS.x, p.y, p.z + TS.z, p.x, p.y + w, p.z, p.x, p.y - w, p.z], v * 3); A.set([al, al, al, al], v); v += 4;
+        if (prev >= 0 && pp.run === p.run) I.set([prev, prev + 1, b + 1, prev, b + 1, b, prev + 2, prev + 3, b + 3, prev + 2, b + 3, b + 2], k), k += 12;
+        prev = b; pp = p;
+      }
+    }
+    t.m.geometry.setDrawRange(0, k); t.m.geometry.attributes.position.needsUpdate = true; t.m.geometry.attributes.a.needsUpdate = true; t.m.geometry.index.needsUpdate = true; t.m.visible = k > 0;
+  }
+  function trailTick(dt) {
+    const now = performance.now() / 1000, tod = ENV.tod ?? TOD[ENV.time] ?? 0;
+    trailMat.uniforms.uL.value = tod <= 1 ? 1 - tod * 0.3 : 0.7 - (tod - 1) * 0.5;   // day 1, sunset 0.7, night 0.2
+    if (S.mode === "fly" && !S.crashed && model) trailSample("me", S.pos, S.q, spec, dt, now);
+    if (NET.room) for (const o of NET.list) if (o.model && o.s === "air" && !(o.deadT > performance.now())) trailSample(o.id, o.model.position, o.model.quaternion, PLANES[o.k], dt, now);
+    for (const [id, t] of TRAILS) {
+      if (now - t.seen > TRAIL_LIFE && !t.pts.length) { scene.remove(t.m); t.m.geometry.dispose(); TRAILS.delete(id); continue; }
+      if (now - t.seen > 0.5 && t.on) { t.on = false; t.run++; }
+      trailDraw(t, now);
+    }
+  }
+  // ---- random failures on free flights: engine fire, bird strike, hydraulics, landing gear ----
+  const FIRE = [];
+  {
+    const g = new THREE.IcosahedronGeometry(1, 1);
+    for (let i = 0; i < 90; i++) { const fire = i % 3 !== 2, m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: fire ? 0xff7a20 : 0x2a2622, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; scene.add(m); FIRE.push({ m, t: 9, fire, life: fire ? 0.7 : 4 }); }
+  }
+  let fireI = 0, fireAcc = 0;
+  const FE = new THREE.Vector3();
+  function enginePos(out) {
+    const fighter = spec.fighter; return out.set(fighter ? 0.7 : (spec.wingX || 18) * 0.34, fighter ? 0 : -1.6, fighter ? 8 : -1).applyQuaternion(S.q).add(S.pos);
+  }
+  function failStart() {
+    const kinds = ["fire", "bird", "hyd"]; if (spec.retract && !S.gearDown) kinds.push("gear");
+    const k = kinds[Math.floor(Math.random() * kinds.length)]; S.failDone = true; buzz([200, 80, 200]);
+    if (k === "fire") { S.failFire = true; S.engOut = true; S.extT = 0; flash("ENGINE FIRE · right engine! Fire the extinguisher (O or the button), then land as soon as you can", 5); }
+    if (k === "bird") { S.engOut = true; sfx("crash"); flash("BIRD STRIKE · right engine failed. Hold a little left rudder (Q), keep your speed up and land", 5); for (let i = 0; i < 6; i++) fireBurst(false); }
+    if (k === "hyd") { S.failHyd = true; flash("HYDRAULICS LOW · the controls are heavy and slow. Fly gently, make a long straight approach", 5); }
+    if (k === "gear") { S.failGear = true; S.gearTries = 0; flash("HYDRAULIC FAULT · the landing gear may not come down. Before landing press G, and keep trying", 5); }
+    if (soundOn) { chime(880, 0.2); setTimeout(() => chime(660, 0.3), 220); }
+  }
+  function fireBurst(fire) { const f = FIRE[fireI++ % FIRE.length]; f.fire = fire; f.life = fire ? 0.7 : 4; f.m.material.color.setHex(fire ? (Math.random() < 0.5 ? 0xff7a20 : 0xffb340) : 0x2a2622); f.t = 0; f.m.visible = true; enginePos(f.m.position); f.m.position.x += (Math.random() - 0.5) * 1.5; f.m.position.y += (Math.random() - 0.5) * 1.5; }
+  function extinguish() {
+    if (!S.failFire || S.extT) return; S.extT = 0.01; flash("Extinguisher fired… the fire is going out. The engine stays shut down", 3); if (soundOn) chime(300, 0.4);
+  }
+  $("extBtn").addEventListener("click", extinguish);
+  window.addEventListener("keydown", (e) => { if (e.code === "KeyO" && S.mode === "fly" && !(e.target && e.target.closest && e.target.closest("input, select, textarea"))) extinguish(); });
+  function failTick(dt) {
+    const eb = $("extBtn"), showExt = S.mode === "fly" && S.failFire && !S.extT && !S.crashed; if (eb.hidden === showExt) eb.hidden = !showExt;
+    for (const f of FIRE) { if (!f.m.visible) continue; f.t += dt; const k = f.t / f.life; if (k >= 1) { f.m.visible = false; continue; } f.m.scale.setScalar(f.fire ? 1.2 + k * 2.5 : 1.5 + k * 9); f.m.material.opacity = (f.fire ? 0.9 : 0.55) * (1 - k); if (!f.fire) f.m.position.y += dt * 2; }
+    if (S.mode !== "fly" || S.crashed) return;
+    if (!S.failPlan && S.started && !S.grounded && S.flightT > 20) {   // once per free flight: maybe something, some minutes after take-off
+      S.failPlan = true; S.failAt = OPT["sw-fail"] && !S.mission && !S.careerJob && Math.random() < 0.6 ? S.flightT + 90 + Math.random() * 270 : 0;
+    }
+    if (S.failAt && !S.failDone && S.flightT > S.failAt && !S.grounded && (S.pos.y - heightAt(S.pos.x, S.pos.z)) * M2FT > 1200) failStart();
+    if (S.failFire) {
+      if (S.extT) { S.extT += dt; if (S.extT > 2.5) { S.failFire = false; flash("Fire out. Right engine shut down: land at the nearest airport", 3); } }
+      else if ((S.fireT = (S.fireT || 0) + dt) > 75) { S.fireT = 0; crash("The engine fire spread to the wing."); return; }
+      if ((fireAcc += dt) > 0.05) { fireAcc = 0; fireBurst(!S.extT || Math.random() < 0.3); if (Math.random() < 0.5) fireBurst(false); }
+      if (!S.extT && soundOn && Math.floor(S.flightT * 2) !== Math.floor((S.flightT - dt) * 2)) chime(1050, 0.12);
+    } else if (S.engOut && S.failDone && (fireAcc += dt) > 0.3) { fireAcc = 0; fireBurst(false); }
+  }
+  // ---- owner tools: announcements, sky for everyone, removing a player ----
+  function ownerSend(o) { if (!GUN.armed || !NET.ref) return; NET.ref.child("chat").push(Object.assign({ m: "", adm: 1, u: NET.uid, n: NET.name, t: Date.now() }, o)).catch(() => flash("Couldn't send", 1.5)); }
+  function annShow(text, who) { const b = $("annBox"); b.replaceChildren(); const h = document.createElement("b"); h.textContent = `ANNOUNCEMENT · ${who}`; b.append(h, document.createTextNode(text)); b.hidden = false; clearTimeout(annShow.t); annShow.t = setTimeout(() => (b.hidden = true), 8000); if (soundOn) { chime(660, 0.15); setTimeout(() => chime(990, 0.2), 160); } }
+  function skySet(time, wx) {
+    if (!["day", "sunset", "night"].includes(time) || ![...$("wxSel").options].some((x) => x.value === wx)) return;
+    $("timeSel").value = time; $("wxSel").value = wx; ENV.tod = TOD[time]; applyEnv(time, wx); S.lights = time !== "day";
+  }
+  function netAdmMsg(m) {
+    if ((m.t || 0) < NET.joinedAt) return;
+    const who = String(m.n || "Owner").slice(0, 16);
+    if (m.say) annShow(String(m.say).slice(0, 120), who);
+    if (m.sky) skySet(m.sky[0], m.sky[1]);
+    if (m.kick && m.kick === NET.uid) { netLeave(); save("sw-kicked", String(Date.now() + 10 * 60000)); annShow("The game's owner removed you from the online room for 10 minutes.", who); }
+  }
+  {
+    const wx = $("ownWx"); for (const o of $("wxSel").options) { const x = document.createElement("option"); x.value = o.value; x.textContent = o.textContent; wx.append(x); }
+    $("ownSay").addEventListener("click", () => { const v = $("ownMsg").value.trim(); if (!v) return; ownerSend({ say: v.slice(0, 120) }); annShow(v.slice(0, 120), "you"); $("ownMsg").value = ""; });
+    $("ownMsg").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("ownSay").click(); } });
+    $("ownSky").addEventListener("click", () => { const t = $("ownTime").value, w = $("ownWx").value; ownerSend({ sky: [t, w] }); skySet(t, w); flash(`Everyone: ${t}, ${w}`, 2); });
+    $("ownKick").addEventListener("click", () => { const id = $("ownKickSel").value, o = NET.by.get(id); if (!o) return; ownerSend({ kick: id }); flash(`${o.n} removed for 10 minutes`, 2); });
+  }
+  function ownToolsDraw() {
+    const box = $("ownTools"), show = GUN.armed && !!NET.room; box.hidden = !show; if (!show) return;
+    const sel = $("ownKickSel"), cur = sel.value, ids = NET.list.map((o) => o.id).join();
+    if (sel.dataset.ids !== ids) { sel.dataset.ids = ids; sel.replaceChildren(); for (const o of NET.list) { const x = document.createElement("option"); x.value = o.id; x.textContent = o.n; sel.append(x); } if (!NET.list.length) { const x = document.createElement("option"); x.textContent = "No other players"; x.value = ""; sel.append(x); } sel.value = cur; }
+    $("ownKick").disabled = !NET.list.length;
+  }
   const NET_F = new THREE.Vector3();
   const NET = { mine: new Set(), list: [], by: new Map(), room: null, ref: null, uid: null, user: null, ready: null, sendT: 0, joinedAt: 0, cloudT: 0,
     tick(dt, now) { if (this.room) { this.send(); this.draw(dt, performance.now()); } },
@@ -7951,6 +8090,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   const netAuth = () => (NET.user ? Promise.resolve(NET.user) : firebase.auth().signInAnonymously().then((c) => c.user));
   function netJoin() {
     const room = ($("netRoom").value || "WORLD").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12) || "WORLD"; $("netRoom").value = room;
+    const kick = +(load("sw-kicked") || 0); if (kick > Date.now()) { netSt(`You were removed from the online room. Try again in ${Math.ceil((kick - Date.now()) / 60000)} min.`); return false; }
     const nm = netCleanName($("netName").value); $("netName").value = nm;
     if (!nm) { netSt("Type your name first — that's what other pilots will see."); $("netName").classList.add("need"); netPanel.hidden = false; $("netName").focus(); return false; }
     $("netName").classList.remove("need"); NET.name = nm; save("sw-netname", nm);
@@ -7973,7 +8113,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       P.on("child_removed", (sn) => NET.drop(sn.key));
       $("netChatLog").replaceChildren();
       base.child("chat").limitToLast(25).on("child_added", (sn) => { const m = sn.val(); if (!m || typeof m.m !== "string") return;
-        if (m.to) { netHitMsg(m); return; } if (m.msl) { netMslMsg(m); return; }
+        if (m.to) { netHitMsg(m); return; } if (m.msl) { netMslMsg(m); return; } if (m.adm) { netAdmMsg(m); return; }
         const fresh = (m.t || 0) >= NET.joinedAt - 2000; chatAdd(String(m.n || "Pilot").slice(0, 16), m.m.slice(0, 100), m.u === NET.uid, !fresh);
         if (fresh && m.u !== NET.uid && soundOn) chime(880, 0.08); });
       save("sw-netroom", /^WORLD\d$/.test(room) ? "WORLD" : room); netRender(); flash(`Online: room ${room}. Other pilots appear as green circles`, 3);
@@ -8017,7 +8157,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   $("netChatIn").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("netChatIn") && !$("netChatIn").value.trim()) chatOpen(false); }, 150));
   window.addEventListener("keydown", (e) => { if (e.key === "Enter" && NET.room && !(e.target && e.target.closest && e.target.closest(S.mode === "fly" ? "input, select, textarea" : "input, select, textarea, button")) && $("netChatIn").hidden) { e.preventDefault(); chatOpen(true); } });
   function netRender() {
-    const on = !!NET.room;
+    const on = !!NET.room; ownToolsDraw();
     $("netJoin").textContent = on ? "Leave" : "Join"; $("netVal").textContent = on ? `${NET.room} · ${NET.list.length + 1}` : "";
     netSt(on ? `In room ${NET.room}: ${NET.list.length + 1} player${NET.list.length ? "s" : ""} online. Other pilots show as green circles with their names.` : "Fly with other players in the same world. Everyone in the same room sees each other.");
     const L = $("netList"); L.replaceChildren();
