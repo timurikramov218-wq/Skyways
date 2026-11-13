@@ -3629,7 +3629,6 @@ vec3 liveryAt(vec3 p, out float fus) {
       const fan = new THREE.Group(); fan.position.set(fit.x, fit.y, fit.z);
       const disc = new THREE.Mesh(FAN_GEO, FAN_MAT); disc.scale.setScalar(fit.r * 0.97); fan.add(disc);
       const cone = new THREE.Mesh(SPIN_GEO, SPIN_MAT); cone.scale.setScalar(fit.r * 1.15); fan.add(cone);
-      fan.userData.r = fit.r; fan.userData.zEnd = e[4] !== undefined && e[4] > fit.z ? e[4] : fit.z + fit.r * 4;   // where the nozzle ends: jet blast starts here
       root.add(fan); fans.push(fan);
     }
     // lights: red (left) and green (right) at the wingtips, white strobes there, a white tail light, red beacons top and bottom
@@ -7686,7 +7685,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (S.crashed && boom.visible && S.mode !== "replay") { S.boomT += dt; boom.scale.setScalar(1 + S.boomT * 30 * (spec.big ? 2 : 1)); boom.material.opacity = Math.max(0, 0.9 - S.boomT * 0.7); }
     animateModel(dt, now);
     if (S.mode !== "paused" && S.mode !== "replay") AI.forEach((ai) => updateAI(ai, dt, now));
-    gunTick(dt); if (S.mode !== "paused" && S.mode !== "replay") { trailTick(dt); failTick(dt); blastTick(dt); }
+    gunTick(dt); if (S.mode !== "paused" && S.mode !== "replay") { trailTick(dt); failTick(dt); }
     // traffic more than 8.5 km away is a dot under a pixel: don't draw the whole aircraft model (it comes back as it nears)
     for (const ai of AI) { const far = ai.pos.distanceToSquared(camera.position) > 8500 * 8500;
       if (ai.deadT > 0) { ai.deadT -= dt; ai.model.visible = false; ai.farHide = true; continue; }   // shot down: gone for a while, then back in the traffic
@@ -8004,46 +8003,6 @@ vec3 liveryAt(vec3 p, out float fus) {
     const sel = $("ownKickSel"), cur = sel.value, ids = NET.list.map((o) => o.id).join();
     if (sel.dataset.ids !== ids) { sel.dataset.ids = ids; sel.replaceChildren(); for (const o of NET.list) { const x = document.createElement("option"); x.value = o.id; x.textContent = o.n; sel.append(x); } if (!NET.list.length) { const x = document.createElement("option"); x.textContent = "No other players"; x.value = ""; sel.append(x); } sel.value = cur; }
     $("ownKick").disabled = !NET.list.length;
-  }
-
-  // ---- jet blast: a shimmering heat plume behind each engine, and dust blown up off the ground at high power ----
-  const blastGeo = new THREE.CylinderGeometry(1, 2.2, 1, 18, 6, true); blastGeo.rotateX(-Math.PI / 2); blastGeo.translate(0, 0, 0.5);   // along +z (behind the nozzle)
-  const blastMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uT: { value: 0 }, uI: { value: 0 } },
-    vertexShader: "varying vec2 vU; varying vec3 vN; varying vec3 vV; uniform float uT; void main() { vU = uv; vec3 p = position; float w = sin(p.z * 9.0 - uT * 30.0) * 0.06 * uv.y; p.x += w; p.y += w * 0.7; vec4 mv = modelViewMatrix * vec4(p, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }",
-    fragmentShader: "varying vec2 vU; varying vec3 vN; varying vec3 vV; uniform float uT; uniform float uI; void main() { float along = vU.y; float rim = abs(dot(vN, vV)); float flick = 0.75 + 0.25 * sin(along * 40.0 - uT * 55.0 + vU.x * 25.0); float a = uI * pow(1.0 - along, 1.4) * (0.35 + 0.65 * rim) * flick * 0.5; vec3 c = mix(vec3(0.62, 0.6, 0.6), vec3(0.86, 0.87, 0.9), along); gl_FragColor = vec4(c, a); }" });
-  const DUST = [];
-  {
-    const g = new THREE.IcosahedronGeometry(1, 1);
-    for (let i = 0; i < 70; i++) { const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0xbfae8e, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; scene.add(m); DUST.push({ m, t: 9, v: new THREE.Vector3() }); }
-  }
-  let dustI = 0, dustAcc = 0, blastT = 0;
-  const BW = new THREE.Vector3(), BB = new THREE.Vector3();
-  function blastFor(mdl) {   // plume meshes are made once per aircraft model, at its nozzles
-    if (mdl.userData.blast) return mdl.userData.blast;
-    const list = [];
-    for (const f of mdl.userData.fans || []) {
-      if (!f.parent || f.userData.r === undefined) continue;
-      const m = new THREE.Mesh(blastGeo, blastMat); m.position.set(f.position.x, f.position.y, f.userData.zEnd); m.frustumCulled = false; m.renderOrder = 5; m.visible = false;
-      f.parent.add(m); list.push({ m, r: f.userData.r });
-    }
-    return (mdl.userData.blast = list);
-  }
-  function blastTick(dt) {
-    blastT += dt; blastMat.uniforms.uT.value = blastT;
-    for (const d of DUST) { if (!d.m.visible) continue; d.t += dt; const k = d.t / 2.4; if (k >= 1) { d.m.visible = false; continue; } d.m.position.addScaledVector(d.v, dt); d.v.multiplyScalar(1 - dt * 1.2); d.m.scale.setScalar(2 + k * 9); d.m.material.opacity = 0.6 * Math.min(1, k * 6) * (1 - k); }
-    if (!model) return;
-    const list = blastFor(model), on = S.mode === "fly" && !S.crashed && !spec.fighter && model.visible, n1 = on ? S.n1 || S.throttle : 0;
-    blastMat.uniforms.uI.value = Math.max(0, (n1 - 0.15) / 0.85);
-    for (const b of list) { b.m.visible = on && n1 > 0.17; const len = b.r * (6 + 22 * n1); b.m.scale.set(b.r * 0.9, b.r * 0.9, len); }
-    // dust: on the ground (or just above it) at take-off power, kicked up 15-70 m behind the engines
-    if (!on || !list.length || n1 < 0.55) return;
-    const agl = S.pos.y - heightAt(S.pos.x, S.pos.z); if (agl > 40 + spec.gearH) return;
-    if ((dustAcc += dt * (n1 - 0.45) * 30) < 1) return; dustAcc = 0;
-    const b = list[Math.floor(Math.random() * list.length)]; b.m.getWorldPosition(BW);
-    BB.set(0, 0, 1).applyQuaternion(S.q); BB.y = 0; BB.normalize();
-    const back = 15 + Math.random() * 55; BW.addScaledVector(BB, back); BW.x += (Math.random() - 0.5) * 8; BW.z += (Math.random() - 0.5) * 8; BW.y = heightAt(BW.x, BW.z) + 1;
-    const d = DUST[dustI++ % DUST.length]; d.t = 0; d.m.visible = true; d.m.position.copy(BW); d.v.copy(BB).multiplyScalar(14 + Math.random() * 10); d.v.y = 2 + Math.random() * 3;
-    const grass = biomeW(BW.x, BW.z); d.m.material.color.setHex(grass && grass.desert > 0.5 ? 0xc9a96e : 0x9a917f);
   }
   const NET_F = new THREE.Vector3();
   const NET = { mine: new Set(), list: [], by: new Map(), room: null, ref: null, uid: null, user: null, ready: null, sendT: 0, joinedAt: 0, cloudT: 0,
