@@ -375,7 +375,9 @@ kbd { font: 400 11px var(--font-mono); color: var(--fg); background: rgba(255,25
 .netlist-h[aria-expanded="false"] .chev { transform: rotate(-90deg); }
 .netlist-rows { display: grid; gap: 2px; padding: 0 6px 6px; max-height: 30vh; overflow-y: auto; }
 .netlist-rows[hidden] { display: none; }
-.netrow { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 8px; align-items: center; padding: 5px 6px; border-radius: 8px; }
+.netrow .fol { grid-column: 3; grid-row: 1 / span 2; padding: 4px 9px; border-radius: 999px; border: 1px solid rgba(127,227,154,0.55); background: rgba(127,227,154,0.12); color: #c9f5d4; font: 600 11px var(--font-body); cursor: pointer; }
+.netrow .fol.on { background: #7fe39a; color: #0b2a16; } .netrow .fol[hidden] { display: none; }
+.netrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1px 8px; align-items: center; padding: 5px 6px; border-radius: 8px; }
 .netrow.me { background: rgba(255,255,255,0.05); }
 .netrow i { grid-row: span 2; width: 8px; height: 8px; border-radius: 50%; background: #7fe39a; }
 .netrow i.paused { background: #ffc94d; } .netrow i.menu { background: #8a8a90; } .netrow i.ground { background: #78beff; }
@@ -7643,7 +7645,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   function frame(now) {
     if (SHOW.on) { last = now; requestAnimationFrame(frame); return; }   // the 360° hangar has the GPU to itself
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (S.mode === "fly" && !S.crashed) { step(dt / 2); if (!S.crashed && S.mode === "fly") step(dt / 2); }
+    if (S.mode === "fly" && !S.crashed) { step(dt / 2); if (!S.crashed && S.mode === "fly") step(dt / 2); followTick(dt); }
     else if (S.mode === "paused") readPad();
     if (S.mode === "fly") recTick(dt);            // the replay recorder keeps the last 90 s (including a crash)
     // time passes on free flights: about 7 minutes from day to sunset, 7 more to night, then back through dawn to day
@@ -7834,6 +7836,31 @@ vec3 liveryAt(vec3 p, out float fus) {
       startFlight(); sel.value = was; if (job) S.careerJob = job;
     }, 1200);
   }
+  // ---- formation: your aircraft takes station off another pilot's wing, behind and to the side, until you take control ----
+  const FOLLOW = { id: null, side: 1, joined: false }, FV = new THREE.Vector3();
+  function followStart(id) {
+    const o = NET.by.get(id); if (!o || o.s !== "air" || S.mode !== "fly" || S.crashed) return;
+    FOLLOW.id = id; FOLLOW.joined = false; FOLLOW.side = -FOLLOW.side;
+    if (typeof AP !== "undefined" && AP.on) apEngage(false);
+    flash(`Formation with ${o.n} · move the stick or tap Stop to take control`, 3);
+  }
+  function followStop(why) {
+    if (!FOLLOW.id) return; FOLLOW.id = null; FOLLOW.joined = false;
+    if (why) flash(why, 2); netListDraw();
+  }
+  function followTick(dt) {
+    if (!FOLLOW.id) return;
+    const o = NET.by.get(FOLLOW.id);
+    if (!o || !o.model || S.crashed || o.deadT > performance.now()) { followStop(o ? `Lost ${o.n}` : "Your lead left"); return; }
+    if (o.s !== "air") { followStop(`${o.n} is ${o.s === "ground" ? "on the ground" : o.s === "paused" ? "paused" : "in the menu"}: you have control`); return; }
+    if (FOLLOW.joined && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD"].some((k) => keys.has(k)) || Math.hypot(stick.x, stick.y) > 0.5) { followStop("You have control"); return; }
+    const big = (PLANES[o.k] && PLANES[o.k].big) || spec.big, side = big ? 75 : 48, back = big ? 70 : 45;
+    FV.set(FOLLOW.side * side, -3, back).applyQuaternion(o.model.quaternion).add(o.model.position);   // +z is behind the nose
+    if (!FOLLOW.joined) { S.pos.copy(FV); S.q.copy(o.model.quaternion); FOLLOW.joined = true; S.grounded = false; S.gearDown = false; S.gearPos = 0; S.flaps = 0; S.flapPos = 0; S.park = false; S.push = null; S.gate = null; }
+    else { S.pos.copy(FV); S.q.slerp(o.model.quaternion, 1 - Math.exp(-dt * 8)).normalize(); }   // the lead's model is already smoothed: hold station exactly
+    if (o.v.lengthSq() > 900) S.vel.copy(o.v); else S.vel.set(0, 0, -1).applyQuaternion(S.q).multiplyScalar(90);
+    const v = S.vel.length(); S.speed = S.ias = S.gs = v; S.vs = S.vel.y; S.throttle = 0.75; S.sink = 0;
+  }
   const NET_F = new THREE.Vector3();
   const NET = { mine: new Set(), list: [], by: new Map(), room: null, ref: null, uid: null, user: null, ready: null, sendT: 0, joinedAt: 0, cloudT: 0,
     tick(dt, now) { if (this.room) { this.send(); this.draw(dt, performance.now()); } },
@@ -7890,8 +7917,11 @@ vec3 liveryAt(vec3 p, out float fus) {
     while (rows.children.length > all.length) rows.lastChild.remove();
     all.forEach((o, i) => {   // rows are updated in place so a tap on one never lands on a node that was just replaced
       let r = rows.children[i];
-      if (!r) { r = document.createElement("div"); r.append(document.createElement("i"), document.createElement("b"), document.createElement("span")); rows.append(r); }
-      const [dot, nm, sub] = r.children;
+      if (!r) { r = document.createElement("div"); const fb = document.createElement("button"); fb.type = "button"; fb.className = "fol";
+        fb.addEventListener("click", (e) => { e.stopPropagation(); const id = r.dataset.id; if (FOLLOW.id === id) followStop("You have control"); else followStart(id); netListDraw(); });
+        r.append(document.createElement("i"), document.createElement("b"), document.createElement("span"), fb); rows.append(r); }
+      const [dot, nm, sub, fb] = r.children; r.dataset.id = o.me ? "" : o.id;
+      fb.hidden = o.me || o.s !== "air" || S.mode !== "fly" || S.crashed; fb.textContent = FOLLOW.id === o.id ? "Stop" : "Follow"; fb.classList.toggle("on", FOLLOW.id === o.id);
       r.className = "netrow" + (o.me ? " me" : ""); dot.className = o.s; nm.textContent = o.n;
       const dist = !o.me && o.s !== "menu" && S.mode !== "brief" ? ` · ${(o.p.distanceTo(S.pos) / 1000).toFixed(1)} km` : "";
       sub.textContent = `${PLANES[o.k] ? PLANES[o.k].name : ""} · ${NST[o.s]}${o.s === "ground" && o.a ? " at " + o.a : ""}${dist}`;
