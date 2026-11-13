@@ -782,6 +782,7 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
         <button class="atc-b" id="atcDep" type="button"><span>Ready for departure</span><small id="atcDepSub">runway</small></button>
         <button class="atc-b" id="atcArr" type="button"><span>Request landing</span><small id="atcArrSub">runway</small></button>
       </div>
+      <button class="chip" id="atcRwy" type="button" hidden>Land on the other runway</button>
       <p class="atc-st" id="atcStatus">No clearance yet.</p>
     </div>
     <div class="svc" id="svc" hidden role="group" aria-label="Ground services">
@@ -4179,11 +4180,12 @@ vec3 liveryAt(vec3 p, out float fus) {
       for (const sd of [-1, 1]) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(70, 7), new THREE.MeshBasicMaterial({ map: textTex(satName, "#14385e", "#ffffff", 1024, 102) }));
         sg.rotation.y = sd < 0 ? -Math.PI / 2 : Math.PI / 2; sg.position.set(cxs + sd * (13 * 1.6 + 0.4), 15 * 1.55 + 4.5, 0); grp.add(sg); }
       const heavy = a.stands.filter((k) => PLANES[k] && PLANES[k].big), kinds = heavy.length ? heavy : a.stands;
-      let n = 0;
-      const perSide = Math.max(2, Math.min(3, Math.floor(L / 135))), fzs = Array.from({ length: perSide }, (_, k) => (k + 0.5) / perSide - 0.5).map((f) => f * 0.9);
-      for (const side of [-1, 1]) for (const fz of fzs) {
+      let n = 0; a.satLive = [];
+      // fewer stands than before: two working stands on the runway side (traffic from the second runway taxis in, parks, pushes back)
+      // and one aircraft parked on the terminal side
+      const SLOTS = [[1, -0.27], [1, 0.27], [-1, 0.27]];
+      for (const [side, fz] of SLOTS) {
         const kind = kinds[n++ % kinds.length], sp = PLANES[kind], len = DIMS[kind][1], z = fz * L;
-        if (Math.abs(z) < L * 0.11 + DIMS[kind][0] * 0.1 && perSide % 2) continue;   // keep the central hall's front clear
         if (side > 0 && cxs + 22 + len > x1 - 10) continue;
         { // jet bridge: a rotunda at the concourse and a glass tunnel to the front left door
           const nose = cxs + side * 21, dx = nose + side * len * 0.12, dz = z + side * 4.5, rx = cxs + side * 16, rz = z + side * 14;
@@ -4192,6 +4194,12 @@ vec3 liveryAt(vec3 p, out float fus) {
           tb.position.set((dx + rx) / 2, 4.8, (dz + rz) / 2); tb.rotation.y = -Math.atan2(dz - rz, dx - rx); grp.add(tb);
           const leg = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.3, 0.8), MAT.door); leg.position.set(rx + (dx - rx) * 0.7, 1.65, rz + (dz - rz) * 0.7); grp.add(leg); }
         flat(grp, Math.max(10, (x1 - x0) / 2 - 20), 0.45, MAT.yellow, cxs + side * ((x1 - x0) / 4 + 6), 0.09, z);
+        if (side > 0) {   // a working stand: no parked model, traffic uses it
+          const st = { kind, z, len, sat: true, cxs, live: true }; a.satLive.push(st);
+          const no = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), new THREE.MeshBasicMaterial({ map: textTex(`B${a.satLive.length}`, "#14161a", "#f2c230", 128, 128), polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -12 }));
+          no.rotation.x = -Math.PI / 2; no.rotation.z = -Math.PI / 2; no.position.set(cxs + 21 + len + 12, 0.1, z); grp.add(no);
+          continue;
+        }
         const placeS = (mdl) => {
           mdl.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2; mdl.position.set(cxs + side * (13 + 8 + len / 2), sp.gearH + 0.05, z);
           if (mdl.userData.glow) mdl.userData.glow.visible = false; (mdl.userData.strobes || []).forEach((s) => (s.visible = false)); grp.add(mdl); bakeParked(mdl); stripParked(mdl, grp); satModels.push(mdl);
@@ -4360,7 +4368,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const [x, z] = toWorld(at, along, 0);
     S.pos.set(x, at.elev + 0.05 + spec.gearH, z);
     S.q.setFromAxisAngle(AY, -at.hdg * Math.PI / 180); S.vel.set(0, 0, 0);
-    Object.assign(S, { failFire: false, failGear: false, failHyd: false, failPlan: false, failAt: 0, failDone: false, extT: 0, gearTries: 0, speed: 0, sink: 0, throttle: 0, grounded: true, crashed: false, flaps: 1, gearDown: true, gearPos: 1, flapPos: 1, flightT: 0, vs: 0, wr: 0, wp: 0, wy: 0, pc: 0, touchFpm: null, landedAt: null, autobrake: false, calls: {}, callUntil: 0, boomT: 0, started: false, gate: null, push: null, taxiOut: false, groundPitch: 0, alpha: 0, load: 1, gust: 0, gs: 0, ias: 0, n1: 0, trimAlpha: 0.09, spoiler: 0, autoSpoiler: false, reverse: false, trim: 0, park: false, alerts: {}, msgQ: [], gammaPrev: undefined, gammaRate: 0, engOut: false, lights: typeof ENV !== "undefined" && ENV.time !== "day" });
+    Object.assign(S, { toLane: 0, laneSet: false, failFire: false, failGear: false, failHyd: false, failPlan: false, failAt: 0, failDone: false, extT: 0, gearTries: 0, speed: 0, sink: 0, throttle: 0, grounded: true, crashed: false, flaps: 1, gearDown: true, gearPos: 1, flapPos: 1, flightT: 0, vs: 0, wr: 0, wp: 0, wy: 0, pc: 0, touchFpm: null, landedAt: null, autobrake: false, calls: {}, callUntil: 0, boomT: 0, started: false, gate: null, push: null, taxiOut: false, groundPitch: 0, alpha: 0, load: 1, gust: 0, gs: 0, ias: 0, n1: 0, trimAlpha: 0.09, spoiler: 0, autoSpoiler: false, reverse: false, trim: 0, park: false, alerts: {}, msgQ: [], gammaPrev: undefined, gammaRate: 0, engOut: false, lights: typeof ENV !== "undefined" && ENV.time !== "day" });
     if (typeof syncTouchKeys === "function") syncTouchKeys();
     if (typeof AP !== "undefined") { AP.on = false; AP.athr = false; AP.app = false; AP.lat = "HDG"; AP.flare = false; apSync(); pushBtn.hidden = true; }
     boom.visible = false; model.visible = true; flyby.set = false;
@@ -6018,9 +6026,9 @@ vec3 liveryAt(vec3 p, out float fus) {
     }
     // destination
     if (S.to) {
-      const [tx, tz] = toWorld(S.to, -S.to.len / 2, 0);
+      const tL = laneOf(S.to, S.toLane), [tx, tz] = toWorld(S.to, tL.al - tL.len / 2, tL.off);
       const dx = tx - S.pos.x, dz = tz - S.pos.z, dist = Math.hypot(dx, dz), brg = ((Math.atan2(dx, -dz) * 57.3) + 360) % 360;
-      hud.fillStyle = HC.nav; hud.textAlign = "center"; hud.fillText(`${S.to.code} · ${(dist / 1000).toFixed(1)} km · BRG ${String(Math.round(brg) % 360).padStart(3, "0")}${w < 480 ? "" : ` · RWY ${S.to.label}`}`, cx, ty + 24 + fs * 2, w - 24);
+      hud.fillStyle = HC.nav; hud.textAlign = "center"; hud.fillText(`${S.to.code} · ${(dist / 1000).toFixed(1)} km · BRG ${String(Math.round(brg) % 360).padStart(3, "0")}${w < 480 ? "" : ` · RWY ${tL.label}`}`, cx, ty + 24 + fs * 2, w - 24);
       proj.set(tx, S.to.elev + 10, tz).project(camera);
       let x = proj.x, y = proj.y; const behind = proj.z > 1; if (behind) { x = -x; y = -y; }
       const on = !behind && Math.abs(x) < 0.9 && Math.abs(y) < 0.9, m = Math.max(Math.abs(x), Math.abs(y), 0.001);
@@ -6228,7 +6236,7 @@ vec3 liveryAt(vec3 p, out float fus) {
         hud.fillStyle = a === S.to ? HC.nav : "#ffffff"; hud.font = `${Math.max(9, Math.round(ms / 16))}px ${MONO}`; hud.textAlign = "center"; hud.fillText(a.code, (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2 - 8);
       }
       if (S.to) {
-        const r = S.to.rwys[0], [fx, fz] = toWorld(S.to, -r.len / 2 - FIX_DIST, r.off), [tx2, tz2] = toWorld(S.to, -r.len / 2, r.off);
+        const r = laneOf(S.to, S.toLane), [fx, fz] = toWorld(S.to, r.al - r.len / 2 - FIX_DIST, r.off), [tx2, tz2] = toWorld(S.to, r.al - r.len / 2, r.off);
         hud.save(); hud.strokeStyle = "#ff3df2"; hud.lineWidth = 2; hud.setLineDash([5, 4]); hud.beginPath(); hud.moveTo(...P(S.pos.x, S.pos.z)); hud.lineTo(...P(fx, fz)); hud.lineTo(...P(tx2, tz2)); hud.stroke(); hud.restore();
       }
       for (const ai of AI) {
@@ -6310,15 +6318,34 @@ vec3 liveryAt(vec3 p, out float fus) {
   function radio(text, where) { if (S.mode !== "fly" || where.distanceTo(S.pos) > 7000) return; RADIO.push({ text, t: 10 }); if (RADIO.length > 4) RADIO.shift(); }
   const aiPorts = (kind) => AIRPORTS.filter((a) => (PLANES[kind].big ? a.kind !== "ga" : true));
   function pickDest(ai) { const list = aiPorts(ai.kind).filter((a) => a !== ai.at); return list[Math.floor(Math.random() * list.length)]; }
-  function finalFix(a) { const [x, z] = toWorld(a, -a.len / 2 - 7000, a.rwys[0].off); return new THREE.Vector3(x, a.elev + 7000 * TAN3 + 30, z); }   // 7 km out: room to line up
+  // the runways traffic (and you) land on: the main one, and the far parallel one by the satellite concourse where there is one
+  function lanes(a) {
+    if (a._lanes) return a._lanes;
+    const r = a.rwys[0], L = [{ i: 0, al: 0, off: r.off, len: r.len, w: r.w, tx: a.tx, label: a.label }];
+    const far = a.satLive && a.satLive.length && a.xr.find((x) => Math.abs(x.d) < 0.05 && x.ac > a.roadX + 300);
+    if (far) L.push({ i: 1, al: far.al, off: far.ac, len: far.len, w: far.w, tx: far.ac + far.tw, label: far.n, far });
+    return (a._lanes = L);
+  }
+  const laneOf = (a, i) => lanes(a)[Math.min(i || 0, lanes(a).length - 1)];
+  function laneAt(a, x, z) {   // which of a's lanes a point is on (-1: neither)
+    const [al, ac] = local(a, x, z);
+    for (const ln of lanes(a)) if (Math.abs(ac - ln.off) < ln.w / 2 + 25 && Math.abs(al - ln.al) < ln.len / 2 + 120) return ln.i;
+    return -1;
+  }
+  function chooseLane(a) {   // arrivals: the second runway now and then, when a stand by it is free
+    return lanes(a).length > 1 && (a.satLive || []).some((st) => !st.ai && !st.player) && Math.random() < 0.45 ? 1 : 0;
+  }
+  function finalFix(a, li) { const ln = laneOf(a, li); const [x, z] = toWorld(a, ln.al - ln.len / 2 - 7000, ln.off); return new THREE.Vector3(x, a.elev + 7000 * TAN3 + 30, z); }   // 7 km out: room to line up
   function placeAtHold(ai, onRunway) {
-    const a = ai.at, r = a.rwys[0], [x, z] = onRunway ? toWorld(a, -r.len / 2 + 50, r.off) : toWorld(a, -r.len * 0.46 + 40, a.tx);
-    ai.pos.set(x, a.elev + 0.05 + ai.sp.gearH, z); ai.hdg = a.hdg * Math.PI / 180 - (onRunway ? 0 : Math.PI / 2); ai.pitch = 0; ai.bank = 0; ai.v = 0; ai.vs = 0; ai.gear = 1;   // holding short: facing the runway
+    const a = ai.at, ln = laneOf(a, ai.atLane), [x, z] = onRunway ? toWorld(a, ln.al - ln.len / 2 + 50, ln.off) : toWorld(a, ln.al - ln.len * 0.46 + 40, ln.tx);
+    ai.pos.set(x, a.elev + 0.05 + ai.sp.gearH, z); ai.hdg = a.hdg * Math.PI / 180 + (onRunway ? 0 : ln.off > ln.tx ? Math.PI / 2 : -Math.PI / 2); ai.pitch = 0; ai.bank = 0; ai.v = 0; ai.vs = 0; ai.gear = 1;   // holding short: facing the runway
   }
   // ---- traffic on the ground: taxi in to a free live stand, park, push back with a tug, taxi out, line up ----
   const GROUND = ["taxiin", "turn", "parked", "push", "taxiout", "lineup", "taxi"];
   const rwyHdg = (a) => a.hdg * Math.PI / 180;
-  const standPos = (a, st, kind) => toWorld(a, -st.z, a.termX0 - 9 - DIMS[kind][1] / 2);
+  const standPos = (a, st, kind) => toWorld(a, -st.z, st.sat ? st.cxs + 21 + DIMS[kind][1] / 2 : a.termX0 - 9 - DIMS[kind][1] / 2);
+  const standHdg = (a, st) => rwyHdg(a) + (st && st.sat ? -Math.PI / 2 : Math.PI / 2);   // nose to the terminal / to the concourse
+  const standName = (a, st) => (st.sat ? `B${a.satLive.indexOf(st) + 1}` : String(a.gates.indexOf(st) + 1));
   function groundBlocked(ai) {   // someone close ahead on the ground: wait (a stand-off longer than 25 s is given up)
     const fx = Math.sin(ai.hdg), fz = -Math.cos(ai.hdg), gap = DIMS[ai.kind][1] * 0.5 + 34;
     const ahead = (x, z) => { const dx = x - ai.pos.x, dz = z - ai.pos.z, d = Math.hypot(dx, dz); return d < gap && d > 1 && (dx * fx + dz * fz) / d > 0.75; };
@@ -6338,15 +6365,16 @@ vec3 liveryAt(vec3 p, out float fus) {
     return false;
   }
   function startTaxiIn(ai, a) {   // after landing: the first exit ahead, taxiway A, the stand's lead-in line, the stand
-    const want = DIMS[ai.kind][0], free = (a.live || []).filter((st) => !st.ai && !st.player);
+    const ln = laneOf(a, ai.toLane), want = DIMS[ai.kind][0], free = ((ln.i ? a.satLive : a.live) || []).filter((st) => !st.ai && !st.player);
     const fit = free.filter((st) => DIMS[st.kind][0] >= want - 4), pool = fit.length ? fit : free;
     const st = pool.sort((p, q) => Math.abs(DIMS[p.kind][0] - want) - Math.abs(DIMS[q.kind][0] - want))[0]; if (!st) return false;
-    const r = a.rwys[0], tl = r.len * 0.92, [al] = local(a, ai.pos.x, ai.pos.z), P = (x, y) => toWorld(a, x, y);
-    const exits = [tl / 2 - 12]; for (let z = -tl / 2 + 450; z < tl / 2 - 300; z += 480) exits.push(-z);
-    const alExit = exits.filter((e) => e - al > 80).sort((p, q) => p - q)[0] ?? tl / 2 - 12, alS = -st.z;
+    const tl = ln.len * 0.92, [al] = local(a, ai.pos.x, ai.pos.z), P = (x, y) => toWorld(a, x, y);
+    const exits = [ln.al + tl / 2 - 12]; for (let z = -tl / 2 + 450; z < tl / 2 - 300; z += 480) exits.push(ln.al - z);
+    const alExit = exits.filter((e) => e - al > 80).sort((p, q) => p - q)[0] ?? ln.al + tl / 2 - 12, alS = -st.z;
     st.ai = ai; ai.stand = st; ai.pi = 0; ai.phase = "taxiin";
-    ai.path = [P(alExit, r.off), P(alExit, a.tx), P(alS, a.tx), P(alS, a.apX0 + 14), standPos(a, st, ai.kind)];
-    radio(`${a.name} Ground: ${ai.cs}, taxi to gate ${a.gates.indexOf(st) + 1} via A.`, ai.pos);
+    ai.path = st.sat ? [P(alExit, ln.off), P(alExit, ln.tx), P(alS, ln.tx), standPos(a, st, ai.kind)]
+      : [P(alExit, ln.off), P(alExit, a.tx), P(alS, a.tx), P(alS, a.apX0 + 14), standPos(a, st, ai.kind)];
+    radio(`${a.name} Ground: ${ai.cs}, taxi to gate ${standName(a, st)}${st.sat ? " at the satellite" : " via A"}.`, ai.pos);
     return true;
   }
   const AITUG = [];
@@ -6389,60 +6417,66 @@ vec3 liveryAt(vec3 p, out float fus) {
   });
   { // traffic already on stand at the start: every other live stand at each airport
     const names = ["SKYWAY", "OCEANA", "NORTHCAPE", "SUNVALE", "EASTGATE", "FALCON", "BREEZE", "ISLANDER", "SOUTHWIND", "PACIFICA"]; let n = 0;
-    for (const a of AIRPORTS) (a.live || []).forEach((st, k) => {
+    for (const a of AIRPORTS) [...(a.live || []), ...(a.satLive || [])].forEach((st, k) => {
       if (k % 2 || !PLANES[st.kind]) return;
       const kind = st.kind, sp = PLANES[kind], ai = { kind, cs: `${names[n % names.length]} ${120 + n * 13}`, sp, pos: new THREE.Vector3(), hdg: 0, pitch: 0, bank: 0, v: 0, vs: 0, gear: 1, phase: "parked", wait: 20 + ((n * 37) % 420), model: null };
       ai.at = a; ai.to = pickDest(ai); ai.cruiseAlt = sp.big ? 1350 + (n % 3) * 150 : 1050; ai.cruiseV = sp.big ? 110 : 45; ai.vr = sp.big ? 72 : 28; ai.vapp = sp.big ? 72 : 30;
-      const [x, z] = standPos(a, st, kind); ai.pos.set(x, a.elev + 0.05 + sp.gearH, z); ai.hdg = rwyHdg(a) + Math.PI / 2;
+      const [x, z] = standPos(a, st, kind); ai.pos.set(x, a.elev + 0.05 + sp.gearH, z); ai.hdg = standHdg(a, st); ai.atLane = st.sat ? 1 : 0;
       st.ai = ai; ai.stand = st; makeAIModel(ai); AI.push(ai); n++;
     });
   }
-  const playerOnRunway = (a) => S.mode === "fly" && !S.crashed && S.grounded && runwayAt(S.pos.x, S.pos.z) === a;
+  const playerOnRunway = (a, li) => S.mode === "fly" && !S.crashed && S.grounded && runwayAt(S.pos.x, S.pos.z) === a && (li === undefined || laneAt(a, S.pos.x, S.pos.z) === li || laneAt(a, S.pos.x, S.pos.z) < 0 && !li);
   // the player on a short final to this runway also keeps the AI from lining up in front of them
-  const playerOnFinal = (a) => {
-    if (S.mode !== "fly" || S.crashed || S.grounded || S.to !== a) return false;
-    const r = a.rwys[0], [al, ac] = local(a, S.pos.x, S.pos.z);
-    return al < -r.len / 2 + 200 && al > -r.len / 2 - 9000 && Math.abs(ac - r.off) < 900 && S.pos.y - a.elev < 700;
+  const playerOnFinal = (a, li) => {
+    if (S.mode !== "fly" || S.crashed || S.grounded || S.to !== a || (li !== undefined && (S.toLane || 0) !== li)) return false;
+    const ln = laneOf(a, S.toLane), [al, ac] = local(a, S.pos.x, S.pos.z), al0 = ln.al - ln.len / 2;
+    return al < al0 + 200 && al > al0 - 9000 && Math.abs(ac - ln.off) < 900 && S.pos.y - a.elev < 700;
   };
-  function aiOnRunway(o, a) {
+  // which of a's runways this aircraft is using there (arriving: the one it lands on; departing: the one by its stand)
+  const aiLane = (o, a) => (o.to === a && ["final", "rollout", "taxi", "taxiin", "cruise", "goaround"].includes(o.phase) ? o.toLane || 0 : o.atLane || 0);
+  function aiOnRunway(o, a, li) {
+    if (li !== undefined && aiLane(o, a) !== li) return false;
     return (o.at === a && ["roll", "lineup"].includes(o.phase)) || ((o.at === a || o.to === a) && (["rollout", "taxi"].includes(o.phase) || (o.phase === "taxiin" && o.pi <= 1)));
   }
   function runwayBusy(a, me) {
-    if (playerOnRunway(a) || playerOnFinal(a)) return true;
-    if (S.atc && S.atc.a === a && S.atc.state === "cleared" && S.mode === "fly" && !S.crashed && (S.atc.kind === "dep" ? S.grounded : !S.grounded)) return true;   // you hold a clearance
-    return AI.some((o) => o !== me && (aiOnRunway(o, a) || (o.to === a && o.phase === "final" && o.pos.distanceTo(me.pos) < 4500)));
+    const li = me ? me.atLane || 0 : undefined;
+    if (playerOnRunway(a, li) || playerOnFinal(a, li)) return true;
+    if (S.atc && S.atc.a === a && S.atc.state === "cleared" && S.mode === "fly" && !S.crashed && (S.atc.li || 0) === (li || 0) && (S.atc.kind === "dep" ? S.grounded : !S.grounded)) return true;   // you hold a clearance
+    return AI.some((o) => o !== me && (aiOnRunway(o, a, li) || (o.to === a && o.phase === "final" && aiLane(o, a) === (li || 0) && o.pos.distanceTo(me.pos) < 4500)));
   }
   // ---------- the tower: departure and landing clearances that look at the real traffic ----------
   const atcEl = $("atcPanel");
-  const thrDist = (a, p) => { const [x, z] = toWorld(a, -a.rwys[0].len / 2, a.rwys[0].off); return Math.hypot(x - p.x, z - p.z); };
+  const thrDist = (a, p, li) => { const ln = laneOf(a, li); const [x, z] = toWorld(a, ln.al - ln.len / 2, ln.off); return Math.hypot(x - p.x, z - p.z); };
   const tName = (ai) => `${ai.cs}, a ${PLANES[ai.kind].name}`;
   // what stands between you and runway a: an aircraft on it, landing on it, or about to
-  function traffic(a, kind) {
-    const myD = kind === "arr" ? thrDist(a, S.pos) : 0, out = [];
+  function traffic(a, kind, li = 0) {
+    const myD = kind === "arr" ? thrDist(a, S.pos, li) : 0, out = [];
     for (const ai of AI) {
       if (!ai.model.visible && !ai.farHide && ai.phase !== "hold") continue;
-      if (aiOnRunway(ai, a)) out.push({ ai, why: "on the runway", d: 0 });
-      else if (ai.to === a && ai.phase === "final") { const d = thrDist(a, ai.pos); if (kind === "dep" ? d < 9000 : d < myD) out.push({ ai, why: `on final, ${(d / 1000).toFixed(1)} km`, d }); }
-      else if (ai.to === a && ai.phase === "cruise" && kind === "dep") { const d = thrDist(a, ai.pos); if (d < 6500) out.push({ ai, why: `on approach, ${(d / 1000).toFixed(1)} km`, d }); }
+      if (aiOnRunway(ai, a, li)) out.push({ ai, why: "on the runway", d: 0 });
+      else if (aiLane(ai, a) !== li) continue;
+      else if (ai.to === a && ai.phase === "final") { const d = thrDist(a, ai.pos, li); if (kind === "dep" ? d < 9000 : d < myD) out.push({ ai, why: `on final, ${(d / 1000).toFixed(1)} km`, d }); }
+      else if (ai.to === a && ai.phase === "cruise" && kind === "dep") { const d = thrDist(a, ai.pos, li); if (d < 6500) out.push({ ai, why: `on approach, ${(d / 1000).toFixed(1)} km`, d }); }
     }
     return out.sort((p, q) => p.d - q.d);
   }
   function atcSay(text, cls) { RADIO.push({ text, t: 12 }); if (RADIO.length > 4) RADIO.shift(); setTxt("atcStatus", text.replace(/^[^:]+: /, "")); $("atcStatus").className = "atc-st " + (cls || ""); }
   function atcDeparture() {
     const a = S.from; if (!a || !S.grounded) return;
-    const t = traffic(a, "dep"), wind = windText();
-    S.atc = { kind: "dep", a, state: t.length ? "hold" : "cleared", t: 0, warned: false };
-    if (t.length) atcSay(`${a.name} Tower: hold short of runway ${a.label}. Traffic ${t[0].why}: ${tName(t[0].ai)}. I'll call you.`, "hold");
-    else atcSay(`${a.name} Tower: runway ${a.label}, wind ${wind}, cleared for takeoff.`, "go");
+    const li = Math.max(0, laneAt(a, S.pos.x, S.pos.z)), lab = laneOf(a, li).label, t = traffic(a, "dep", li), wind = windText();
+    S.atc = { kind: "dep", a, li, state: t.length ? "hold" : "cleared", t: 0, warned: false };
+    if (t.length) atcSay(`${a.name} Tower: hold short of runway ${lab}. Traffic ${t[0].why}: ${tName(t[0].ai)}. I'll call you.`, "hold");
+    else atcSay(`${a.name} Tower: runway ${lab}, wind ${wind}, cleared for takeoff.`, "go");
     syncAtc();
   }
   function atcArrival() {
     const a = S.to; if (!a || S.grounded) return;
-    const t = traffic(a, "arr");
-    S.atc = { kind: "arr", a, state: t.length ? "hold" : "cleared", t: 0, warned: false };
+    if (S.toLane == null || !S.laneSet) S.toLane = nearestLane(a);
+    const li = S.toLane || 0, lab = laneOf(a, li).label, t = traffic(a, "arr", li);
+    S.atc = { kind: "arr", a, li, state: t.length ? "hold" : "cleared", t: 0, warned: false };
     const n = t.filter((q) => q.why.startsWith("on final")).length + 1;
     if (t.length) atcSay(`${a.name} Tower: number ${n}, ${t[0].why === "on the runway" ? "runway occupied" : `follow ${tName(t[0].ai)} ${t[0].why}`}. Reduce to approach speed, continue, expect late landing clearance.`, "hold");
-    else atcSay(`${a.name} Tower: runway ${a.label}, wind ${windText()}, cleared to land.`, "go");
+    else atcSay(`${a.name} Tower: runway ${lab}, wind ${windText()}, cleared to land.`, "go");
     syncAtc();
   }
   // once a second: hand out the waiting clearance when the runway frees up; warn if you go without one
@@ -6453,16 +6487,16 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (C.kind === "dep") {
       if (!S.grounded) { if (C.state === "hold" && !C.warned) { C.warned = true; atcSay(`${a.name} Tower: you took off without a clearance! Contact departure.`, "warn"); } S.atc = null; syncAtc(); return; }
       if (C.state === "hold") {
-        const t = traffic(a, "dep");
-        if (!t.length) { C.state = "cleared"; atcSay(`${a.name} Tower: traffic is clear. Line up runway ${a.label}, wind ${windText()}, cleared for takeoff.`, "go"); chime(880, 0.12); }
+        const t = traffic(a, "dep", C.li || 0);
+        if (!t.length) { C.state = "cleared"; atcSay(`${a.name} Tower: traffic is clear. Line up runway ${laneOf(a, C.li).label}, wind ${windText()}, cleared for takeoff.`, "go"); chime(880, 0.12); }
         else if (S.gs > 12 && runwayAt(S.pos.x, S.pos.z) === a && !C.warned) { C.warned = true; atcSay(`${a.name} Tower: STOP, STOP! You are not cleared: traffic ${t[0].why}.`, "warn"); buzz(200); }
       }
     } else {
       if (S.grounded) { S.atc = null; syncAtc(); return; }
-      const d = thrDist(a, S.pos);
+      const d = thrDist(a, S.pos, C.li || 0);
       if (C.state === "hold") {
-        const t = traffic(a, "arr");
-        if (!t.length) { C.state = "cleared"; atcSay(`${a.name} Tower: runway ${a.label} is clear, wind ${windText()}, cleared to land.`, "go"); chime(880, 0.12); }
+        const t = traffic(a, "arr", C.li || 0);
+        if (!t.length) { C.state = "cleared"; atcSay(`${a.name} Tower: runway ${laneOf(a, C.li).label} is clear, wind ${windText()}, cleared to land.`, "go"); chime(880, 0.12); }
         else if (d < 1800 && S.pos.y - a.elev < 200 && !C.warned) { C.warned = true; atcSay(`${a.name} Tower: GO AROUND! Runway occupied by ${t[0].ai.cs}. Climb, then request landing again.`, "warn"); buzz(200); S.atc = null; syncAtc(); }
       }
     }
@@ -6471,12 +6505,22 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (atcEl.hidden) return;
     const g = S.grounded && S.mode === "fly", a = S.from, b = S.to, C = S.atc;
     $("atcDep").disabled = !(g && a && !S.liftT); $("atcArr").disabled = !(!S.grounded && b && S.mode === "fly");
-    setTxt("atcDepSub", a ? `${a.code} · runway ${a.label}` : "—"); setTxt("atcArrSub", b ? `${b.code} · runway ${b.label}${b && !S.grounded ? ` · ${(thrDist(b, S.pos) / 1000).toFixed(0)} km` : ""}` : "no destination");
+    setTxt("atcDepSub", a ? `${a.code} · runway ${a.label}` : "—"); setTxt("atcArrSub", b ? `${b.code} · runway ${laneOf(b, S.toLane).label}${b && !S.grounded ? ` · ${(thrDist(b, S.pos, S.toLane) / 1000).toFixed(0)} km` : ""}` : "no destination");
+    { const two = !!b && lanes(b).length > 1 && !S.grounded && S.mode === "fly"; $("atcRwy").hidden = !two; if (two) $("atcRwy").textContent = `Land on runway ${laneOf(b, (S.toLane || 0) ? 0 : 1).label} instead`; }
     setTxt("atcFreq", (!S.grounded && b ? b : a || b) ? `${(!S.grounded && b ? b : a).name} Tower` : "Tower");
     if (!C) { const st = $("atcStatus"); if (!st.classList.contains("warn")) { setTxt("atcStatus", g ? "Tell the tower when you're ready to go." : b ? "Call the tower before your final approach." : "No clearance yet."); st.className = "atc-st"; } }
   }
   $("atcDep").addEventListener("click", atcDeparture);
   $("atcArr").addEventListener("click", atcArrival);
+  function nearestLane(a) {   // the runway whose extended centreline you are lined up with best
+    const L = lanes(a); if (L.length < 2) return 0; const [, ac] = local(a, S.pos.x, S.pos.z);
+    return L.reduce((b, ln) => (Math.abs(ac - ln.off) < Math.abs(ac - L[b].off) ? ln.i : b), 0);
+  }
+  $("atcRwy").addEventListener("click", () => {
+    const b = S.to; if (!b || lanes(b).length < 2) return; S.toLane = (S.toLane || 0) ? 0 : 1; S.laneSet = true;
+    flash(`Landing runway ${laneOf(b, S.toLane).label}: the magenta line on the map leads to it`, 2.6);
+    if (S.atc && S.atc.kind === "arr") atcArrival(); else syncAtc();
+  });
   const atcOpen = (on) => { atcEl.hidden = !on; $("atcToggle").setAttribute("aria-pressed", String(on)); $("atcToggle").setAttribute("aria-expanded", String(on)); if (on) syncAtc(); };
   $("atcToggle").addEventListener("click", () => atcOpen(atcEl.hidden));
   document.addEventListener("keydown", (e) => { if (e.code === "KeyY" && S.mode === "fly" && !e.repeat && !(e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName))) atcOpen(atcEl.hidden); });
@@ -6486,8 +6530,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     ai.bank = lerp(ai.bank, (rate / maxRate) * (ai.sp.big ? 0.42 : 0.55), Math.min(1, dt * 2));
   }
   // on the runway: head along it, easing back onto the centreline
-  function holdCentreline(ai, a, dt) {
-    const [, ac] = local(a, ai.pos.x, ai.pos.z), want = a.hdg * Math.PI / 180 - clamp((ac - a.rwys[0].off) * 0.04, -0.12, 0.12);
+  function holdCentreline(ai, a, dt, ln) {
+    const [, ac] = local(a, ai.pos.x, ai.pos.z), want = a.hdg * Math.PI / 180 - clamp((ac - (ln || laneOf(a, 0)).off) * 0.04, -0.12, 0.12);
     ai.hdg = wrapA(ai.hdg + clamp(wrapA(want - ai.hdg), -0.25 * dt, 0.25 * dt));
   }
   function moveAI(ai, dt) {
@@ -6500,10 +6544,10 @@ vec3 liveryAt(vec3 p, out float fus) {
     switch (ai.phase) {
       case "hold":
         ai.wait -= dt; ai.v = 0;
-        ai.model.visible = !AI.some((o) => o !== ai && o.at === a && o.phase === "hold" && o.wait < ai.wait);
+        ai.model.visible = !AI.some((o) => o !== ai && o.at === a && o.phase === "hold" && (o.atLane || 0) === (ai.atLane || 0) && o.wait < ai.wait);
         if (ai.wait <= 0 && !runwayBusy(a, ai)) {   // cleared: taxi onto the centreline, turn along the runway, roll
-          const [al] = local(a, ai.pos.x, ai.pos.z); ai.path = [toWorld(a, al, a.rwys[0].off)]; ai.pi = 0; ai.phase = "lineup"; ai.model.visible = true;
-          radio(`${a.name} Tower: ${ai.cs}, runway ${a.label}, cleared for takeoff.`, ai.pos);
+          const ln = laneOf(a, ai.atLane), [al] = local(a, ai.pos.x, ai.pos.z); ai.path = [toWorld(a, al, ln.off)]; ai.pi = 0; ai.phase = "lineup"; ai.model.visible = true;
+          radio(`${a.name} Tower: ${ai.cs}, runway ${ln.label}, cleared for takeoff.`, ai.pos);
         }
         break;
       case "lineup":
@@ -6514,33 +6558,33 @@ vec3 liveryAt(vec3 p, out float fus) {
         ai.pos.y = groundY(ai.pos.x, ai.pos.z) + sp.gearH;
         if (Math.abs(e) < 0.01) {
           ai.hdg = ai.turnTo; ai.phase = ai.next;
-          if (ai.next === "parked") { ai.at = ai.to; ai.to = pickDest(ai); ai.wait = 240 + Math.random() * 360; }
+          if (ai.next === "parked") { ai.at = ai.to; ai.atLane = ai.stand && ai.stand.sat ? 1 : 0; ai.toLane = null; ai.to = pickDest(ai); ai.wait = 240 + Math.random() * 360; }
           if (ai.next === "hold") ai.wait = 6 + Math.random() * 20;
         }
         break;
       }
       case "taxiin":
-        if (followPath(ai, dt, to, 9)) { ai.phase = "turn"; ai.turnTo = rwyHdg(to) + Math.PI / 2; ai.next = "parked"; radio(`${ai.cs}: on stand at ${to.code}.`, ai.pos); }
+        if (followPath(ai, dt, to, 9)) { ai.phase = "turn"; ai.turnTo = standHdg(to, ai.stand); ai.next = "parked"; radio(`${ai.cs}: on stand at ${to.code}.`, ai.pos); }
         break;
       case "parked":
         ai.v = 0; ai.wait -= dt;
         if (ai.wait <= 0) {   // pushback: the tug comes in, the aircraft rolls back and swings round to face the runway end
-          ai.phase = "push"; ai.push = { d: 0, D: DIMS[ai.kind][1] * 0.55 + 28, h0: ai.hdg }; aiTug(ai);
+          ai.phase = "push"; ai.push = { d: 0, D: DIMS[ai.kind][1] * 0.55 + 28, h0: ai.hdg, dir: ai.stand && ai.stand.sat ? -1 : 1 }; aiTug(ai);
           radio(`${a.name} Ground: ${ai.cs}, pushback approved.`, ai.pos);
         }
         break;
       case "push": {
         const P0 = ai.push, v = 2, k = Math.min(1, (P0.d + v * dt) / P0.D); P0.d += v * dt;
-        ai.hdg = wrapA(P0.h0 + (Math.PI / 2) * k * k * (3 - 2 * k)); ai.v = 0;
+        ai.hdg = wrapA(P0.h0 + (P0.dir || 1) * (Math.PI / 2) * k * k * (3 - 2 * k)); ai.v = 0;
         ai.pos.x -= Math.sin(ai.hdg) * v * dt; ai.pos.z += Math.cos(ai.hdg) * v * dt; ai.pos.y = groundY(ai.pos.x, ai.pos.z) + sp.gearH; poseTug(ai);
         if (k >= 1) {
           releaseTug(ai); if (ai.stand) { ai.stand.ai = null; ai.stand = null; }
-          const r = a.rwys[0], [al] = local(a, ai.pos.x, ai.pos.z); ai.path = [toWorld(a, al, a.tx), toWorld(a, -r.len * 0.46 + 40, a.tx)]; ai.pi = 0; ai.phase = "taxiout";
+          const ln = laneOf(a, ai.atLane), [al] = local(a, ai.pos.x, ai.pos.z); ai.path = [toWorld(a, al, ln.tx), toWorld(a, ln.al - ln.len * 0.46 + 40, ln.tx)]; ai.pi = 0; ai.phase = "taxiout";
         }
         break;
       }
       case "taxiout":
-        if (followPath(ai, dt, a, 9)) { ai.phase = "turn"; ai.turnTo = rwyHdg(a) - Math.PI / 2; ai.next = "hold"; }
+        if (followPath(ai, dt, a, 9)) { const ln = laneOf(a, ai.atLane); ai.phase = "turn"; ai.turnTo = rwyHdg(a) + (ln.off > ln.tx ? Math.PI / 2 : -Math.PI / 2); ai.next = "hold"; }
         break;
       case "roll":
         ai.v += (sp.big ? 2.6 : 3.2) * dt; moveAI(ai, dt); ai.pos.y = groundY(ai.pos.x, ai.pos.z) + sp.gearH;
@@ -6549,32 +6593,33 @@ vec3 liveryAt(vec3 p, out float fus) {
       case "climb":
         ai.pitch = lerp(ai.pitch, 0.13, dt * 1.5); ai.vs = lerp(ai.vs, sp.big ? 10 : 5, dt); ai.v = Math.min(ai.cruiseV, ai.v + dt * 1.5); moveAI(ai, dt);
         if (ai.pos.y - a.elev > 40) ai.gear = Math.max(0, ai.gear - dt * 0.4);
-        if (ai.pos.y - a.elev > 320) { ai.phase = "cruise"; radio(`${a.name} Departure: ${ai.cs}, radar contact, proceed to ${to.code}.`, ai.pos); }
+        if (ai.pos.y - a.elev > 320) { ai.phase = "cruise"; ai.toLane = chooseLane(to); radio(`${a.name} Departure: ${ai.cs}, radar contact, proceed to ${to.code}.`, ai.pos); }
         break;
       case "cruise": {
-        const fx = finalFix(to), dist = Math.hypot(fx.x - ai.pos.x, fx.z - ai.pos.z);
+        if (ai.toLane == null) ai.toLane = chooseLane(to);
+        const fx = finalFix(to, ai.toLane), dist = Math.hypot(fx.x - ai.pos.x, fx.z - ai.pos.z);
         steer(ai, fx.x, fx.z, dt, maxRate);
         let want = dist > 7000 ? ai.cruiseAlt : lerp(fx.y, ai.cruiseAlt, clamp((dist - 800) / 6200, 0, 1));
         for (const k of [400, 1200, 2400]) want = Math.max(want, heightAt(ai.pos.x + Math.sin(ai.hdg) * k, ai.pos.z - Math.cos(ai.hdg) * k) + 220);
         ai.vs = clamp((want - ai.pos.y) * 0.08, -9, 10); ai.pitch = lerp(ai.pitch, Math.atan2(ai.vs, ai.v) + 0.03, dt);
         ai.v = lerp(ai.v, dist < 3000 ? ai.vapp * 1.25 : ai.cruiseV, dt * 0.2); moveAI(ai, dt);
-        if (dist < 500) { ai.phase = "final"; radio(`${to.name} Tower: ${ai.cs}, runway ${to.label}, cleared to land.`, ai.pos); }
+        if (dist < 500) { ai.phase = "final"; radio(`${to.name} Tower: ${ai.cs}, runway ${laneOf(to, ai.toLane).label}, cleared to land.`, ai.pos); }
         break;
       }
       case "final": {
         // follow the extended centreline: aim at a point on it ahead (closer as the runway nears) and turn harder than in cruise
-        const r = to.rwys[0], [al, ac] = local(to, ai.pos.x, ai.pos.z), e = ac - r.off, tdAl = -r.len / 2 + 300, toTd = tdAl - al;
-        const look = clamp(toTd * 0.3, 260, 1500), [tx, tz] = toWorld(to, Math.min(al + look, r.len / 2), r.off);
+        const r = laneOf(to, ai.toLane), [al, ac] = local(to, ai.pos.x, ai.pos.z), e = ac - r.off, tdAl = r.al - r.len / 2 + 300, toTd = tdAl - al;
+        const look = clamp(toTd * 0.3, 260, 1500), [tx, tz] = toWorld(to, Math.min(al + look, r.al + r.len / 2), r.off);
         steer(ai, tx, tz, dt, sp.big ? 0.12 : 0.2);
         const toThr = Math.max(0, toTd), glide = to.elev + toThr * TAN3 + sp.gearH, aligned = Math.abs(e) < r.w / 2 - 3;
         ai.vs = clamp((glide - ai.pos.y) * 0.6 - ai.v * TAN3, -9, 3); ai.pitch = lerp(ai.pitch, 0.04, dt);
         ai.v = lerp(ai.v, ai.vapp, dt * 0.3); ai.gear = Math.min(1, ai.gear + dt * 0.4); moveAI(ai, dt);
         const gy = groundY(ai.pos.x, ai.pos.z) + sp.gearH;
-        if (ai.pos.y <= gy + 0.2 && al > -r.len / 2 + 40 && aligned) {   // wheels down only on the runway itself
+        if (ai.pos.y <= gy + 0.2 && al > r.al - r.len / 2 + 40 && aligned) {   // wheels down only on the runway itself
           ai.pos.y = gy; ai.vs = 0; ai.bank = 0; ai.phase = "rollout"; radio(`${ai.cs}: down at ${to.code}.`, ai.pos);
         } else if (ai.pos.y < gy) ai.pos.y = gy;
         const unstable = !aligned && toTd < 900 && ai.pos.y - gy < 60;   // not lined up by short final: go around rather than land beside the runway
-        if (ai.phase === "final" && (unstable || al > 0 || (playerOnRunway(to) && al < -r.len / 2 && ai.pos.y - to.elev > 40))) { ai.phase = "goaround"; ai.wait = 40; radio(`${ai.cs}: going around.`, ai.pos); }
+        if (ai.phase === "final" && (unstable || al > r.al || (playerOnRunway(to, r.i) && al < r.al - r.len / 2 && ai.pos.y - to.elev > 40))) { ai.phase = "goaround"; ai.wait = 40; radio(`${ai.cs}: going around.`, ai.pos); }
         break;
       }
       case "goaround":
@@ -6583,14 +6628,14 @@ vec3 liveryAt(vec3 p, out float fus) {
         if (ai.wait <= 0) ai.phase = "cruise";
         break;
       case "rollout":
-        ai.pitch = lerp(ai.pitch, 0, dt * 2); ai.bank = lerp(ai.bank, 0, dt * 3); holdCentreline(ai, to, dt);
+        ai.pitch = lerp(ai.pitch, 0, dt * 2); ai.bank = lerp(ai.bank, 0, dt * 3); holdCentreline(ai, to, dt, laneOf(to, ai.toLane));
         ai.v = Math.max(9, ai.v - 2.4 * dt); moveAI(ai, dt); ai.pos.y = groundY(ai.pos.x, ai.pos.z) + sp.gearH;
         if (ai.v <= 9.5 && !startTaxiIn(ai, to)) { ai.phase = "taxi"; ai.wait = 10; }
         break;
       case "taxi": {
-        holdCentreline(ai, to, dt); moveAI(ai, dt); ai.pos.y = groundY(ai.pos.x, ai.pos.z) + sp.gearH; ai.wait -= dt;
+        const ln = laneOf(to, ai.toLane); holdCentreline(ai, to, dt, ln); moveAI(ai, dt); ai.pos.y = groundY(ai.pos.x, ai.pos.z) + sp.gearH; ai.wait -= dt;
         const [al] = local(to, ai.pos.x, ai.pos.z);
-        if (ai.wait <= 0 || al > to.rwys[0].len / 2 - 60) { ai.at = to; ai.to = pickDest(ai); ai.phase = "hold"; ai.wait = 25 + Math.random() * 50; placeAtHold(ai, false); }
+        if (ai.wait <= 0 || al > ln.al + ln.len / 2 - 60) { ai.at = to; ai.atLane = ln.i; ai.toLane = null; ai.to = pickDest(ai); ai.phase = "hold"; ai.wait = 25 + Math.random() * 50; placeAtHold(ai, false); }
         break;
       }
     }
@@ -6827,7 +6872,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   apEls.app.addEventListener("click", () => {
     if (!S.to) { flash("Pick a destination in the briefing to use APP", 2); return; }
     AP.app = !AP.app; if (AP.app && AP.lat === "HDG") AP.lat = "NAV"; if (!AP.app && AP.lat === "LOC") AP.lat = "NAV"; apSync();
-    if (AP.app) flash(`Approach armed: ${S.to.code} runway ${S.to.label}`, 2);
+    if (AP.app) flash(`Approach armed: ${S.to.code} runway ${laneOf(S.to, S.toLane).label}`, 2);
   });
   apEls.panel.querySelectorAll("button[data-ap]").forEach((b) => b.addEventListener("click", () => {
     const k = b.dataset.ap, d = +b.dataset.d;
@@ -6847,25 +6892,25 @@ vec3 liveryAt(vec3 p, out float fus) {
     let hdgT = AP.hdg * Math.PI / 180, altT = AP.alt / M2FT, vsT = null;
     const agl = S.pos.y - spec.gearH - Math.max(0, groundY(S.pos.x, S.pos.z));
     if (S.to && AP.lat !== "HDG") {
-      const a = S.to, r = a.rwys[0], [al, ac] = local(a, S.pos.x, S.pos.z), rwyH = a.hdg * Math.PI / 180;
-      const [fx, fz] = toWorld(a, -r.len / 2 - FIX_DIST, r.off), fixAlt = a.elev + FIX_DIST * TAN3 + spec.gearH;
+      const a = S.to, r = laneOf(a, S.toLane), [al, ac] = local(a, S.pos.x, S.pos.z), rwyH = a.hdg * Math.PI / 180;
+      const [fx, fz] = toWorld(a, (r.al - r.len / 2) - FIX_DIST, r.off), fixAlt = a.elev + FIX_DIST * TAN3 + spec.gearH;
       const dFix = Math.hypot(fx - S.pos.x, fz - S.pos.z);
       if (AP.lat === "NAV") {
         hdgT = Math.atan2(fx - S.pos.x, -(fz - S.pos.z));
         if (AP.app && dFix < 22000) altT = Math.min(altT, fixAlt);
-        if (AP.app && (dFix < 1800 || (al < -r.len / 2 && al > -r.len / 2 - FIX_DIST - 3000 && Math.abs(ac - r.off) < 2500 && Math.abs(wrapA(hdgNow - rwyH)) < 1.2))) {
-          AP.lat = "LOC"; flash(`Localizer captured, runway ${a.label}`, 2); apSync();
+        if (AP.app && (dFix < 1800 || (al < (r.al - r.len / 2) && al > (r.al - r.len / 2) - FIX_DIST - 3000 && Math.abs(ac - r.off) < 2500 && Math.abs(wrapA(hdgNow - rwyH)) < 1.2))) {
+          AP.lat = "LOC"; flash(`Localizer captured, runway ${r.label}`, 2); apSync();
         }
       }
       if (AP.lat === "LOC") {
         hdgT = rwyH + clamp(-(ac - r.off) / 350, -0.55, 0.55);
-        const toTd = (-r.len / 2 + 300) - al, glide = a.elev + spec.gearH + Math.max(0, toTd) * TAN3;
+        const toTd = ((r.al - r.len / 2) + 300) - al, glide = a.elev + spec.gearH + Math.max(0, toTd) * TAN3;
         if (S.pos.y < glide + 60 || toTd < FIX_DIST + 500) vsT = clamp((glide - S.pos.y) * 0.3 - (toTd > 0 ? S.gs * TAN3 : 0), -12, S.pos.y < glide - 30 ? Math.max(4, AP.vs / M2FT / 60) : 4);
         if (S.alerts && S.alerts.terrain && !AP.flare) vsT = Math.max(vsT, clamp((AP.terrVs || 0) * 1.4, 4, 25));   // far below the path and terrain ahead: climb
         // flare: starts lower the slower you sink (about 3 s before the wheels would touch), then the sink rate shrinks
         // in proportion to the height, aiming at ~140 ft/min (the wheels meet the runway at ~200); measured above the runway, never over terrain short of it
         const hR = S.pos.y - spec.gearH - a.elev, sinkNow = Math.max(1.2, -S.vs);
-        if (!AP.flare && al > -r.len / 2 - 450 && hR < clamp(sinkNow * 3, 4.5, 10)) { AP.flare = true; AP.flareH = Math.max(1, hR); AP.flareV = sinkNow; }
+        if (!AP.flare && al > (r.al - r.len / 2) - 450 && hR < clamp(sinkNow * 3, 4.5, 10)) { AP.flare = true; AP.flareH = Math.max(1, hR); AP.flareV = sinkNow; }
         if (AP.flare) { vsT = -(0.7 + Math.max(0, AP.flareV - 0.7) * clamp(hR / AP.flareH, 0, 1)); S.throttle = Math.max(0, S.throttle - dt * 0.35); }   // and retard
         // approach speed: Vref + 5 kt, plus a gust margin in cloud and rain (the stall warning stays quiet in turbulence)
         if (AP.athr) AP.spd = Math.round(spec.stall * (1 - 0.28 * S.flapPos) * 1.3 * MS2KT) + wxP().spd;
@@ -6912,7 +6957,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   let hiddenParked = null;
   const pushBtn = $("pushBtn");
   function playerStand(a) {
-    AIRPORTS.forEach((q) => (q.live || []).forEach((st) => (st.player = false)));
+    AIRPORTS.forEach((q) => [...(q.live || []), ...(q.satLive || [])].forEach((st) => (st.player = false)));
     const want = DIMS[spec.kind][0], live = a.live && a.live.length ? a.live : a.gates;
     const free = live.filter((st) => !st.ai), pool = free.length ? free : live;
     const g = pool.slice().sort((g1, g2) => Math.abs(DIMS[g1.kind][0] - want) - Math.abs(DIMS[g2.kind][0] - want))[0];
@@ -7087,10 +7132,10 @@ vec3 liveryAt(vec3 p, out float fus) {
         show = ["TO", `Takeoff · ${spec.name}`, `Flaps <b>${S.flaps === R.flapsTo ? R.flapsTo : `${R.flapsTo} (now ${S.flaps})`}</b> · V1 <b>${R.v1}</b> · Rotate <b>${R.vr}</b> · V2 <b>${R.v2}</b> kt`,
           `${kt} kt`, kt < R.v1 - 15 ? "full throttle" : kt < R.vr ? "hold it…" : "pull back gently"];
       } else if (!S.grounded && S.to && S.liftT != null) {
-        const [tx, tz] = toWorld(S.to, -S.to.len / 2, 0), d = Math.hypot(tx - S.pos.x, tz - S.pos.z), agl = S.pos.y - spec.gearH - S.to.elev;
+        const tL = laneOf(S.to, S.toLane), [tx, tz] = toWorld(S.to, tL.al - tL.len / 2, tL.off), d = Math.hypot(tx - S.pos.x, tz - S.pos.z), agl = S.pos.y - spec.gearH - S.to.elev;
         if (d < 16000 && agl < 900 && (S.vs < 1 || d < 6000)) {
           const fl = S.flaps === R.flapsL ? "full" : `full (now ${S.flaps})`;
-          show = ["LDG", `Landing · runway ${S.to.label}`, `Flaps <b>${fl}</b> · gear <b>${S.gearDown ? "down" : "DOWN!"}</b> · approach <b>${R.vapp}</b> · touchdown <b>${R.vtd}</b> kt`,
+          show = ["LDG", `Landing · runway ${laneOf(S.to, S.toLane).label}`, `Flaps <b>${fl}</b> · gear <b>${S.gearDown ? "down" : "DOWN!"}</b> · approach <b>${R.vapp}</b> · touchdown <b>${R.vtd}</b> kt`,
             `${kt} kt`, kt > R.vapp + 15 ? "too fast" : kt < R.vtd - 5 ? "too slow!" : "on speed"];
         }
       }
@@ -7115,12 +7160,30 @@ vec3 liveryAt(vec3 p, out float fus) {
       ["along the apron", "onto taxiway A (the yellow line)", `onto the link to runway ${rw}`, `and stop at the red hold line, runway ${rw} ahead`, `onto runway ${rw} and line up`]);
     flash(`Taxi to runway ${rw}: follow the yellow dashes and the card at the top`, 3.5);
   }
+  function playerSatStand(a) {   // landed on the second runway: a working stand at the satellite (the aircraft there moves on)
+    AIRPORTS.forEach((q) => [...(q.live || []), ...(q.satLive || [])].forEach((st) => (st.player = false)));
+    const free = a.satLive.filter((st) => !st.ai), g = (free.length ? free : a.satLive)[0];
+    if (g && g.ai) evictAI(g.ai, a);
+    if (g) g.player = true;
+    return g;
+  }
   function arrivalGuide(a) {
-    const r = a.rwys[0], tl = r.len * 0.92, [alNow] = local(a, S.pos.x, S.pos.z);
+    const li = Math.max(0, laneAt(a, S.pos.x, S.pos.z)), r = laneOf(a, li), tl = r.len * 0.92, [alNow] = local(a, S.pos.x, S.pos.z);
     const fwd = V.fwd.set(0, 0, -1).applyQuaternion(S.q), dir = Math.sign(fwd.x * a.s - fwd.z * a.c) || 1;   // rolling along the runway's heading or against it
-    const exits = [tl / 2 - 12, -(tl / 2 - 12)]; for (let z = -tl / 2 + 450; z < tl / 2 - 300; z += 480) exits.push(-z);
+    const exits = [r.al + tl / 2 - 12, r.al - (tl / 2 - 12)]; for (let z = -tl / 2 + 450; z < tl / 2 - 300; z += 480) exits.push(r.al - z);
     const ahead = exits.filter((e) => (e - alNow) * dir > 120).sort((p, q) => (p - alNow) * dir - (q - alNow) * dir);
     const alExit = ahead.length ? ahead[0] : exits.sort((p, q) => (q - p) * dir)[0];
+    if (r.i === 1 && a.satLive && a.satLive.length) {   // the second runway: taxi to the satellite concourse
+      const g = playerSatStand(a); if (!g) return false;
+      const n = standName(a, g), alGate = -g.z, len = DIMS[spec.kind][1], P = (al, ac) => toWorld(a, al, ac);
+      setGuide("arr", [P(alExit, r.off), P(alExit, r.tx), P(alGate, r.tx), P(alGate, g.cxs + 21 + len / 2)],
+        ["EXIT RUNWAY", "VACATE TO THE TAXIWAY", `TAXIWAY · GATE ${n}`, `PARK · GATE ${n}`],
+        [null, "Runway vacated.", null, null], null,
+        ["off the runway onto the exit", `onto the parallel taxiway towards the satellite`, `towards the satellite, gate ${n}`, `on the stand at gate ${n} (end of the yellow line)`]);
+      S.parked = { a, g, n, hdgDeg: a.hdg - 90 };
+      RADIO.push({ text: `${a.name} Ground: welcome. Vacate runway ${r.label}, taxi to the satellite, gate ${n}: look for the green GATE ${n} sign.`, t: 14 });
+      return true;
+    }
     const g = playerStand(a);
     if (!g) return false;
     if (hiddenParked) hiddenParked.visible = true;
@@ -7140,7 +7203,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const a = S.parked.a, [px, pz] = S.guide.pts[S.guide.pts.length - 1];
     D.t += dt; const k = Math.min(1, D.t / D.T), e = k * k * (3 - 2 * k);
     S.pos.x = lerp(D.from.x, px, e); S.pos.z = lerp(D.from.z, pz, e); S.pos.y = groundY(S.pos.x, S.pos.z) + spec.gearH;
-    tmpQ.setFromAxisAngle(AY, -(a.hdg + 90) * Math.PI / 180); S.q.copy(D.q0).slerp(tmpQ, Math.min(1, e * 1.4));
+    tmpQ.setFromAxisAngle(AY, -(S.parked.hdgDeg ?? a.hdg + 90) * Math.PI / 180); S.q.copy(D.q0).slerp(tmpQ, Math.min(1, e * 1.4));
     S.gs = k < 1 ? 1.5 : 0; S.speed = S.gs; S.throttle = 0; S.vel.set(0, 0, 0); S.groundPitch = 0;
     syncTaxiCard();
     if (k >= 1) {   // on the stand: park, set the brakes, open up
