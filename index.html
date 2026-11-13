@@ -1097,7 +1097,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       stands: ["b77w", "b763", "a321", "b744", "b737", "b787", "a350", "mh"] },
   ];
   const WORLD = 21000;   // half the island: room for ten airports kept well apart
-  const DIMS = { a380: [79.4, 72.7], md11: [51.8, 61.6], concorde: [25.9, 61.7], f15: [13.05, 19.43], bizjet: [19.4, 24.0], b787: [60.1, 68.3], a330: [60.3, 63.7], b744: [64.4, 70.6], b747: [64.4, 70.6], b773: [60.9, 73.6], a350: [64.8, 66.9], b77w: [64.8, 73.6], b763: [47.6, 55.2], a321: [35.8, 46.5], b739: [37.8, 43.0], b777: [60.9, 63.7], trainer: [11, 8.3], aero: [8, 6.6], islander: [35.8, 39.5], breeze: [27.1, 27.2], swift: [15.5, 17.7], atlas: [42.4, 45.1], arrow: [9.1, 14.4], regio: [28.7, 36.2], skyliner: [60.1, 62.8], jumbo: [64.4, 70.7], commuter: [17.7, 17.6], b772: [64.8, 73.9], b737: [35.8, 39.7], mh: [37.8, 35.5], b767: [47.6, 48.5] };
+  const DIMS = { md11p: [51.8, 61.6], a380: [79.4, 72.7], md11: [51.8, 61.6], concorde: [25.9, 61.7], f15: [13.05, 19.43], bizjet: [19.4, 24.0], b787: [60.1, 68.3], a330: [60.3, 63.7], b744: [64.4, 70.6], b747: [64.4, 70.6], b773: [60.9, 73.6], a350: [64.8, 66.9], b77w: [64.8, 73.6], b763: [47.6, 55.2], a321: [35.8, 46.5], b739: [37.8, 43.0], b777: [60.9, 63.7], trainer: [11, 8.3], aero: [8, 6.6], islander: [35.8, 39.5], breeze: [27.1, 27.2], swift: [15.5, 17.7], atlas: [42.4, 45.1], arrow: [9.1, 14.4], regio: [28.7, 36.2], skyliner: [60.1, 62.8], jumbo: [64.4, 70.7], commuter: [17.7, 17.6], b772: [64.8, 73.9], b737: [35.8, 39.7], mh: [37.8, 35.5], b767: [47.6, 48.5] };
   const swapLR = (s) => (s === "L" ? "R" : s === "R" ? "L" : "");
   // runways long enough for the fleet: an A320/737 needs about 2 km, the 767/A330 about 2.5 km, the 777/747 about 3 km
   const RWY_MIN = { ga: 2100, regional: 2400, intl: 2900 };
@@ -2513,6 +2513,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     bizjet: ["pjnavy", "pjred", "pjblack"],
     a380: ["uae", "sia", "qtr", "baw", "dlh", "kal", "afr"],
     md11: ["fdx", "lhc", "ups", "abc", "atl"],
+    md11p: ["klm", "swr", "dal", "aal", "kal", "afl", "house"],
     concorde: ["baw", "afr"],
     b787: ["uzb", "ual", "aal", "baw", "klm", "qtr", "thy", "sia", "vir", "afr", "kal"],
     a350: ["qtr", "dlh", "afl", "sia", "cpa", "afr", "dal", "ual", "baw", "kal", "thy", "vir", "klm"],
@@ -2543,6 +2544,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     f15: { name: "F-15 Eagle", type: "Air-superiority fighter · twin afterburning engines", packed: true, fighter: true, build: buildF15model, thrust: 13, vmax: 290, stall: 58, roll: 2.2, pitch: 1.05, yaw: 0.4, turn: 1.4, gearH: 2.0, retract: true, cam: [34, 7], cock: [1.95, -4.3], wingX: 8.1, brake: 5.5, shadow: 10, stats: [1.0, 1.0, 0.95] },
     a380: { name: "Airbus A380", type: "Double-deck giant · four engines", packed: true, build: (liv) => buildPacked("a380", packOpts("a380"), liv), thrust: 2.7, vmax: 150, stall: 63, roll: 0.28, pitch: 0.24, yaw: 0.13, turn: 0.58, gearH: 5.4, retract: true, cam: [145, 30], cock: [2.0, -32.3], wingX: 39.7, brake: 3.7, shadow: 42, big: true, stats: [0.97, 0.16, 0.22] },
     md11: { name: "McDonnell Douglas MD-11F", type: "Tri-jet freighter · FedEx colours", packed: true, freighter: true, cargo: 91, build: (liv) => buildPacked("md11", packOpts("md11"), liv), thrust: 2.9, vmax: 146, stall: 62, roll: 0.33, pitch: 0.27, yaw: 0.15, turn: 0.64, gearH: 4.8, retract: true, cam: [112, 22], cock: [1.5, -26.7], wingX: 25.9, brake: 3.9, shadow: 31, big: true, stats: [0.95, 0.2, 0.26] },
+    md11p: { name: "McDonnell Douglas MD-11", type: "Tri-jet passenger airliner · long haul", packed: true, build: buildMD11Pmodel, thrust: 2.9, vmax: 146, stall: 62, roll: 0.33, pitch: 0.27, yaw: 0.15, turn: 0.64, gearH: 4.8, retract: true, cam: [112, 22], cock: [1.5, -26.7], wingX: 25.9, brake: 3.9, shadow: 31, big: true, stats: [0.95, 0.2, 0.26] },
     concorde: { name: "Concorde", type: "Supersonic airliner · delta wing · Mach 2", packed: true, build: (liv) => buildPacked("concorde", packOpts("concorde"), liv), thrust: 9, vmax: 330, stall: 78, roll: 0.7, pitch: 0.42, yaw: 0.18, turn: 0.7, gearH: 5.0, retract: true, cam: [105, 18], cock: [0.42, -22.9], wingX: 12.9, brake: 4.2, shadow: 22, big: true, stats: [1.0, 0.5, 0.2] },
   };
   for (const k of Object.keys(PLANES)) PLANES[k].kind = k;
@@ -2559,9 +2561,9 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
       sp.gearH *= f; sp.wingX *= f; sp.shadow *= f; sp.cam = sp.cam.map((v) => v * f); sp.cock = sp.cock.map((v) => v * f);
     }
   })();
-  const CAT = { a380: "airliner", md11: "special", concorde: "special", f15: "special", bizjet: "light", b787: "airliner", a330: "airliner", b744: "airliner", b747: "airliner", b773: "airliner", a350: "airliner", b77w: "airliner", b763: "airliner", a321: "airliner", b739: "airliner", b777: "airliner", b767: "airliner", b737: "airliner", mh: "airliner", trainer: "light", aero: "light", swift: "light", islander: "airliner", breeze: "airliner", regio: "airliner", skyliner: "airliner", jumbo: "airliner", b772: "airliner", commuter: "airliner", atlas: "special", arrow: "special" };
-  const SEATS = { a380: 555, md11: 0, concorde: 100, f15: 1, bizjet: 12, b787: 336, a330: 300, b744: 416, b773: 368, a350: 325, b77w: 396, b763: 269, a321: 220, b739: 215, b777: 314, b767: 224, b737: 180, mh: 189, trainer: 4, aero: 2, swift: 9, islander: 189, breeze: 72, regio: 100, skyliner: 296, jumbo: 416, b772: 396, commuter: 19, atlas: 116, arrow: 1 };
-  const CRUISE = { a380: 490, md11: 473, concorde: 1160, f15: 540, bizjet: 470, b787: 488, a330: 470, b744: 490, b747: 490, b773: 480, a350: 488, b77w: 484, b763: 459, a321: 447, b739: 453, b777: 482, b767: 459, b737: 447, mh: 453, trainer: 124, aero: 210, swift: 465, islander: 453, breeze: 275, regio: 447, skyliner: 488, jumbo: 490, b772: 490, commuter: 280, atlas: 421, arrow: 500 };
+  const CAT = { md11p: "airliner", a380: "airliner", md11: "special", concorde: "special", f15: "special", bizjet: "light", b787: "airliner", a330: "airliner", b744: "airliner", b747: "airliner", b773: "airliner", a350: "airliner", b77w: "airliner", b763: "airliner", a321: "airliner", b739: "airliner", b777: "airliner", b767: "airliner", b737: "airliner", mh: "airliner", trainer: "light", aero: "light", swift: "light", islander: "airliner", breeze: "airliner", regio: "airliner", skyliner: "airliner", jumbo: "airliner", b772: "airliner", commuter: "airliner", atlas: "special", arrow: "special" };
+  const SEATS = { md11p: 323, a380: 555, md11: 0, concorde: 100, f15: 1, bizjet: 12, b787: 336, a330: 300, b744: 416, b773: 368, a350: 325, b77w: 396, b763: 269, a321: 220, b739: 215, b777: 314, b767: 224, b737: 180, mh: 189, trainer: 4, aero: 2, swift: 9, islander: 189, breeze: 72, regio: 100, skyliner: 296, jumbo: 416, b772: 396, commuter: 19, atlas: 116, arrow: 1 };
+  const CRUISE = { md11p: 473, a380: 490, md11: 473, concorde: 1160, f15: 540, bizjet: 470, b787: 488, a330: 470, b744: 490, b747: 490, b773: 480, a350: 488, b77w: 484, b763: 459, a321: 447, b739: 453, b777: 482, b767: 459, b737: 447, mh: 453, trainer: 124, aero: 210, swift: 465, islander: 453, breeze: 275, regio: 447, skyliner: 488, jumbo: 490, b772: 490, commuter: 280, atlas: 421, arrow: 500 };
   for (const k of Object.keys(PLANES)) { PLANES[k].cat = CAT[k] || "light"; PLANES[k].seats = SEATS[k] || 0; }
 
   // ================= DETAILED 3D MODELS (GLB) =================
@@ -2683,6 +2685,7 @@ b767: {"c":[0.0,3.9792,0.0],"e":[23.5523,7.4299,24.2524],"tip":[23.55,1.249,7.42
     a330: { from: "b767", s: 1.12, fx: 3.4, plugs: [[-12.25, 8 * 0.557], [4.85, 7 * 0.557]], span: [3.4, 1.152], bend: { root: 3.8, c0: 26.8, tip: 29.8, ang: 1.35, flex: 0.35 },
       nose: { z: -24.3, len: 5.5, cy: 0.2, k: 0.86, ext: 0.9 } },
     b744: { from: "b747", s: 1, fx: 4, plugs: [] },   // passenger 747-400: the freighter's airframe with windows painted on
+    md11p: { from: "md11", s: 1, fx: 3.3, plugs: [] },   // passenger MD-11: the freighter's airframe with cabin windows and doors painted on
     b763: { from: "b767", s: 1, fx: 3.4, plugs: [[-12.25, 6 * 0.557], [4.85, 6 * 0.557]] },
     a321: { from: "b737", s: 1, fx: 2.7, plugs: [[-9.7, 7 * 0.4855], [1.49, 7 * 0.4855]], sharklet: 2.3 },   // the A321neo's 2.4 m sharklets
     b739: { from: "mh", s: 1, fx: 2.6, plugs: [[-9.67, 6 * 0.58], [1.67, 7 * 0.58]] },
@@ -3655,6 +3658,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   function buildA321model(liv) { return buildPacked("a321", packOpts("a321", { doors: [0.13, 0.33, 0.62, 0.9, -5], winRange: [0.15, 0.88] }), liv); }
   function build739model(liv) { return buildPacked("mh", packOpts("mh"), liv); }
   function build747model(liv) { return buildPacked("b747", packOpts("b747"), liv); }
+  function buildMD11Pmodel(liv) { return buildPacked("md11p", packOpts("md11p", { paintWindows: true, doors: [0.15, 0.31, 0.6, 0.83, -5], winRange: [0.13, 0.86] }), liv); }
   function build744model(liv) { return buildPacked("b744", packOpts("b744", { win: 0.24, paintWindows: true, upper: [-26.6, 21.3, 3.85, 1], upDoor: 16, hump: 1.4, doors: [0.14, 0.283, 0.453, 0.642, 0.793], winRange: [0.115, 0.84] }), liv); }
   function buildA330model(liv) {
     const d = DERIVED.a330;
@@ -5080,8 +5084,8 @@ vec3 liveryAt(vec3 p, out float fus) {
   // reputation and wear the aircraft, which needs repairs. Earn experience for promotions; each rank lets you buy bigger
   // aircraft. Everything is saved in this browser.
   const RANKS = [["Cadet", 0], ["Junior First Officer", 300], ["First Officer", 900], ["Captain", 2200], ["Senior Captain", 5000], ["Chief Pilot", 10000]];
-  const LICENCE = { a380: 4, md11: 3, concorde: 5, b737: 0, mh: 0, bizjet: 0, a321: 1, b763: 2, b787: 2, a330: 3, a350: 3, b77w: 3, b744: 4, b747: 4, f15: 5 };
-  const PRICE = { a380: 520000, md11: 330000, concorde: 700000, b737: 60000, mh: 55000, bizjet: 45000, a321: 90000, b763: 160000, b787: 240000, a330: 220000, a350: 300000, b77w: 380000, b744: 420000, b747: 400000, f15: 600000 };
+  const LICENCE = { md11p: 3, a380: 4, md11: 3, concorde: 5, b737: 0, mh: 0, bizjet: 0, a321: 1, b763: 2, b787: 2, a330: 3, a350: 3, b77w: 3, b744: 4, b747: 4, f15: 5 };
+  const PRICE = { md11p: 300000, a380: 520000, md11: 330000, concorde: 700000, b737: 60000, mh: 55000, bizjet: 45000, a321: 90000, b763: 160000, b787: 240000, a330: 220000, a350: 300000, b77w: 380000, b744: 420000, b747: 400000, f15: 600000 };
   const CAR = Object.assign({ cash: 0, xp: 0, flights: 0, secs: 0, earned: 0, rep: 50, fleet: [], sel: null, jobs: [], hist: [], started: false, airline: "", hub: "LHR", seed: 1 }, readJSON("sw-career", {}) || {});
   if (!Array.isArray(CAR.fleet)) CAR.fleet = []; if (!Array.isArray(CAR.hist)) CAR.hist = []; if (!Array.isArray(CAR.jobs)) CAR.jobs = [];
   const carSave = () => save("sw-career", JSON.stringify(CAR));
