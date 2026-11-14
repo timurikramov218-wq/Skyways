@@ -928,13 +928,13 @@ body.fs-on .stage { position: fixed; inset: 0; z-index: 50; width: 100vw; height
             <label><span>To</span><select id="toSel" aria-label="Fly to"></select></label>
           </div>
           <div class="conds">
-            <div class="seg" data-for="startSel" role="group" aria-label="Start position"><span>Start</span><button type="button" class="seg-btn" data-v="runway">Runway</button><button type="button" class="seg-btn" data-v="gate">Gate</button></div>
+            <div class="seg" data-for="startSel" role="group" aria-label="Start position"><span>Start</span><button type="button" class="seg-btn" data-v="runway">Runway</button><button type="button" class="seg-btn" data-v="gate">Gate</button><button type="button" class="seg-btn" data-v="sat" id="segSat" hidden>Satellite</button></div>
             <div class="seg" data-for="timeSel" role="group" aria-label="Time of day"><span>Time</span><button type="button" class="seg-btn" data-v="day">Day</button><button type="button" class="seg-btn" data-v="sunset">Sunset</button><button type="button" class="seg-btn" data-v="night">Night</button></div>
             <div class="seg" data-for="modelSel" role="group" aria-label="Flight model"><span>Flight model</span><button type="button" class="seg-btn" data-v="easy">Assisted</button><button type="button" class="seg-btn" data-v="real">Realistic</button></div>
             <div class="seg" data-for="wxSel" role="group" aria-label="Weather"><span>Weather</span><button type="button" class="seg-btn" data-v="clear">Clear</button><button type="button" class="seg-btn" data-v="cloudy">Cloudy</button><button type="button" class="seg-btn" data-v="rain">Rain</button><button type="button" class="seg-btn" data-v="fog">Fog</button><button type="button" class="seg-btn" data-v="overcast">Overcast</button><button type="button" class="seg-btn" data-v="windy">Windy</button><button type="button" class="seg-btn" data-v="storm">Storm</button><button type="button" class="seg-btn" data-v="snow">Snow</button><button type="button" class="seg-btn" data-v="haze">Haze</button></div>
           </div>
           <div hidden>
-            <select id="startSel" aria-label="Start at"><option value="runway">Runway</option><option value="gate">Gate</option></select>
+            <select id="startSel" aria-label="Start at"><option value="runway">Runway</option><option value="gate">Gate</option><option value="sat">Satellite gate</option></select>
             <select id="timeSel" aria-label="Time of day"><option value="day">Day</option><option value="sunset">Sunset</option><option value="night">Night</option></select>
             <select id="modelSel" aria-label="Flight model"><option value="easy">Assisted</option><option value="real">Realistic</option></select>
             <select id="wxSel" aria-label="Weather"><option value="clear">Clear</option><option value="cloudy">Cloudy</option><option value="rain">Rain</option><option value="fog">Fog</option><option value="overcast">Overcast</option><option value="windy">Windy</option><option value="storm">Storm</option><option value="snow">Snow</option><option value="haze">Haze</option></select>
@@ -3762,6 +3762,18 @@ vec3 liveryAt(vec3 p, out float fus) {
     list.forEach(([x, y, z], i) => { m4.makeTranslation(x, y, z); im.setMatrixAt(i, m4); }); grp.add(im); return im;
   }
   const lightG = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+  // night: warm pools of light on the aprons under the floodlights (shown only after dark), green taxiway centre lights
+  var NIGHT_OBJS = [];
+  const poolTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d"), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, "rgba(255,226,170,1)"); gr.addColorStop(0.45, "rgba(255,200,120,0.55)"); gr.addColorStop(1, "rgba(255,190,110,0)"); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+  const poolMat = new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.55, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 });
+  const poolGeo = new THREE.PlaneGeometry(1, 1); poolGeo.rotateX(-Math.PI / 2);
+  function lightPools(grp, list) {   // list: [x, z, radius]
+    if (!list.length) return; const im = new THREE.InstancedMesh(poolGeo, poolMat, list.length), m4 = new THREE.Matrix4();
+    list.forEach(([x, z, r], i) => { m4.makeScale(r * 2, 1, r * 2); m4.setPosition(x, 0.14, z); im.setMatrixAt(i, m4); });
+    im.renderOrder = 2; im.visible = false; grp.add(im); NIGHT_OBJS.push(im);
+  }
+  const greenLightG = new THREE.BoxGeometry(0.45, 0.2, 0.45);
 
   // ---------- airport building textures (drawn once) ----------
   const APT = (function () {
@@ -4005,7 +4017,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     const TW = 34, TH = TW / 2;   // taxiway width: wide enough to steer a wide-body along comfortably
     const taxiLink = (x0, z0, x1, z1) => { strip(grp, x0, z0, x1, z1, TW, MAT.taxi, 0.05); strip(grp, x0, z0, x1, z1, 0.5, MAT.yellow, 0.08); };
     const r0 = a.rwys[0], tl = r0.len * 0.92;
-    const xrBlue = [];
+    const xrBlue = [], xrGreen = [];
     for (const r of a.xr) {
       const cx = r.ac, cz = -r.al, cd = Math.cos(r.d), sd = Math.sin(r.d);
       const P = (lx, lz) => [cx + lx * cd - lz * sd, cz + lx * sd + lz * cd];
@@ -4030,6 +4042,7 @@ vec3 liveryAt(vec3 p, out float fus) {
       const tlx = r.len * 0.9;
       flat(gD, TW, tlx, MAT.taxi, r.tw, 0.05, 0); flat(gD, 0.5, tlx, MAT.yellow, r.tw, 0.08, 0);
       for (let z = -tlx / 2; z <= tlx / 2; z += 60) for (const sx of [-1, 1]) pt(xrBlue, r.tw + sx * (TH + 1.5), 0.25, z);
+      for (let z = -tlx / 2 + 10; z <= tlx / 2 - 10; z += 30) pt(xrGreen, r.tw, 0.12, z);
       const cl = Math.abs(r.tw) - r.w / 2;
       for (const f of [-0.45, -0.15, 0.15, 0.45]) {
         const z = f * r.len, xm = sd2 * (r.w / 2 + cl / 2);
@@ -4041,10 +4054,11 @@ vec3 liveryAt(vec3 p, out float fus) {
       const ends = Math.abs(r.d) < 0.3 ? [-0.42, 0.42] : [[-0.45, 0, 0.45].map((f) => [f, P(r.tw, f * r.len)]).sort((p, q) => Math.hypot(p[1][0] - tx0, p[1][1] - clampZ(p[1][1])) - Math.hypot(q[1][0] - tx0, q[1][1] - clampZ(q[1][1])))[0][0]];
       for (const f of ends) { const [sx, sz] = P(r.tw, f * r.len); taxiLink(sx, sz, tx0, clampZ(sz)); }
     }
-    instanced(grp, lightG, MAT.blue, xrBlue);
+    instanced(grp, lightG, MAT.blue, xrBlue); if (xrGreen.length) instanced(grp, greenLightG, MAT.green, xrGreen);
     for (const [mat, list] of [[MAT.edge, edgeL], [MAT.green, thrG], [MAT.redL, thrR], [MAT.white, appr]]) instanced(grp, lightG, mat, list).userData.keep = true;
     // taxiways
     flat(grp, TW, tl, MAT.taxi, a.tx, 0.05, 0); flat(grp, 0.5, tl, MAT.yellow, a.tx, 0.08, 0);
+    { const gl = []; for (let z = -tl / 2 + 10; z <= tl / 2 - 10; z += 30) gl.push([a.tx, 0.12, z]); instanced(grp, greenLightG, MAT.green, gl); }   // green centre-line lights
     for (let z = -tl / 2; z <= tl / 2; z += 60) for (const sx of [-1, 1]) blueL.push([a.tx + sx * (TH + 1.5), 0.25, z]);
     const conns = [-tl / 2 + 12, tl / 2 - 12]; for (let z = -tl / 2 + 450; z < tl / 2 - 300; z += 480) conns.push(z);
     // taxiway edge lines (double yellow is for shoulders; a single 15 cm line marks the paved edge), broken where connectors join
@@ -4176,6 +4190,10 @@ vec3 liveryAt(vec3 p, out float fus) {
         else K.gable(30, 5, L * 0.22, Mk.dark, cxs, top, 0);
         // the people mover's station on the concourse, under the end of the track
         box(grp, 30, 6, 16, MAT.wall2, a.satX0 + 18, 13.6, -(a.apL * 0.45 + 30)); box(grp, 34, 0.8, 18, MAT.roof, a.satX0 + 18, 26, -(a.apL * 0.45 + 30)); }
+      { const ph = 28, masts = [[cxs + 27, 0], [cxs - 27, -L * 0.27], [cxs - 27, L * 0.02]];
+        for (const [mx, mz] of masts) { const pl = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, ph, 6), APT.pole); pl.position.set(mx, ph / 2, mz); grp.add(pl);
+          const hd = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 4), APT.floodHead); hd.position.set(mx, ph, mz); grp.add(hd); }
+        lightPools(grp, [[cxs + 70, -L * 0.27, 70], [cxs + 70, L * 0.27, 70], [cxs + 60, 0, 55], [cxs - 60, -L * 0.27, 60], [cxs - 60, L * 0.15, 60]]); }
       const satName = { LHR: "TERMINAL 5B", CDG: "TERMINAL 2E · HALL K", DXB: "CONCOURSE B", SIN: "TERMINAL 3 · B GATES" }[a.code] || "SATELLITE B";
       for (const sd of [-1, 1]) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(70, 7), new THREE.MeshBasicMaterial({ map: textTex(satName, "#14385e", "#ffffff", 1024, 102) }));
         sg.rotation.y = sd < 0 ? -Math.PI / 2 : Math.PI / 2; sg.position.set(cxs + sd * (13 * 1.6 + 0.4), 15 * 1.55 + 4.5, 0); grp.add(sg); }
@@ -4270,6 +4288,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     // apron floodlight masts
     // between neighbouring stands, close to the terminal: never on a lead-in line or in the taxi lane
     const mastZ = stands.slice(0, -1).map((st, i) => (st.z + stands[i + 1].z) / 2).filter((_, i) => i % 2 === 0);
+    lightPools(grp, mastZ.map((fz) => [a.termX0 - 40, fz, intl ? 62 : 44]));
     for (const fz of mastZ) {
       const fx = a.termX0 - 24, ph = intl ? 28 : 20;
       const pl = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, ph, 6), APT.pole); pl.position.set(fx, ph / 2, fz); grp.add(pl);
@@ -4912,7 +4931,11 @@ vec3 liveryAt(vec3 p, out float fus) {
   });
   const noneOpt = document.createElement("option"); noneOpt.value = "-1"; noneOpt.textContent = "Free flight (no destination)"; toSel.append(noneOpt);
   fromSel.value = "0"; toSel.value = "1";
-  fromSel.addEventListener("change", () => { S.from = AIRPORTS[+fromSel.value]; if (toSel.value === fromSel.value) toSel.value = String((+fromSel.value + 1) % AIRPORTS.length); spawn(S.from); updateSummary(); renderBoard(); });
+  function syncSatSeg() {   // the satellite start only where the airport has one
+    const a = AIRPORTS[+fromSel.value], has = !!(a && a.satLive && a.satLive.length); $("segSat").hidden = !has;
+    if (!has && $("startSel").value === "sat") { $("startSel").value = "gate"; segSyncs.forEach((f) => f()); }
+  }
+  fromSel.addEventListener("change", () => { syncSatSeg(); S.from = AIRPORTS[+fromSel.value]; if (toSel.value === fromSel.value) toSel.value = String((+fromSel.value + 1) % AIRPORTS.length); spawn(S.from); updateSummary(); renderBoard(); });
   toSel.addEventListener("change", () => { if (toSel.value === fromSel.value) fromSel.value = String((+toSel.value + 1) % AIRPORTS.length); S.from = AIRPORTS[+fromSel.value]; spawn(S.from); updateSummary(); renderBoard(); });
   const boardEl = $("routeBoard");
   function flapText(t, n) { const sp = document.createElement("span"); sp.className = "flap"; sp.textContent = t.padEnd(n, " ").slice(0, n); return sp; }
@@ -4947,6 +4970,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     grp.querySelectorAll("button").forEach((btn) => btn.addEventListener("click", () => { sel.value = btn.dataset.v; sel.dispatchEvent(new Event("change")); sync(); updateSummary(); }));
     sync();
   });
+  syncSatSeg();
   // ---------- 360° hangar: its own small scene and renderer, opened from the briefing or the ⋯ menu ----------
   const SHOW = (function () {
     const el = $("showroom"), cv = $("showCv"); let r = null, sc = null, cam = null, mdl = null, kind = null, raf = 0, last = 0, floorY = 0;
@@ -5404,7 +5428,9 @@ vec3 liveryAt(vec3 p, out float fus) {
     S.lights = ENV.time !== "day"; syncTouchKeys();
     ENV.model = $("modelSel").value;
     { const ws = wxP().wind, dir = Math.random() * Math.PI * 2; S.wind.set(Math.sin(dir) * ws, 0, Math.cos(dir) * ws); S.gustV.set(0, 0, 0); }
-    if ($("startSel").value === "gate") spawnAtGate(S.from); else if (hiddenParked) { hiddenParked.visible = true; hiddenParked = null; }
+    S.depLane = 0;
+    if ($("startSel").value === "sat" && S.from.satLive && S.from.satLive.length) spawnAtSat(S.from);
+    else if ($("startSel").value !== "runway") spawnAtGate(S.from); else if (hiddenParked) { hiddenParked.visible = true; hiddenParked = null; }
     S.wantGate = !!S.to;   // free flight: after landing at the destination, taxi to a gate and let the passengers off
     S.mode = "fly"; brief.hidden = true;
     const rot = Math.round(spec.stall * 1.05 * 0.9 * MS2KT);
@@ -6463,7 +6489,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   function atcSay(text, cls) { RADIO.push({ text, t: 12 }); if (RADIO.length > 4) RADIO.shift(); setTxt("atcStatus", text.replace(/^[^:]+: /, "")); $("atcStatus").className = "atc-st " + (cls || ""); }
   function atcDeparture() {
     const a = S.from; if (!a || !S.grounded) return;
-    const li = Math.max(0, laneAt(a, S.pos.x, S.pos.z)), lab = laneOf(a, li).label, t = traffic(a, "dep", li), wind = windText();
+    const on = laneAt(a, S.pos.x, S.pos.z), li = on >= 0 ? on : S.depLane || 0, lab = laneOf(a, li).label, t = traffic(a, "dep", li), wind = windText();
     S.atc = { kind: "dep", a, li, state: t.length ? "hold" : "cleared", t: 0, warned: false };
     if (t.length) atcSay(`${a.name} Tower: hold short of runway ${lab}. Traffic ${t[0].why}: ${tName(t[0].ai)}. I'll call you.`, "hold");
     else atcSay(`${a.name} Tower: runway ${lab}, wind ${wind}, cleared for takeoff.`, "go");
@@ -6505,7 +6531,7 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (atcEl.hidden) return;
     const g = S.grounded && S.mode === "fly", a = S.from, b = S.to, C = S.atc;
     $("atcDep").disabled = !(g && a && !S.liftT); $("atcArr").disabled = !(!S.grounded && b && S.mode === "fly");
-    setTxt("atcDepSub", a ? `${a.code} · runway ${a.label}` : "—"); setTxt("atcArrSub", b ? `${b.code} · runway ${laneOf(b, S.toLane).label}${b && !S.grounded ? ` · ${(thrDist(b, S.pos, S.toLane) / 1000).toFixed(0)} km` : ""}` : "no destination");
+    setTxt("atcDepSub", a ? `${a.code} · runway ${laneOf(a, S.depLane).label}` : "—"); setTxt("atcArrSub", b ? `${b.code} · runway ${laneOf(b, S.toLane).label}${b && !S.grounded ? ` · ${(thrDist(b, S.pos, S.toLane) / 1000).toFixed(0)} km` : ""}` : "no destination");
     { const two = !!b && lanes(b).length > 1 && !S.grounded && S.mode === "fly"; $("atcRwy").hidden = !two; if (two) $("atcRwy").textContent = `Land on runway ${laneOf(b, (S.toLane || 0) ? 0 : 1).label} instead`; }
     setTxt("atcFreq", (!S.grounded && b ? b : a || b) ? `${(!S.grounded && b ? b : a).name} Tower` : "Tower");
     if (!C) { const st = $("atcStatus"); if (!st.classList.contains("warn")) { setTxt("atcStatus", g ? "Tell the tower when you're ready to go." : b ? "Call the tower before your final approach." : "No clearance yet."); st.className = "atc-st"; } }
@@ -6736,7 +6762,8 @@ vec3 liveryAt(vec3 p, out float fus) {
     for (const k of ["apt_term", "mono_train"]) { const pk = PACK_CACHE[k]; if (!pk) continue;
       for (const pt of pk.parts) { const c = pt.base, glass = c[2] > 0.7 && c[0] < 0.1, lamp = k === "apt_term" ? (c[0] < 0.15 && c[1] < 0.15) : (c[0] > 0.6 && c[2] < 0.2);
         if (pt.mat.emissive) pt.mat.emissive.set(night && (glass || lamp) ? (glass ? 0x5a4a2c : 0xffe2a8) : 0x000000); } }
-    if (typeof TERM_GLASS !== "undefined") for (const m of TERM_GLASS) if (m.emissive) m.emissive.set(night ? 0x5a4a2c : 0x000000);
+    if (typeof TERM_GLASS !== "undefined") for (const m of TERM_GLASS) if (m.emissive) m.emissive.set(night ? 0x8a6c3c : 0x000000);
+    if (typeof NIGHT_OBJS !== "undefined") for (const o of NIGHT_OBJS) o.visible = night;
   }
   function lightning(dt) {
     if (ENV.weather !== "storm" || !(S.mode === "fly" || S.mode === "brief" || S.mode === "paused")) { if (LT.flash > 0) { LT.flash = 0; hemi.intensity = ENV.hemi0 ?? hemi.intensity; } return; }
@@ -6965,6 +6992,17 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (g) g.player = true;
     return g;
   }
+  function spawnAtSat(a) {   // on a working stand at the satellite: you leave from the second runway
+    const g = playerSatStand(a); if (!g) return spawnAtGate(a);
+    if (hiddenParked) { hiddenParked.visible = true; hiddenParked = null; }
+    const len = DIMS[spec.kind][1], [x, z] = toWorld(a, -g.z, g.cxs + 21 + len / 2);
+    S.pos.set(x, a.elev + 0.05 + spec.gearH, z);
+    S.q.setFromAxisAngle(AY, -(a.hdg - 90) * Math.PI / 180);
+    S.gate = { a, g, len }; S.taxiOut = true; S.push = null; S.gateFlow = true; S.depLane = 1;
+    pushBtn.hidden = true; startServices("dep");
+    RADIO.push({ text: `${a.name} Ground: ${PLANES[spec.kind].name}, welcome to gate ${standName(a, g)} at the satellite. You'll depart from runway ${laneOf(a, 1).label}.`, t: 12 });
+    return true;
+  }
   function spawnAtGate(a) {
     const g = playerStand(a); if (!g) return false;
     if (hiddenParked) hiddenParked.visible = true;
@@ -7147,6 +7185,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   }
   $("perfX").addEventListener("click", (e) => { S.perfHide = $("perfTag").textContent; perfCard.hidden = true; e.currentTarget.blur(); });
   function departureGuide() {
+    if (S.depLane && lanes(S.from).length > 1) return departureGuideSat();
     const a = S.from, r = a.rwys[0], tl = r.len * 0.92, alHold = -(tl / 2 - 12), [alNow] = local(a, S.pos.x, S.pos.z), rw = a.label;
     const P = (al, ac) => toWorld(a, al, ac), here = [S.pos.x, S.pos.z];
     // straight ahead along the apron first (you face the runway end after the pushback), then a smooth turn onto taxiway A
@@ -7166,6 +7205,16 @@ vec3 liveryAt(vec3 p, out float fus) {
     if (g && g.ai) evictAI(g.ai, a);
     if (g) g.player = true;
     return g;
+  }
+  function departureGuideSat() {   // from the satellite: onto the parallel taxiway, along it to the end of runway 2, hold short, line up
+    const a = S.from, ln = laneOf(a, 1), tl = ln.len * 0.92, alHold = ln.al - (tl / 2 - 12), rw = ln.label, P = (al, ac) => toWorld(a, al, ac);
+    const [alNow, acNow] = local(a, S.pos.x, S.pos.z), dirA = Math.sign(alHold - alNow) || -1, sg = Math.sign(ln.off - ln.tx) || 1;
+    const pts = [P(alNow + dirA * 30, acNow), P(alNow + dirA * 110, ln.tx), P(alHold, ln.tx), P(alHold, ln.off - sg * (ln.w / 2 + 48)), P(alHold, ln.off)];
+    setGuide("dep", pts,
+      ["TAXI AHEAD", "TO THE TAXIWAY", `TAXIWAY · TO RWY ${rw}`, `HOLD SHORT RWY ${rw}`, `LINE UP RWY ${rw}`],
+      [null, null, null, `${a.name} Tower: line up runway ${rw}.`, null], null,
+      ["along the satellite apron", "onto the parallel taxiway (the yellow line)", `along the taxiway to runway ${rw}`, `and stop at the red hold line, runway ${rw} ahead`, `onto runway ${rw} and line up`]);
+    flash(`Taxi to runway ${rw}: follow the yellow dashes and the card at the top`, 3.5);
   }
   function arrivalGuide(a) {
     const li = Math.max(0, laneAt(a, S.pos.x, S.pos.z)), r = laneOf(a, li), tl = r.len * 0.92, [alNow] = local(a, S.pos.x, S.pos.z);
@@ -7252,7 +7301,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   }
   function startPushback() {
     if (!S.gate || S.push || S.mode !== "fly") return;
-    S.push = { d: 0, D: S.gate.len * 0.55 + 28, h0: Math.atan2(-V.fwd.set(0, 0, -1).applyQuaternion(S.q).x, -V.fwd.z) };
+    S.push = { d: 0, D: S.gate.len * 0.55 + 28, h0: Math.atan2(-V.fwd.set(0, 0, -1).applyQuaternion(S.q).x, -V.fwd.z), dir: S.gate.g && S.gate.g.sat ? -1 : 1 };   // swing the tail so you face the runway's start
     pushBtn.hidden = true; chime(440, 0.2);
     RADIO.push({ text: `${S.gate.a.name} Ground: pushback approved.`, t: 8 });
   }
@@ -7260,7 +7309,7 @@ vec3 liveryAt(vec3 p, out float fus) {
   function stepPushback(dt) {
     const p = S.push; if (!p) return false;
     const v = 2.2, k = Math.min(1, (p.d + v * dt) / p.D); p.d += v * dt;
-    const yaw = p.h0 - (Math.PI / 2) * k * k * (3 - 2 * k);
+    const yaw = p.h0 - (p.dir || 1) * (Math.PI / 2) * k * k * (3 - 2 * k);
     S.q.setFromAxisAngle(AY, yaw);
     const fwd = V.fwd.set(0, 0, -1).applyQuaternion(S.q);
     S.pos.x -= fwd.x * v * dt; S.pos.z -= fwd.z * v * dt; S.pos.y = groundY(S.pos.x, S.pos.z) + spec.gearH; S.speed = 0; S.gs = 0;
